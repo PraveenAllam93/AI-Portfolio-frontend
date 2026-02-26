@@ -36,5 +36,9 @@
 		"typescript": "^5.9.3",
 		"typescript-eslint": "^8.53.1",
 		"vite": "^7.3.1"
+	},
+	"dependencies": {
+		"@aws-sdk/client-cognito-identity-provider": "^3.997.0",
+		"aws-amplify": "^6.16.2"
 	}
 }
