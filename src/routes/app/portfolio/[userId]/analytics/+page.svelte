@@ -2,16 +2,15 @@
 	import { onMount } from 'svelte';
 	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
+	import { fade, scale } from 'svelte/transition';
+	import { cubicOut } from 'svelte/easing';
 	import { authStore } from '$lib/stores/auth';
 	import { getPortfolioAnalytics } from '$lib/services/portfolio';
 	import { reveal } from '$lib/actions/animate';
 	import type { PortfolioAnalytics, AnalyticsTimeline } from '$lib/types/portfolio';
 
-	// $page.params are string | undefined at the TypeScript level; the route
-	// guarantees userId is always present at runtime.
 	const userId: string = $derived($page.params.userId ?? '');
 
-	// Ownership guard — only the portfolio owner can view their analytics
 	$effect(() => {
 		const authUser = $authStore.user;
 		if (!$authStore.loading && authUser && authUser.userId !== userId) {
@@ -19,25 +18,36 @@
 		}
 	});
 
-	let analytics: PortfolioAnalytics | null = $state(null);
+	interface ExtendedAnalytics extends PortfolioAnalytics {
+		uniqueVisitors?: number;
+		avgTtfb?: number;
+		cacheHitRate?: number;
+		byHour?: Record<string, number>;
+		byDayOfWeek?: Record<string, number>;
+		byVersion?: Record<string, number>;
+		bestTimeToShare?: {
+			hour: number;
+			dayOfWeek: string;
+		};
+	}
+
+	let analytics: ExtendedAnalytics | null = $state(null);
 	let loadingStatus: 'loading' | 'error' | 'done' = $state('loading');
 	let errorMsg = $state('');
+	let isChartExpanded = $state(false);
+	let hoveredIndex: number | null = $state(null);
 
 	// ── SVG chart constants ────────────────────────────────────────────────────
-	const PAD_L = 48;
-	const PAD_R = 16;
-	const PAD_T = 12;
-	const PAD_B = 32;
-	const SVG_W = 600;
-	const SVG_H = 160;
-	const CHART_W = SVG_W - PAD_L - PAD_R; // 536
-	const CHART_H = SVG_H - PAD_T - PAD_B; // 116
-	const CHART_BOTTOM = SVG_H - PAD_B; // 128
+	const SVG_W = 1000;
+	const SVG_H = 300;
+	const PAD_L = 50;
+	const PAD_R = 30;
+	const PAD_T = 30;
+	const PAD_B = 40;
+	const CHART_W = SVG_W - PAD_L - PAD_R;
+	const CHART_H = SVG_H - PAD_T - PAD_B;
+	const CHART_BOTTOM = SVG_H - PAD_B;
 
-	// ── Chart state (populated in loadAnalytics) ───────────────────────────────
-	// Avoid $derived on `analytics` — Svelte 5 compiles $state(null) such that
-	// TypeScript infers the literal `null` type, causing property access in
-	// $derived to resolve to `never`. Compute eagerly in loadAnalytics instead.
 	let timeline: AnalyticsTimeline[] = $state([]);
 	let minV = $state(0);
 	let maxV = $state(0);
@@ -46,17 +56,20 @@
 	let areaPath = $state('');
 	let xLabels: Array<{ x: number; label: string }> = $state([]);
 	let yLabels: Array<{ y: number; label: string }> = $state([]);
+	
 	let countryTotal = $state(0);
 	let sourceTotal = $state(0);
 	let deviceTotal = $state(0);
+	let dayTotal = $state(0);
 
-	// ── Pure chart computation helpers ────────────────────────────────────────
 	function buildLinePath(tl: AnalyticsTimeline[], mn: number, rg: number): string {
+		if (tl.length === 0) return '';
 		return tl
 			.map((d, i) => {
 				const n = tl.length;
 				const x = PAD_L + (n > 1 ? i / (n - 1) : 0.5) * CHART_W;
-				const y = CHART_BOTTOM - ((d.views - mn) / rg) * CHART_H;
+				const val = (d as any).count ?? d.views ?? 0;
+				const y = CHART_BOTTOM - ((val - mn) / rg) * CHART_H;
 				return `${i === 0 ? 'M' : 'L'}${x.toFixed(1)},${y.toFixed(1)}`;
 			})
 			.join(' ');
@@ -70,17 +83,44 @@
 		const points = tl
 			.map((d, i) => {
 				const x = PAD_L + (n > 1 ? i / (n - 1) : 0.5) * CHART_W;
-				const y = CHART_BOTTOM - ((d.views - mn) / rg) * CHART_H;
+				const val = (d as any).count ?? d.views ?? 0;
+				const y = CHART_BOTTOM - ((val - mn) / rg) * CHART_H;
 				return `L${x.toFixed(1)},${y.toFixed(1)}`;
 			})
 			.join(' ');
 		return `M${firstX},${CHART_BOTTOM} ${points} L${lastX},${CHART_BOTTOM} Z`;
 	}
 
+	function onMouseMove(event: MouseEvent) {
+		if (timeline.length === 0) return;
+		const svg = event.currentTarget as SVGSVGElement;
+		const rect = svg.getBoundingClientRect();
+		const mouseX = event.clientX - rect.left;
+		const svgX = (mouseX / rect.width) * SVG_W;
+		
+		let closestIdx = 0;
+		let minDistance = Infinity;
+		
+		for (let i = 0; i < timeline.length; i++) {
+			const x = PAD_L + (timeline.length > 1 ? i / (timeline.length - 1) : 0.5) * CHART_W;
+			const dist = Math.abs(x - svgX);
+			if (dist < minDistance) {
+				minDistance = dist;
+				closestIdx = i;
+			}
+		}
+		
+		hoveredIndex = closestIdx;
+	}
+
+	function onMouseLeave() {
+		hoveredIndex = null;
+	}
+
 	function buildXLabels(tl: AnalyticsTimeline[]): Array<{ x: number; label: string }> {
 		if (tl.length === 0) return [];
 		return [
-			...new Set([0, 15, 30, 45, 60, 75, tl.length - 1].filter((i) => i < tl.length))
+			...new Set([0, Math.floor(tl.length/4), Math.floor(tl.length/2), Math.floor(tl.length*0.75), tl.length - 1].filter((i) => i < tl.length))
 		].map((i) => ({
 			x: PAD_L + (tl.length > 1 ? i / (tl.length - 1) : 0.5) * CHART_W,
 			label: formatDate(tl[i].date)
@@ -94,32 +134,39 @@
 		}));
 	}
 
-	function sumRecord(record: Record<string, number>): number {
+	function sumRecord(record: Record<string, number> | undefined): number {
+		if (!record) return 0;
 		return (Object.values(record) as number[]).reduce((a: number, b: number) => a + b, 0);
 	}
 
-	// ── Load + compute ────────────────────────────────────────────────────────
 	async function loadAnalytics() {
 		loadingStatus = 'loading';
 		errorMsg = '';
 		const result = await getPortfolioAnalytics(userId);
 		if (result.ok && result.data) {
-			analytics = result.data;
-			const tl = result.data.timeline;
-			const mn = tl.length ? Math.min(...tl.map((d) => d.views)) : 0;
-			const mx = tl.length ? Math.max(...tl.map((d) => d.views)) : 0;
-			const rg = mx - mn || 1;
+			analytics = result.data as ExtendedAnalytics;
+			const tl = result.data.timeline || [];
+			
+			const getVal = (d: any) => d.count ?? d.views ?? 0;
+			const mn = 0; 
+			const mx = tl.length ? Math.max(...tl.map(getVal)) : 0;
+			const paddedMx = mx === 0 ? 10 : mx + Math.ceil(mx * 0.1); 
+			const rg = paddedMx - mn || 1;
+			
 			timeline = tl;
 			minV = mn;
-			maxV = mx;
+			maxV = paddedMx;
 			range = rg;
 			linePath = buildLinePath(tl, mn, rg);
 			areaPath = buildAreaPath(tl, mn, rg);
 			xLabels = buildXLabels(tl);
-			yLabels = buildYLabels(mn, mx);
+			yLabels = buildYLabels(mn, paddedMx);
+			
 			countryTotal = sumRecord(result.data.byCountry);
 			sourceTotal = sumRecord(result.data.bySource);
 			deviceTotal = sumRecord(result.data.byDevice);
+			dayTotal = sumRecord(analytics.byDayOfWeek);
+			
 			loadingStatus = 'done';
 		} else {
 			errorMsg = result.error ?? 'Failed to load analytics';
@@ -129,8 +176,8 @@
 
 	onMount(loadAnalytics);
 
-	// ── Display helpers ────────────────────────────────────────────────────────
-	function topEntries(record: Record<string, number>, limit = 5): Array<[string, number]> {
+	function topEntries(record: Record<string, number> | undefined, limit = 5): Array<[string, number]> {
+		if (!record) return [];
 		return (Object.entries(record) as Array<[string, number]>)
 			.sort(([, a], [, b]) => b - a)
 			.slice(0, limit);
@@ -176,238 +223,339 @@
 		tablet: 'Tablet',
 		other: 'Other'
 	};
+	
+	function formatHour(h: number | string): string {
+	    const hr = Number(h);
+	    if (hr === 0) return '12 AM';
+	    if (hr === 12) return '12 PM';
+	    return hr > 12 ? `${hr - 12} PM` : `${hr} AM`;
+	}
+
+    function getDayCount(day: string, record: Record<string, number> | undefined): number {
+        if (!record) return 0;
+        // Try exact match, then short version, case-insensitive
+        const dayLower = day.toLowerCase();
+        const dayShort = day.substring(0, 3).toLowerCase();
+        for (const [key, val] of Object.entries(record)) {
+            const kl = key.toLowerCase();
+            if (kl === dayLower || kl === dayShort || kl.startsWith(dayShort)) return val;
+        }
+        return 0;
+    }
 </script>
 
 <svelte:head>
 	<title>Analytics — AIfolio</title>
 </svelte:head>
 
-<div class="flex min-h-screen flex-col bg-[#F5F3FF]">
-	<!-- Header -->
-	<header class="sticky top-0 z-10 border-b border-gray-100 bg-white shadow-sm">
+<!-- Expanded Chart Modal -->
+{#if isChartExpanded && timeline.length > 0}
+	<div class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm sm:p-8" transition:fade={{ duration: 200 }}>
+		<div class="relative w-full max-w-6xl rounded-[2.5rem] bg-white p-6 shadow-2xl sm:p-10" transition:scale={{ start: 0.95, duration: 250, easing: cubicOut }}>
+			<div class="mb-8 flex items-center justify-between">
+				<div>
+					<h2 class="font-serif text-3xl font-bold text-slate-900">Traffic Over Time</h2>
+					<p class="mt-1 text-slate-500">A detailed view of your portfolio's historical performance. Hover points for counts.</p>
+				</div>
+				<button onclick={() => isChartExpanded = false} class="flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 text-slate-500 transition-colors hover:bg-slate-200 hover:text-slate-900">
+					<svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+						<path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+					</svg>
+				</button>
+			</div>
+			<div class="w-full">
+				{@render chartSvg("h-[50vh] min-h-[400px]")}
+			</div>
+		</div>
+	</div>
+{/if}
+
+{#snippet chartSvg(cssClass: string)}
+	<svg
+		viewBox="0 0 {SVG_W} {SVG_H}"
+		width="100%"
+		height="100%"
+		class="{cssClass} cursor-crosshair"
+		preserveAspectRatio="none"
+		aria-label="Portfolio views over time"
+		onmousemove={onMouseMove}
+		onmouseleave={onMouseLeave}
+	>
+		<defs>
+			<linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
+				<stop offset="0%" stop-color="#0f172a" stop-opacity="0.15" />
+				<stop offset="100%" stop-color="#0f172a" stop-opacity="0" />
+			</linearGradient>
+			<pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+				<circle cx="2" cy="2" r="1" fill="#f1f5f9" />
+			</pattern>
+		</defs>
+
+		<rect width="100%" height="100%" fill="url(#grid)" />
+
+		{#each yLabels as { y }}
+			<line x1={PAD_L} y1={y} x2={SVG_W - PAD_R} y2={y} stroke="#e2e8f0" stroke-width="1" stroke-dasharray="4 4" />
+		{/each}
+
+		<path d={areaPath} fill="url(#areaGrad)" />
+		<path d={linePath} fill="none" stroke="#0f172a" stroke-width="3" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke" />
+
+		{#if hoveredIndex !== null}
+			{@const d = timeline[hoveredIndex]}
+			{@const x = PAD_L + (timeline.length > 1 ? hoveredIndex / (timeline.length - 1) : 0.5) * CHART_W}
+			{@const val = (d as any).count ?? d.views ?? 0}
+			{@const y = CHART_BOTTOM - ((val - minV) / range) * CHART_H}
+			<line x1={x} y1={PAD_T} x2={x} y2={CHART_BOTTOM} stroke="#0f172a" stroke-width="1" stroke-dasharray="4 4" />
+			<circle cx={x} cy={y} r="6" fill="#0f172a" stroke="white" stroke-width="2" />
+			<g transform="translate({x > SVG_W - 130 ? x - 130 : x + 10}, {y > 50 ? y - 45 : y + 10})">
+				<rect width="120" height="45" rx="8" fill="#0f172a" />
+				<text x="10" y="20" fill="white" font-size="14" font-weight="bold">{val.toLocaleString()} views</text>
+				<text x="10" y="36" fill="#94a3b8" font-size="11">{formatDate(d.date)}</text>
+			</g>
+		{/if}
+
+		<line x1={PAD_L} y1={CHART_BOTTOM} x2={SVG_W - PAD_R} y2={CHART_BOTTOM} stroke="#cbd5e1" stroke-width="2" />
+
+		{#each xLabels as { x, label }}
+			<text x={x} y={SVG_H - 12} text-anchor="middle" font-size="12" fill="#64748b" font-weight="600" class="select-none">{label}</text>
+		{/each}
+
+		{#each yLabels as { y, label }}
+			<text x={PAD_L - 10} {y} text-anchor="end" dominant-baseline="middle" font-size="12" fill="#64748b" font-weight="600" class="select-none">{label}</text>
+		{/each}
+	</svg>
+{/snippet}
+
+<div class="flex min-h-screen flex-col bg-[#fafafa]">
+	<header class="sticky top-0 z-10 border-b border-slate-200 bg-white shadow-sm">
 		<div class="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
-			<a href="/" class="font-serif text-xl font-bold">
-				<span class="gradient-text">AI</span><span class="text-[#1E1033]">folio</span>
+			<a href="/" class="flex items-center gap-2 font-bold text-xl text-slate-900">
+                <div class="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-900 text-white shadow-md transition-transform hover:rotate-12">
+                    <span class="text-xs font-black">AI</span>
+                </div>
+                folio
 			</a>
 			{#if $authStore.user}
 				<div class="flex items-center gap-3">
-					<div
-						class="gradient-bg flex h-9 w-9 items-center justify-center rounded-full text-sm font-bold text-white shadow-sm"
-					>
-						{$authStore.user.name
-							.split(' ')
-							.slice(0, 2)
-							.map((n) => n[0]?.toUpperCase() ?? '')
-							.join('')}
+					<div class="flex h-9 w-9 items-center justify-center rounded-full text-sm font-bold text-slate-700 bg-slate-100 border border-slate-200 shadow-sm">
+						{$authStore.user.name.split(' ').slice(0, 2).map((n) => n[0]?.toUpperCase() ?? '').join('')}
 					</div>
-					<span class="hidden text-sm font-medium text-[#1E1033] sm:block">
-						{$authStore.user.name}
-					</span>
+					<span class="hidden text-sm font-medium text-slate-700 sm:block">{$authStore.user.name}</span>
 				</div>
 			{/if}
 		</div>
 	</header>
 
-	<main class="mx-auto w-full max-w-7xl flex-1 px-6 py-10">
-		<!-- Page title -->
-		<div use:reveal class="mb-8">
-			<a
-				href="/app/dashboard"
-				class="mb-3 inline-flex items-center gap-1.5 text-sm font-medium text-[#4B5563] transition-colors hover:text-[#1E1033]"
-			>
-				<svg
-					xmlns="http://www.w3.org/2000/svg"
-					fill="none"
-					viewBox="0 0 24 24"
-					stroke-width="2"
-					stroke="currentColor"
-					class="h-4 w-4"
-				>
+	<main class="mx-auto w-full max-w-7xl flex-1 px-6 py-8">
+		<div use:reveal class="mb-6">
+			<a href="/app/dashboard" class="mb-3 inline-flex items-center gap-1.5 text-sm font-bold text-slate-500 transition-colors hover:text-slate-900">
+				<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="h-4 w-4">
 					<path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" />
 				</svg>
-				Back to Dashboard
+				Back
 			</a>
-			<h1 class="font-serif text-3xl font-bold text-[#1E1033]">Portfolio Analytics</h1>
-			<p class="mt-1 text-[#4B5563]">See who's viewing your portfolio and where they're coming from.</p>
+			<h1 class="font-serif text-3xl font-bold tracking-tight text-slate-900">Portfolio Analytics</h1>
 		</div>
 
 		{#if loadingStatus === 'loading'}
-			<div class="flex items-center gap-2 py-12 text-sm text-[#4B5563]">
-				<svg class="h-4 w-4 animate-spin text-violet-500" fill="none" viewBox="0 0 24 24">
-					<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"
-					></circle>
-					<path
-						class="opacity-75"
-						fill="currentColor"
-						d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
-					></path>
+			<div class="flex flex-col items-center justify-center py-24 text-sm text-slate-500">
+				<svg class="h-8 w-8 animate-spin text-slate-300" fill="none" viewBox="0 0 24 24">
+					<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+					<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
 				</svg>
-				Loading analytics…
+				<span class="mt-4 font-bold text-slate-400">Loading metrics…</span>
 			</div>
 		{:else if loadingStatus === 'error'}
-			<div class="rounded-2xl bg-red-50 px-6 py-8 text-center ring-1 ring-red-200">
-				<p class="text-sm font-medium text-red-700">{errorMsg}</p>
-				<button
-					onclick={loadAnalytics}
-					class="mt-4 rounded-full border border-red-300 px-4 py-2 text-sm font-medium text-red-700 transition-colors hover:bg-red-100"
-				>
-					Retry
-				</button>
+			<div class="rounded-3xl border border-red-100 bg-white p-10 text-center shadow-xl">
+				<p class="text-xl font-serif font-bold text-slate-900">Failed to load analytics</p>
+				<p class="mt-2 text-slate-500">{errorMsg}</p>
+				<button onclick={loadAnalytics} class="mt-6 rounded-full bg-slate-900 px-8 py-3 text-sm font-bold text-white transition-all hover:bg-slate-800 shadow-lg">Retry</button>
 			</div>
 		{:else if analytics}
-			<!-- Stats row -->
-			<div use:reveal={{ delay: 60 }} class="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
+			<!-- Primary Stats -->
+			<div use:reveal={{ delay: 60 }} class="mb-6 grid grid-cols-2 md:grid-cols-3 gap-4 xl:grid-cols-6">
 				{#each [
-					{ label: 'Total Views', value: analytics.totalViews.toLocaleString(), icon: 'M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z', iconBg: 'bg-violet-100', iconColor: 'text-violet-600' },
-					{ label: 'Last 7 Days', value: analytics.last7Days.toLocaleString(), icon: 'M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 0 1 2.25-2.25h13.5A2.25 2.25 0 0 1 21 7.5v11.25m-18 0A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75m-18 0v-7.5A2.25 2.25 0 0 1 5.25 9h13.5A2.25 2.25 0 0 1 21 11.25v7.5', iconBg: 'bg-blue-100', iconColor: 'text-blue-600' },
-					{ label: 'Last 30 Days', value: analytics.last30Days.toLocaleString(), icon: 'M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 0 1 3 19.875v-6.75ZM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V8.625ZM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V4.125Z', iconBg: 'bg-emerald-100', iconColor: 'text-emerald-600' }
+					{ label: 'Total Views', value: analytics.totalViews.toLocaleString(), icon: 'M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z' },
+					{ label: 'Last 30 Days', value: analytics.last30Days.toLocaleString(), icon: 'M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 0 1 2.25-2.25h13.5A2.25 2.25 0 0 1 21 7.5v11.25m-18 0A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75m-18 0v-7.5A2.25 2.25 0 0 1 5.25 9h13.5A2.25 2.25 0 0 1 21 11.25v7.5' },
+					{ label: 'Last 7 Days', value: analytics.last7Days.toLocaleString(), icon: 'M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 0 1 2.25-2.25h13.5A2.25 2.25 0 0 1 21 7.5v11.25m-18 0A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75m-18 0v-7.5A2.25 2.25 0 0 1 5.25 9h13.5A2.25 2.25 0 0 1 21 11.25v7.5' },
+					{ label: 'Unique Visitors', value: (analytics.uniqueVisitors ?? 0).toLocaleString(), icon: 'M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z' },
+                    { label: 'Speed (TTFB)', value: analytics.avgTtfb ? `${Math.round(analytics.avgTtfb * 1000)}ms` : '–', icon: 'M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z' },
+                    { label: 'Cache Hit', value: analytics.cacheHitRate ? `${analytics.cacheHitRate}%` : '–', icon: 'M20.25 14.15v4.25c0 1.094-.787 2.036-1.872 2.18-2.087.277-4.216.42-6.378.42s-4.291-.143-6.378-.42c-1.085-.144-1.872-1.086-1.872-2.18v-4.25m16.5 0a2.18 2.18 0 0 0 .75-1.661V8.706c0-1.081-.768-2.015-1.837-2.175a48.114 48.114 0 0 0-3.413-.387' }
 				] as stat}
-					<div class="flex items-center gap-4 rounded-2xl bg-white p-5 shadow-sm ring-1 ring-black/5">
-						<div
-							class="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl {stat.iconBg}"
-						>
-							<svg
-								xmlns="http://www.w3.org/2000/svg"
-								fill="none"
-								viewBox="0 0 24 24"
-								stroke-width="1.5"
-								stroke="currentColor"
-								class="h-6 w-6 {stat.iconColor}"
-							>
+					<div class="flex flex-col items-start gap-2 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+						<div class="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-50 border border-slate-100">
+							<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="h-4 w-4 text-slate-900">
 								{#each stat.icon.split(' M ').filter(Boolean) as _, i}
-									{#if i === 0}
-										<path
-											stroke-linecap="round"
-											stroke-linejoin="round"
-											d={stat.icon.split(' M ')[0]}
-										/>
-									{:else}
-										<path
-											stroke-linecap="round"
-											stroke-linejoin="round"
-											d={'M ' + stat.icon.split(' M ')[i]}
-										/>
-									{/if}
+									<path stroke-linecap="round" stroke-linejoin="round" d={i === 0 ? stat.icon.split(' M ')[0] : 'M ' + stat.icon.split(' M ')[i]} />
 								{/each}
 							</svg>
 						</div>
 						<div>
-							<p class="text-xs font-medium uppercase tracking-wide text-[#4B5563]">{stat.label}</p>
-							<p class="mt-0.5 font-serif text-2xl font-bold text-[#1E1033]">{stat.value}</p>
+							<p class="text-[9px] font-bold tracking-widest text-slate-400 uppercase">{stat.label}</p>
+							<p class="font-serif text-xl font-bold text-slate-900">{stat.value}</p>
 						</div>
 					</div>
 				{/each}
 			</div>
 
-			<!-- 90-day timeline chart -->
-			<div
-				use:reveal={{ delay: 120 }}
-				class="mb-6 overflow-hidden rounded-2xl bg-white p-6 shadow-sm ring-1 ring-black/5"
-			>
-				<h2 class="mb-4 text-sm font-semibold text-[#1E1033]">90-Day View Timeline</h2>
-				{#if timeline.length === 0}
-					<p class="py-8 text-center text-sm text-[#9CA3AF]">No data yet.</p>
-				{:else}
-					<svg
-						viewBox="0 0 {SVG_W} {SVG_H}"
-						width="100%"
-						height="160"
-						preserveAspectRatio="none"
-						aria-label="Portfolio views over the last 90 days"
-					>
-						<defs>
-							<linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
-								<stop offset="0%" stop-color="#6D28D9" stop-opacity="0.25" />
-								<stop offset="100%" stop-color="#6D28D9" stop-opacity="0" />
-							</linearGradient>
-						</defs>
+			<div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+                <!-- Main Timeline -->
+                <div use:reveal={{ delay: 120 }} class="lg:col-span-2 overflow-hidden rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm flex flex-col">
+                    <div class="flex items-center justify-between mb-6 border-b border-slate-50 pb-4">
+						<div>
+							<h2 class="font-serif text-xl font-bold text-slate-900">Traffic Over Time</h2>
+							<p class="text-xs text-slate-500 mt-0.5">Daily view trends.</p>
+						</div>
+						<button onclick={() => isChartExpanded = true} class="h-8 w-8 flex items-center justify-center rounded-lg bg-slate-50 border border-slate-200 hover:bg-slate-100 transition-colors">
+							<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="h-4 w-4 text-slate-400">
+								<path stroke-linecap="round" stroke-linejoin="round" d="M3.75 3.75v4.5m0-4.5h4.5m-4.5 0L9 9M3.75 20.25v-4.5m0 4.5h4.5m-4.5 0L9 15M20.25 3.75h-4.5m4.5 0v4.5m0-4.5L15 9m5.25 11.25h-4.5m4.5 0v-4.5m0 4.5L15 15" />
+							</svg>
+						</button>
+                    </div>
+                    <div class="flex-1 min-h-[200px] flex flex-col justify-center">
+                        {#if timeline.length === 0}
+                            <p class="text-slate-400 text-sm italic text-center">No data available for timeline.</p>
+                        {:else}
+							{@render chartSvg("max-h-64")}
+                        {/if}
+                    </div>
+                </div>
 
-						<!-- Horizontal grid lines -->
-						{#each yLabels as { y }}
-							<line
-								x1={PAD_L}
-								y1={y}
-								x2={SVG_W - PAD_R}
-								y2={y}
-								stroke="#E5E7EB"
-								stroke-width="1"
-							/>
-						{/each}
+                <!-- Engagement -->
+                <div use:reveal={{ delay: 150 }} class="rounded-[2rem] bg-slate-900 p-6 shadow-xl flex flex-col text-white justify-between relative overflow-hidden">
+					<div class="absolute right-0 top-0 w-32 h-32 bg-white/5 rounded-full blur-3xl pointer-events-none"></div>
+                    <div class="relative z-10 mb-6">
+                        <h2 class="font-serif text-xl font-bold">Engagement</h2>
+                        <p class="text-slate-400 text-[11px]">Peak activity periods.</p>
+                    </div>
 
-						<!-- Area fill -->
-						<path d={areaPath} fill="url(#areaGrad)" />
+                    <div class="space-y-4 relative z-10">
+                        {#if analytics.byDayOfWeek}
+                            {@const weekDays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']}
+                            {@const dayVals = weekDays.map(d => getDayCount(d, analytics?.byDayOfWeek))}
+                            {@const peakVal = Math.max(...dayVals, 1)}
+                            {@const svgW = 200}
+                            {@const svgH = 60}
+                            {@const pad = 10}
+                            {@const chartW = svgW - (pad * 2)}
+                            {@const chartH = svgH - (pad * 2)}
+                            
+                            {@const points = dayVals.map((v, i) => ({
+                                x: pad + (i * (chartW / 6)),
+                                y: (svgH - pad) - ((v / peakVal) * chartH),
+                                val: v,
+                                day: weekDays[i]
+                            }))}
+                            
+                            {@const lineD = points.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x},${p.y}`).join(' ')}
+                            {@const areaD = `${lineD} L${points[6].x},${svgH} L${points[0].x},${svgH} Z`}
 
-						<!-- Line -->
-						<path d={linePath} fill="none" stroke="#6D28D9" stroke-width="2" stroke-linejoin="round" />
+                            <div class="bg-white/5 rounded-xl p-4 border border-white/10">
+                                <div class="flex items-center justify-between mb-3">
+                                    <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Weekly Activity</p>
+                                    <span class="text-[10px] font-bold text-emerald-400 uppercase">Trends</span>
+                                </div>
+                                
+                                <div class="relative h-16 w-full">
+                                    <svg viewBox="0 0 {svgW} {svgH}" width="100%" height="100%" preserveAspectRatio="none" class="overflow-visible">
+                                        <defs>
+                                            <linearGradient id="weekGrad" x1="0" y1="0" x2="0" y2="1">
+                                                <stop offset="0%" stop-color="#34d399" stop-opacity="0.2" />
+                                                <stop offset="100%" stop-color="#34d399" stop-opacity="0" />
+                                            </linearGradient>
+                                        </defs>
+                                        <path d={areaD} fill="url(#weekGrad)" />
+                                        <path d={lineD} fill="none" stroke="#34d399" stroke-width="2" stroke-linejoin="round" />
+                                        
+                                        {#each points as p}
+                                            {@const isPeak = p.val === peakVal && p.val > 0}
+                                            <g class="group/pt">
+                                                <circle cx={p.x} cy={p.y} r={isPeak ? 3 : 2} fill={isPeak ? "#34d399" : "#475569"} class="transition-all group-hover/pt:r-4 group-hover/pt:fill-white" />
+                                                <title>{p.day}: {p.val} views</title>
+                                            </g>
+                                        {/each}
+                                    </svg>
+                                </div>
+                                
+                                <div class="flex justify-between mt-2 text-[8px] font-bold text-slate-500 uppercase tracking-tighter">
+                                    {#each weekDays as day}
+                                        <span>{day.charAt(0)}</span>
+                                    {/each}
+                                </div>
+                            </div>
+                        {/if}
 
-						<!-- Data point dots (only render if ≤ 30 points to avoid clutter) -->
-						{#if timeline.length <= 30}
-							{#each timeline as d, i}
-								{@const n = timeline.length}
-								{@const cx = PAD_L + (n > 1 ? i / (n - 1) : 0.5) * CHART_W}
-								{@const cy = CHART_BOTTOM - ((d.views - minV) / range) * CHART_H}
-								<circle {cx} {cy} r="3" fill="#6D28D9" />
-							{/each}
-						{/if}
+                        {#if analytics.byHour}
+                            {@const hourVals = Object.values(analytics.byHour)}
+                            {@const peakHVal = Math.max(...hourVals, 1)}
+                            <div class="bg-white/5 rounded-xl p-4 border border-white/10">
+                                <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">Daily Pulse (24h)</p>
+                                <div class="flex items-end justify-between gap-[1px] h-12">
+                                    {#each Array.from({length: 24}, (_, i) => i.toString()) as hour}
+                                        {@const count = analytics?.byHour?.[hour] ?? 0}
+                                        {@const isPeak = count === peakHVal && count > 0}
+                                        <div class="flex-1 {isPeak ? 'bg-emerald-400' : 'bg-slate-700/50'} rounded-t-[1px] relative group transition-all hover:bg-emerald-400" style="height: {Math.max((count / peakHVal) * 100, 5)}%">
+                                            <div class="absolute -top-7 left-1/2 -translate-x-1/2 bg-white text-slate-900 text-[10px] font-bold px-1.5 py-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity z-20 pointer-events-none">{formatHour(hour)}: {count}</div>
+                                        </div>
+                                    {/each}
+                                </div>
+                            </div>
+                        {/if}
+                    </div>
+                </div>
+            </div>
 
-						<!-- X-axis baseline -->
-						<line
-							x1={PAD_L}
-							y1={CHART_BOTTOM}
-							x2={SVG_W - PAD_R}
-							y2={CHART_BOTTOM}
-							stroke="#D1D5DB"
-							stroke-width="1"
-						/>
+            <!-- Versions Insights -->
+            <div use:reveal={{ delay: 160 }} class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+                <div class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm text-center flex flex-col justify-center">
+                    <p class="text-[10px] font-bold tracking-widest text-slate-400 uppercase mb-2">Total Versions</p>
+                    <p class="font-serif text-5xl font-bold text-slate-900">{Object.keys(analytics.byVersion ?? {}).length}</p>
+                </div>
 
-						<!-- X-axis labels -->
-						{#each xLabels as { x, label }}
-							<text
-								x={x}
-								y={SVG_H - 8}
-								text-anchor="middle"
-								font-size="10"
-								fill="#9CA3AF"
-								font-family="Inter, sans-serif">{label}</text
-							>
-						{/each}
+                <div class="md:col-span-3 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm overflow-hidden flex flex-col">
+                    <div class="flex items-center justify-between mb-4 border-b border-slate-50 pb-3">
+                        <h2 class="font-serif text-xl font-bold text-slate-900">Version Performance</h2>
+                        <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Efficiency</span>
+                    </div>
+                    {#if analytics.byVersion && Object.keys(analytics.byVersion).length > 0}
+                        <div class="space-y-4 max-h-[120px] overflow-y-auto custom-scrollbar pr-2">
+                            {#each Object.entries(analytics.byVersion).sort((a, b) => b[1] - a[1]) as [version, count]}
+                                <div class="flex items-center gap-4 group">
+                                    <span class="w-12 text-xs font-bold text-slate-900 uppercase group-hover:text-emerald-600 transition-colors">{version}</span>
+                                    <div class="flex-1 h-2 bg-slate-50 rounded-full overflow-hidden">
+                                        <div class="h-full bg-slate-900 group-hover:bg-emerald-500 transition-all duration-1000" style="width: {pct(count, analytics.totalViews)}%"></div>
+                                    </div>
+                                    <span class="w-24 text-right text-xs font-bold text-slate-500">{count.toLocaleString()} views</span>
+                                    <span class="w-12 text-right text-xs font-bold text-slate-400">{pct(count, analytics.totalViews)}%</span>
+                                </div>
+                            {/each}
+                        </div>
+                    {:else}
+                        <p class="text-sm font-medium text-slate-400 text-center py-4 italic">No version data yet.</p>
+                    {/if}
+                </div>
+            </div>
 
-						<!-- Y-axis labels -->
-						{#each yLabels as { y, label }}
-							<text
-								x={PAD_L - 6}
-								{y}
-								text-anchor="end"
-								dominant-baseline="middle"
-								font-size="10"
-								fill="#9CA3AF"
-								font-family="Inter, sans-serif">{label}</text
-							>
-						{/each}
-					</svg>
-				{/if}
-			</div>
-
-			<!-- Breakdown grid -->
+            <!-- Detailed Breakdowns -->
 			<div use:reveal={{ delay: 180 }} class="grid grid-cols-1 gap-6 md:grid-cols-3">
 				<!-- By Country -->
-				<div class="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-black/5">
-					<h2 class="mb-4 text-sm font-semibold text-[#1E1033]">By Country</h2>
+				<div class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm hover:shadow-md transition-shadow">
+					<h2 class="mb-6 font-serif text-xl font-bold text-slate-900 border-b border-slate-100 pb-3">By Country</h2>
 					{#if countryTotal === 0}
-						<p class="text-sm text-[#9CA3AF]">No data yet.</p>
+						<p class="text-sm font-medium text-slate-400 py-4 text-center">No data yet.</p>
 					{:else}
-						<ul class="space-y-3">
+						<ul class="space-y-4">
 							{#each topEntries(analytics.byCountry) as [code, count]}
 								<li>
-									<div class="mb-1 flex items-center justify-between text-sm">
-										<span class="font-medium text-[#1E1033]">{countryDisplayName(code)}</span>
-										<span class="text-[#4B5563]">{pct(count, countryTotal)}%</span>
+									<div class="mb-2 flex items-center justify-between text-sm">
+										<span class="font-bold text-slate-900 flex items-center gap-2">
+											<span class="text-lg leading-none">{new Intl.DisplayNames(['en'], {type: 'region'}).of(code) !== code ? String.fromCodePoint(...code.toUpperCase().split('').map(char => 127397 + char.charCodeAt(0))) : '🌐'}</span>
+											{countryDisplayName(code)}
+										</span>
+										<span class="font-bold text-slate-500">{pct(count, countryTotal)}%</span>
 									</div>
-									<div class="h-1.5 overflow-hidden rounded-full bg-gray-100">
-										<div
-											class="h-full rounded-full bg-violet-500"
-											style="width: {pct(count, countryTotal)}%"
-										></div>
+									<div class="h-2 overflow-hidden rounded-full bg-slate-100">
+										<div class="h-full rounded-full bg-slate-900 transition-all duration-1000" style="width: {pct(count, countryTotal)}%"></div>
 									</div>
 								</li>
 							{/each}
@@ -416,25 +564,22 @@
 				</div>
 
 				<!-- By Source -->
-				<div class="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-black/5">
-					<h2 class="mb-4 text-sm font-semibold text-[#1E1033]">By Source</h2>
+				<div class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm hover:shadow-md transition-shadow">
+					<h2 class="mb-6 font-serif text-xl font-bold text-slate-900 border-b border-slate-100 pb-3">By Source</h2>
 					{#if sourceTotal === 0}
-						<p class="text-sm text-[#9CA3AF]">No data yet.</p>
+						<p class="text-sm font-medium text-slate-400 py-4 text-center">No data yet.</p>
 					{:else}
-						<ul class="space-y-3">
+						<ul class="space-y-4">
 							{#each topEntries(analytics.bySource) as [key, count]}
 								<li>
-									<div class="mb-1 flex items-center justify-between text-sm">
-										<span class="font-medium text-[#1E1033]"
-											>{sourceLabels[key] ?? key}</span
-										>
-										<span class="text-[#4B5563]">{pct(count, sourceTotal)}%</span>
+									<div class="mb-2 flex items-center justify-between text-sm">
+										<span class="font-bold text-slate-900 capitalize">
+											{sourceLabels[key] ?? key}
+										</span>
+										<span class="font-bold text-slate-500">{pct(count, sourceTotal)}%</span>
 									</div>
-									<div class="h-1.5 overflow-hidden rounded-full bg-gray-100">
-										<div
-											class="h-full rounded-full bg-blue-500"
-											style="width: {pct(count, sourceTotal)}%"
-										></div>
+									<div class="h-2 overflow-hidden rounded-full bg-slate-100">
+										<div class="h-full rounded-full bg-slate-900 transition-all duration-1000" style="width: {pct(count, sourceTotal)}%"></div>
 									</div>
 								</li>
 							{/each}
@@ -443,23 +588,29 @@
 				</div>
 
 				<!-- By Device -->
-				<div class="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-black/5">
-					<h2 class="mb-4 text-sm font-semibold text-[#1E1033]">By Device</h2>
+				<div class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm hover:shadow-md transition-shadow">
+					<h2 class="mb-6 font-serif text-xl font-bold text-slate-900 border-b border-slate-100 pb-3">By Device</h2>
 					{#if deviceTotal === 0}
-						<p class="text-sm text-[#9CA3AF]">No data yet.</p>
+						<p class="text-sm font-medium text-slate-400 py-4 text-center">No data yet.</p>
 					{:else}
-						<ul class="space-y-3">
+						<ul class="space-y-4">
 							{#each topEntries(analytics.byDevice) as [key, count]}
 								<li>
-									<div class="mb-1 flex items-center justify-between text-sm">
-										<span class="font-medium text-[#1E1033]">{deviceLabels[key] ?? key}</span>
-										<span class="text-[#4B5563]">{pct(count, deviceTotal)}%</span>
+									<div class="mb-2 flex items-center justify-between text-sm">
+										<span class="font-bold text-slate-900 flex items-center gap-2">
+											{#if key === 'mobile'}
+												<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="size-4 text-slate-400"><path stroke-linecap="round" stroke-linejoin="round" d="M10.5 1.5H8.25A2.25 2.25 0 0 0 6 3.75v16.5a2.25 2.25 0 0 0 2.25 2.25h7.5A2.25 2.25 0 0 0 18 20.25V3.75a2.25 2.25 0 0 0-2.25-2.25H13.5m-3 0V3h3V1.5m-3 0h3m-3 18.75h3" /></svg>
+											{:else if key === 'desktop'}
+												<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="size-4 text-slate-400"><path stroke-linecap="round" stroke-linejoin="round" d="M9 17.25v1.007a3 3 0 0 1-.879 2.122L7.5 21h9l-.621-.621A3 3 0 0 1 15 18.257V17.25m6-12V15a2.25 2.25 0 0 1-2.25 2.25H5.25A2.25 2.25 0 0 1 3 15V5.25m18 0A2.25 2.25 0 0 0 18.75 3H5.25A2.25 2.25 0 0 0 3 5.25m18 0V12a2.25 2.25 0 0 1-2.25 2.25H5.25A2.25 2.25 0 0 1 3 12V5.25" /></svg>
+											{:else}
+												<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="size-4 text-slate-400"><path stroke-linecap="round" stroke-linejoin="round" d="M10.5 1.5H8.25A2.25 2.25 0 0 0 6 3.75v16.5a2.25 2.25 0 0 0 2.25 2.25h7.5A2.25 2.25 0 0 0 18 20.25V3.75a2.25 2.25 0 0 0-2.25-2.25H13.5m-3 0V3h3V1.5m-3 0h3m-3 18.75h3" /></svg>
+											{/if}
+											{deviceLabels[key] ?? key}
+										</span>
+										<span class="font-bold text-slate-500">{pct(count, deviceTotal)}%</span>
 									</div>
-									<div class="h-1.5 overflow-hidden rounded-full bg-gray-100">
-										<div
-											class="h-full rounded-full bg-emerald-500"
-											style="width: {pct(count, deviceTotal)}%"
-										></div>
+									<div class="h-2 overflow-hidden rounded-full bg-slate-100">
+										<div class="h-full rounded-full bg-slate-900 transition-all duration-1000" style="width: {pct(count, deviceTotal)}%"></div>
 									</div>
 								</li>
 							{/each}
@@ -470,3 +621,10 @@
 		{/if}
 	</main>
 </div>
+
+<style>
+    .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+    .custom-scrollbar::-webkit-scrollbar-track { background: #f8fafc; }
+    .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+</style>

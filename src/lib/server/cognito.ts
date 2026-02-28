@@ -136,7 +136,7 @@ export function isTokenExpired(token: string): boolean {
 
 const BASE_OPTS = {
 	httpOnly: true,
-	secure: !dev,       // false on localhost, true in production
+	secure: !dev, // false on localhost, true in production
 	sameSite: 'lax' as const,
 	path: '/'
 };

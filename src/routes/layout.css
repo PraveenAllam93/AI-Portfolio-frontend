@@ -8,26 +8,31 @@
 	--font-serif: 'Playfair Display', serif;
 	--font-sans: 'Inter', system-ui, sans-serif;
 
-	/* Brand */
-	--color-brand: #6D28D9;
-	--color-brand-light: #8B5CF6;
-	--color-brand-dark: #4C1D95;
+	/* Brand - More Vibrant/Futuristic */
+	--color-brand: #7c3aed;
+	--color-brand-light: #a78bfa;
+	--color-brand-dark: #5b21b6;
+
+	/* Futuristic Accents */
+	--color-neon-purple: #c084fc;
+	--color-neon-pink: #f472b6;
+	--color-neon-blue: #38bdf8;
 
 	/* Surfaces */
-	--color-surface: #FFFFFF;
-	--color-surface-subtle: #F5F3FF;
-	--color-surface-muted: #EDE9FE;
+	--color-surface: #ffffff;
+	--color-surface-subtle: #f8fafc;
+	--color-surface-muted: #f1f5f9;
 
 	/* Text */
-	--color-ink: #1E1033;
-	--color-ink-soft: #4B5563;
-	--color-ink-muted: #9CA3AF;
+	--color-ink: #0f172a;
+	--color-ink-soft: #475569;
+	--color-ink-muted: #94a3b8;
 
 	/* Feature accents */
-	--color-accent-emerald: #10B981;
-	--color-accent-amber: #F59E0B;
-	--color-accent-rose: #F43F5E;
-	--color-accent-cyan: #06B6D4;
+	--color-accent-emerald: #10b981;
+	--color-accent-amber: #f59e0b;
+	--color-accent-rose: #f43f5e;
+	--color-accent-cyan: #06b6d4;
 }
 
 html {
@@ -40,32 +45,156 @@ body {
 	background-color: #ffffff;
 }
 
+/* ── Glassmorphism ───────────────────────────────────── */
+.glass {
+	background: rgba(255, 255, 255, 0.7);
+	backdrop-filter: blur(12px);
+	-webkit-backdrop-filter: blur(12px);
+	border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.glass-dark {
+	background: rgba(15, 23, 42, 0.6);
+	backdrop-filter: blur(12px);
+	-webkit-backdrop-filter: blur(12px);
+	border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.glass-card {
+	background: rgba(255, 255, 255, 0.4);
+	backdrop-filter: blur(8px);
+	-webkit-backdrop-filter: blur(8px);
+	border: 1px solid rgba(255, 255, 255, 0.5);
+	box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.07);
+}
+
+/* ── Aurora / Mesh Gradients ─────────────────────────── */
+.aurora-bg {
+	position: relative;
+	background-color: #0f172a;
+	overflow: hidden;
+}
+
+.aurora-bg::before,
+.aurora-bg::after {
+	content: '';
+	position: absolute;
+	width: 800px;
+	height: 800px;
+	border-radius: 50%;
+	filter: blur(80px);
+	opacity: 0.4;
+	z-index: 0;
+}
+
+.aurora-bg::before {
+	background: radial-gradient(circle, #7c3aed, transparent);
+	top: -200px;
+	left: -200px;
+	animation: aurora-float 15s infinite alternate;
+}
+
+.aurora-bg::after {
+	background: radial-gradient(circle, #ec4899, transparent);
+	bottom: -200px;
+	right: -200px;
+	animation: aurora-float 18s infinite alternate-reverse;
+}
+
+@keyframes aurora-float {
+	0% {
+		transform: translate(0, 0) scale(1);
+	}
+	100% {
+		transform: translate(100px, 100px) scale(1.1);
+	}
+}
+
 /* ── Gradient utilities ──────────────────────────────── */
 .gradient-text {
-	background: linear-gradient(135deg, #6D28D9, #A855F7, #EC4899);
+	background: linear-gradient(135deg, #7c3aed, #a855f7, #ec4899);
 	-webkit-background-clip: text;
 	-webkit-text-fill-color: transparent;
 	background-clip: text;
 }
 
 .gradient-bg {
-	background: linear-gradient(135deg, #6D28D9 0%, #A855F7 50%, #EC4899 100%);
+	background: linear-gradient(135deg, #7c3aed 0%, #a855f7 50%, #ec4899 100%);
 }
 
 .gradient-bg-subtle {
-	background: linear-gradient(135deg, #F5F3FF 0%, #FAF5FF 50%, #FDF2F8 100%);
+	background: linear-gradient(135deg, #f5f3ff 0%, #faf5ff 50%, #fdf2f8 100%);
+}
+
+.gradient-border {
+	position: relative;
+	background: #fff;
+	background-clip: padding-box;
+	border: 2px solid transparent;
+}
+
+.gradient-border::before {
+	content: '';
+	position: absolute;
+	top: 0;
+	right: 0;
+	bottom: 0;
+	left: 0;
+	z-index: -1;
+	margin: -2px;
+	border-radius: inherit;
+	background: linear-gradient(135deg, #7c3aed, #ec4899);
+}
+
+/* ── Shimmer Effect ─────────────────────────────────── */
+.shimmer {
+	position: relative;
+	overflow: hidden;
+}
+
+.shimmer::after {
+	content: '';
+	position: absolute;
+	top: -50%;
+	left: -50%;
+	width: 200%;
+	height: 200%;
+	background: linear-gradient(
+		45deg,
+		transparent 45%,
+		rgba(255, 255, 255, 0.1) 50%,
+		transparent 55%
+	);
+	animation: shimmer-anim 3s infinite;
+}
+
+@keyframes shimmer-anim {
+	0% {
+		transform: translate(-30%, -30%);
+	}
+	100% {
+		transform: translate(30%, 30%);
+	}
 }
 
 /* ── Drop zone animated border ───────────────────────── */
 @keyframes gradient-spin {
-	0% { background-position: 0% 50%; }
-	50% { background-position: 100% 50%; }
-	100% { background-position: 0% 50%; }
+	0% {
+		background-position: 0% 50%;
+	}
+	50% {
+		background-position: 100% 50%;
+	}
+	100% {
+		background-position: 0% 50%;
+	}
 }
 
 /* ── SVG checkmark draw animation ────────────────────── */
 @keyframes draw-check {
-	to { stroke-dashoffset: 0; }
+	to {
+		stroke-dashoffset: 0;
+	}
 }
 .draw-check {
 	stroke-dasharray: 50;
@@ -73,19 +202,46 @@ body {
 	animation: draw-check 0.6s ease forwards 0.3s;
 }
 
-/* ── Floating mockup (Hero) ───────────────────────────── */
+/* ── Animations ──────────────────────────────────────── */
 @keyframes float {
-	0%, 100% { transform: perspective(1000px) rotateX(5deg) translateY(0px); }
-	50%       { transform: perspective(1000px) rotateX(5deg) translateY(-10px); }
+	0%,
+	100% {
+		transform: perspective(1000px) rotateX(5deg) translateY(0px);
+	}
+	50% {
+		transform: perspective(1000px) rotateX(5deg) translateY(-20px);
+	}
 }
+
 .animate-float {
 	animation: float 5s ease-in-out infinite;
 }
 
+.animate-float-slow {
+	animation: float 8s ease-in-out infinite;
+}
+
+.animate-glow {
+	animation: glow 3s ease-in-out infinite alternate;
+}
+
+@keyframes glow {
+	from {
+		box-shadow: 0 0 5px rgba(124, 58, 237, 0.2);
+	}
+	to {
+		box-shadow: 0 0 20px rgba(124, 58, 237, 0.6);
+	}
+}
+
 /* ── Infinite marquee (PortfolioShowcase) ─────────────── */
 @keyframes marquee {
-	from { transform: translateX(0); }
-	to   { transform: translateX(-50%); }
+	from {
+		transform: translateX(0);
+	}
+	to {
+		transform: translateX(-50%);
+	}
 }
 .animate-marquee {
 	display: flex;
@@ -110,9 +266,15 @@ body {
 
 /* ── Drop-zone pulse ring (Upload idle state) ─────────── */
 @keyframes ring-pulse {
-	0%   { box-shadow: 0 0 0 0    rgba(109, 40, 217, 0.25); }
-	70%  { box-shadow: 0 0 0 10px rgba(109, 40, 217, 0);    }
-	100% { box-shadow: 0 0 0 0    rgba(109, 40, 217, 0);     }
+	0% {
+		box-shadow: 0 0 0 0 rgba(124, 58, 237, 0.25);
+	}
+	70% {
+		box-shadow: 0 0 0 10px rgba(124, 58, 237, 0);
+	}
+	100% {
+		box-shadow: 0 0 0 0 rgba(124, 58, 237, 0);
+	}
 }
 .animate-ring-pulse {
 	animation: ring-pulse 2.5s ease-out infinite;

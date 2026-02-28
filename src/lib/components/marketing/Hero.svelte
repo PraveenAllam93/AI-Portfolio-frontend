@@ -2,131 +2,95 @@
 	import { reveal } from '$lib/actions/animate';
 </script>
 
-<section
-	class="relative overflow-hidden pt-32 pb-24 md:pt-44 md:pb-32"
-	style="background: linear-gradient(135deg, #6D28D9 0%, #A855F7 50%, #EC4899 100%)"
->
-	<!-- Depth layers -->
-	<div class="pointer-events-none absolute inset-0 overflow-hidden">
-		<div class="absolute -top-32 -left-32 h-96 w-96 rounded-full bg-white/10 blur-3xl"></div>
-		<div class="absolute top-1/2 -right-24 h-80 w-80 rounded-full bg-white/10 blur-3xl"></div>
-		<div class="absolute -bottom-20 left-1/3 h-72 w-72 rounded-full bg-white/10 blur-3xl"></div>
-		<!-- Dot grid -->
-		<div
-			class="absolute inset-0 opacity-10"
-			style="background-image: radial-gradient(circle, white 1px, transparent 1px); background-size: 32px 32px;"
-		></div>
+<section class="relative overflow-hidden pt-32 pb-24 md:pt-44 md:pb-32 bg-[#fafafa]">
+	<!-- Background glow -->
+	<div class="pointer-events-none absolute inset-0 overflow-hidden flex justify-center items-center opacity-30">
+		<div class="w-[800px] h-[400px] bg-gradient-to-r from-brand/20 via-neon-pink/10 to-transparent blur-[100px] rounded-full"></div>
 	</div>
 
 	<div class="relative mx-auto max-w-5xl px-6 text-center">
-		<!-- Badge -->
-		<div
-			use:reveal={{ delay: 0 }}
-			class="mb-6 inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-4 py-1.5 text-sm font-medium text-white backdrop-blur-sm"
-		>
-			<span>✨</span>
-			<span>AI-Powered Portfolio Builder</span>
-		</div>
-
+		<!-- Main Headline -->
 		<h1
 			use:reveal={{ delay: 100 }}
-			class="font-serif text-5xl font-bold leading-tight tracking-tight text-white md:text-7xl md:leading-tight"
+			class="font-serif text-5xl leading-tight font-bold tracking-tight text-slate-900 md:text-7xl md:leading-[1.1]"
 		>
-			Turn your resume into a
-			<span class="relative mx-2 inline-block rounded-md bg-amber-400 px-3 py-1 text-ink italic">
-				stunning
-			</span>
-			portfolio website
+			Your dream portfolio is <span class="relative inline-block"><span class="relative z-10">one upload</span><span class="absolute bottom-2 left-0 w-full h-3 bg-brand/30 -z-10 rounded-full"></span></span> away
 		</h1>
 
-		<p use:reveal={{ delay: 200 }} class="mx-auto mt-7 max-w-2xl text-lg leading-relaxed text-white/80 md:text-xl">
-			Upload your resume. Let AI do the heavy lifting. Publish your personal site in minutes — no
-			coding required.
+		<p
+			use:reveal={{ delay: 200 }}
+			class="mx-auto mt-8 max-w-2xl text-lg leading-relaxed text-slate-600 md:text-xl"
+		>
+			For <span class="bg-brand/10 text-brand px-2 py-0.5 rounded-md font-medium">job seekers and professionals</span> who want a stunning online presence without hiring a designer or learning to code.
 		</p>
 
+		<!-- Call to action -->
 		<div
 			use:reveal={{ delay: 300 }}
-			class="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row"
+			class="mt-12 flex flex-col items-center justify-center gap-5 sm:flex-row"
 		>
 			<a
 				href="/signup"
-				class="rounded-full bg-white px-8 py-4 text-base font-semibold text-brand shadow-xl transition-all hover:scale-[1.02] hover:shadow-2xl"
+				class="group flex items-center gap-2 rounded-full bg-slate-900 px-8 py-4 text-sm font-bold text-white shadow-xl transition-all hover:scale-105 hover:bg-slate-800 active:scale-95"
 			>
-				Get Started Free
-			</a>
-			<a
-				href="#templates"
-				class="rounded-full border-2 border-white/40 bg-white/10 px-8 py-4 text-base font-semibold text-white backdrop-blur-sm transition-all hover:bg-white/20"
-			>
-				See Examples
+				Try for Free
+				<svg class="h-4 w-4 transition-transform group-hover:translate-x-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3" />
+				</svg>
 			</a>
 		</div>
 
-		<!-- Trust strip -->
-		<div
-			use:reveal={{ delay: 400 }}
-			class="mt-8 flex flex-wrap items-center justify-center gap-6 text-sm text-white/70"
-		>
-			{#each ['No credit card needed', 'Free to start', 'Live in minutes'] as item}
-				<span class="flex items-center gap-1.5">
-					<svg class="h-4 w-4 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="m5 13 4 4L19 7" />
-					</svg>
-					{item}
-				</span>
-			{/each}
+		<!-- Trust Badges (simulating Product of the Day style) -->
+		<div use:reveal={{ delay: 400 }} class="mt-16 flex flex-wrap justify-center gap-4 opacity-80">
+			<div class="flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-5 py-3 shadow-sm">
+				<div class="flex h-8 w-8 items-center justify-center rounded-full bg-orange-100 text-orange-600 font-bold text-xs">1</div>
+				<div class="text-left">
+					<div class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Product Hunt</div>
+					<div class="text-sm font-bold text-slate-800">#1 Product of the Day</div>
+				</div>
+			</div>
+			<div class="flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-5 py-3 shadow-sm">
+				<div class="flex h-8 w-8 items-center justify-center rounded-full bg-blue-100 text-blue-600 font-bold text-xs">★</div>
+				<div class="text-left">
+					<div class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Top Rated</div>
+					<div class="text-sm font-bold text-slate-800">Portfolio Builder</div>
+				</div>
+			</div>
 		</div>
 
-		<!-- Floating mockup — animate-float applies CSS keyframe -->
-		<div
-			use:reveal={{ delay: 500, y: 32 }}
-			class="relative mx-auto mt-16 max-w-2xl"
-		>
-			<div
-				class="animate-float overflow-hidden rounded-2xl border border-white/20 bg-white/10 shadow-2xl backdrop-blur-sm"
-			>
+		<!-- Subtle Hero Image/Mockup -->
+		<div use:reveal={{ delay: 500, y: 40 }} class="relative mx-auto mt-24 max-w-4xl">
+			<div class="group relative overflow-hidden rounded-2xl bg-white border border-slate-200 shadow-2xl">
 				<!-- Browser chrome -->
-				<div class="flex items-center gap-2 border-b border-white/10 bg-white/5 px-4 py-3">
+				<div class="flex items-center gap-2 border-b border-slate-100 bg-slate-50 px-4 py-3">
 					<div class="flex gap-1.5">
-						<div class="h-2.5 w-2.5 rounded-full bg-red-400/70"></div>
-						<div class="h-2.5 w-2.5 rounded-full bg-amber-400/70"></div>
-						<div class="h-2.5 w-2.5 rounded-full bg-emerald-400/70"></div>
+						<div class="h-2.5 w-2.5 rounded-full bg-red-400"></div>
+						<div class="h-2.5 w-2.5 rounded-full bg-amber-400"></div>
+						<div class="h-2.5 w-2.5 rounded-full bg-emerald-400"></div>
 					</div>
-					<div class="mx-auto rounded-md bg-white/10 px-10 py-1 text-xs text-white/50">
-						aifolio.dev/yourname
+					<div class="mx-auto rounded-md bg-white px-10 py-1 text-[10px] font-medium tracking-widest text-slate-400 border border-slate-200 shadow-sm">
+						yourname.aifolio.dev
 					</div>
 				</div>
-				<!-- Mock portfolio content -->
-				<div class="grid grid-cols-3 gap-0">
-					<div class="col-span-1 border-r border-white/10 bg-white/5 p-5">
-						<div class="mb-3 h-12 w-12 rounded-full bg-white/20"></div>
-						<div class="mb-2 h-3 w-20 rounded bg-white/30"></div>
-						<div class="mb-4 h-2 w-16 rounded bg-white/20"></div>
-						<div class="space-y-1.5">
-							{#each [14, 12, 16, 10] as w}
-								<div class="h-2 rounded bg-white/15" style="width: {w * 4}px"></div>
-							{/each}
+				<!-- Content Area -->
+				<div class="bg-white p-8 md:p-12 relative flex flex-col md:flex-row gap-12 text-left">
+					<div class="flex-1">
+						<div class="h-16 w-16 bg-slate-100 rounded-full mb-6"></div>
+						<h3 class="font-serif text-3xl font-bold text-slate-900 mb-4">Alex Developer</h3>
+						<p class="text-slate-500 mb-8 leading-relaxed">Full-stack engineer building scalable systems and beautiful interfaces. 5+ years of experience in React, Node, and AWS.</p>
+						<div class="flex gap-3">
+							<div class="h-10 w-32 bg-slate-900 rounded-full"></div>
+							<div class="h-10 w-10 bg-slate-100 rounded-full"></div>
 						</div>
 					</div>
-					<div class="col-span-2 p-5">
-						<div class="mb-3 h-4 w-3/4 rounded bg-white/30"></div>
-						<div class="mb-5 space-y-1.5">
-							{#each [90, 75, 85, 60] as w}
-								<div class="h-2 rounded bg-white/15" style="width: {w}%"></div>
-							{/each}
-						</div>
-						<div class="grid grid-cols-2 gap-3">
-							<div class="h-16 rounded-xl bg-white/10"></div>
-							<div class="h-16 rounded-xl bg-white/10"></div>
-						</div>
+					<div class="flex-1 grid grid-cols-2 gap-4">
+						<div class="bg-slate-50 rounded-xl p-4 border border-slate-100 h-32"></div>
+						<div class="bg-slate-50 rounded-xl p-4 border border-slate-100 h-32 mt-8"></div>
+						<div class="bg-slate-50 rounded-xl p-4 border border-slate-100 h-32"></div>
+						<div class="bg-slate-50 rounded-xl p-4 border border-slate-100 h-32 mt-8"></div>
 					</div>
 				</div>
 			</div>
-			<!-- Glow behind mockup -->
-			<div
-				class="pointer-events-none absolute -inset-4 -z-10 rounded-3xl opacity-30 blur-2xl"
-				style="background: linear-gradient(135deg, #6D28D9, #EC4899);"
-			></div>
 		</div>
 	</div>
 </section>

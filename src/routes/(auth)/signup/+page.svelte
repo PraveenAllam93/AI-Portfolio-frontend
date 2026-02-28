@@ -3,18 +3,12 @@
 	import { register, confirmEmail, resendConfirmationCode } from '$lib/services/auth';
 	import { reveal } from '$lib/actions/animate';
 
-	// Step: 'register' | 'confirm'
 	let step: 'register' | 'confirm' = $state('register');
-
-	// Register form
 	let name = $state('');
 	let email = $state('');
 	let password = $state('');
-
-	// Confirm form
 	let confirmationCode = $state('');
 	let resendCooldown = $state(0);
-
 	let errorMessage = $state('');
 	let successMessage = $state('');
 	let isLoading = $state(false);
@@ -80,85 +74,119 @@
 	<title>Sign Up — AIfolio</title>
 </svelte:head>
 
-<div class="flex min-h-screen">
-	<!-- Left panel — gradient brand side -->
+<div class="flex min-h-screen bg-[#fafafa]">
+	<!-- Left panel — Clean Brand Side -->
 	<div
-		class="gradient-bg relative hidden flex-col items-center justify-center overflow-hidden p-12 lg:flex lg:w-[45%]"
+		class="relative hidden flex-col items-center justify-center overflow-hidden border-r border-slate-200 bg-[#fafafa] p-12 lg:flex lg:w-[45%]"
 	>
-		<!-- Background depth blobs -->
-		<div class="absolute -top-20 -left-20 h-72 w-72 rounded-full bg-white/10 blur-3xl"></div>
-		<div class="absolute -bottom-20 -right-20 h-72 w-72 rounded-full bg-white/10 blur-3xl"></div>
+		<!-- Background decoration -->
+		<div
+			class="pointer-events-none absolute inset-0 opacity-[0.03]"
+			style="background-image: radial-gradient(circle, #000 1px, transparent 1px); background-size: 40px 40px;"
+		></div>
 
 		{#if step === 'register'}
-			<!-- Register left panel -->
 			<div class="relative z-10 text-center">
-				<a href="/" class="inline-block font-serif text-4xl font-bold text-white">AIfolio</a>
-				<p class="mt-4 text-lg leading-relaxed text-white/80">
-					Your resume deserves a<br />beautiful home online.
+				<a
+					href="/"
+					class="group mb-8 inline-flex items-center gap-2 text-4xl font-bold tracking-tight text-slate-900"
+				>
+					<div
+						class="flex h-12 w-14 items-center justify-center rounded-2xl bg-slate-900 text-white shadow-lg transition-transform group-hover:rotate-12"
+					>
+						<span class="text-lg font-black tracking-tighter">AI</span>
+					</div>
+					<span>folio</span>
+				</a>
+				<p class="mt-6 text-xl leading-relaxed text-slate-600">
+					Create your professional online<br />presence in seconds.
 				</p>
 			</div>
 
-			<div class="relative z-10 mt-12 flex flex-col gap-4">
-				{#each [
-					{ icon: '01', label: 'Upload your resume' },
-					{ icon: '02', label: 'AI extracts your content' },
-					{ icon: '03', label: 'Your portfolio goes live' }
-				] as step_item}
-					<div class="flex items-center gap-4">
-						<div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/20 text-xs font-bold text-white">
-							{step_item.icon}
+			<div class="relative z-10 mt-16 flex flex-col gap-4">
+				{#each [{ icon: '01', label: 'Upload your resume', desc: 'PDF or Word file' }, { icon: '02', label: 'Pick a template', desc: 'Tailored for your role' }, { icon: '03', label: 'Go live instantly', desc: 'Hosted on our fast edge network' }] as item}
+					<div
+						class="flex items-center gap-5 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"
+					>
+						<div
+							class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-xs font-bold text-slate-500"
+						>
+							{item.icon}
 						</div>
-						<p class="text-sm font-medium text-white/90">{step_item.label}</p>
+						<div>
+							<p class="text-sm font-bold text-slate-900">{item.label}</p>
+							<p class="text-xs text-slate-500">{item.desc}</p>
+						</div>
 					</div>
 				{/each}
 			</div>
 		{:else}
-			<!-- Confirm left panel -->
 			<div class="relative z-10 text-center">
-				<div class="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-white/20">
-					<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="h-10 w-10 text-white">
-						<path stroke-linecap="round" stroke-linejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 0 1-2.25 2.25h-15a2.25 2.25 0 0 1-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25m19.5 0v.243a2.25 2.25 0 0 1-1.07 1.916l-7.5 4.615a2.25 2.25 0 0 1-2.36 0L3.32 8.91a2.25 2.25 0 0 1-1.07-1.916V6.75" />
+				<div
+					class="mx-auto mb-8 flex h-24 w-24 items-center justify-center rounded-3xl bg-slate-100 border border-slate-200"
+				>
+					<svg
+						xmlns="http://www.w3.org/2000/svg"
+						fill="none"
+						viewBox="0 0 24 24"
+						stroke-width="1.5"
+						stroke="currentColor"
+						class="h-10 w-10 text-slate-900"
+					>
+						<path
+							stroke-linecap="round"
+							stroke-linejoin="round"
+							d="M21.75 6.75v10.5a2.25 2.25 0 0 1-2.25 2.25h-15a2.25 2.25 0 0 1-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25m19.5 0v.243a2.25 2.25 0 0 1-1.07 1.916l-7.5 4.615a2.25 2.25 0 0 1-2.36 0L3.32 8.91a2.25 2.25 0 0 1-1.07-1.916V6.75"
+						/>
 					</svg>
 				</div>
-				<p class="mt-6 font-serif text-3xl font-bold text-white">Check your inbox</p>
-				<p class="mt-3 text-sm leading-relaxed text-white/80">
-					We sent a 6-digit code to<br />
-					<span class="font-semibold text-white">{email}</span>
+				<p class="font-serif text-4xl font-bold text-slate-900">Verify Email</p>
+				<p class="mt-4 text-lg text-slate-600">
+					A 6-digit verification code<br />
+					was sent to <span class="font-bold text-slate-900">{email}</span>
 				</p>
 			</div>
-
-			<p class="relative z-10 mt-10 max-w-xs text-center text-xs text-white/60">
-				The code expires in 10 minutes. Check your spam folder if you don't see it.
-			</p>
 		{/if}
 	</div>
 
-	<!-- Right panel — form -->
-	<div class="flex flex-1 flex-col items-center justify-center bg-[#F5F3FF] px-6 py-12">
-		<div class="w-full max-w-md" use:reveal={{ y: 18, delay: 80 }}>
+	<!-- Right panel — Form -->
+	<div class="relative flex flex-1 flex-col items-center justify-center bg-white px-6 py-12">
+		<div class="relative w-full max-w-md" use:reveal={{ y: 24, delay: 100 }}>
 			<!-- Mobile logo -->
-			<div class="mb-8 text-center lg:hidden">
-				<a href="/" class="font-serif text-2xl font-bold">
-					<span class="gradient-text">AI</span><span class="text-[#1E1033]">folio</span>
+			<div class="mb-10 text-center lg:hidden">
+				<a href="/" class="inline-flex items-center gap-2 text-3xl font-bold tracking-tight text-slate-900">
+					<div
+						class="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-900 text-white shadow-md"
+					>
+						<span class="text-sm font-black">AI</span>
+					</div>
+					<span>folio</span>
 				</a>
 			</div>
 
-			<div class="rounded-2xl bg-white p-8 shadow-sm ring-1 ring-black/5">
+			<div class="overflow-hidden rounded-[2.5rem] border border-slate-100 bg-white p-10 shadow-xl sm:p-12">
 				{#if step === 'register'}
-					<div class="mb-6">
-						<h1 class="font-serif text-2xl font-bold text-[#1E1033]">Create your account</h1>
-						<p class="mt-1.5 text-sm text-[#4B5563]">Start building your portfolio — it's free.</p>
+					<div class="mb-10">
+						<h1 class="font-serif text-4xl font-bold tracking-tight text-slate-900">Get Started</h1>
+						<p class="mt-3 text-lg text-slate-500">Create your account for free.</p>
 					</div>
 
 					{#if errorMessage}
-						<div class="mb-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+						<div
+							class="mb-6 rounded-2xl border border-red-100 bg-red-50/50 px-5 py-4 text-sm font-bold text-red-600"
+						>
+							<span class="mr-2">⚠️</span>
 							{errorMessage}
 						</div>
 					{/if}
 
 					<form class="space-y-5" onsubmit={handleRegister}>
-						<div>
-							<label for="name" class="block text-sm font-medium text-[#1E1033]">Full name</label>
+						<div class="space-y-2">
+							<label
+								for="name"
+								class="ml-1 text-xs font-bold tracking-widest text-slate-500 uppercase"
+								>Full Name</label
+							>
 							<input
 								id="name"
 								type="text"
@@ -166,13 +194,17 @@
 								required
 								bind:value={name}
 								disabled={isLoading}
-								class="mt-1.5 w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-[#1E1033] placeholder:text-gray-400 focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 focus:outline-none disabled:opacity-60 transition-colors"
+								class="w-full rounded-2xl border border-slate-200 bg-slate-50/50 px-6 py-4 text-base font-medium text-slate-900 transition-all outline-none focus:border-slate-400 focus:bg-white focus:ring-4 focus:ring-slate-100 disabled:opacity-50"
 								placeholder="Jane Doe"
 							/>
 						</div>
 
-						<div>
-							<label for="email" class="block text-sm font-medium text-[#1E1033]">Email</label>
+						<div class="space-y-2">
+							<label
+								for="email"
+								class="ml-1 text-xs font-bold tracking-widest text-slate-500 uppercase"
+								>Email Address</label
+							>
 							<input
 								id="email"
 								type="email"
@@ -180,13 +212,17 @@
 								required
 								bind:value={email}
 								disabled={isLoading}
-								class="mt-1.5 w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-[#1E1033] placeholder:text-gray-400 focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 focus:outline-none disabled:opacity-60 transition-colors"
+								class="w-full rounded-2xl border border-slate-200 bg-slate-50/50 px-6 py-4 text-base font-medium text-slate-900 transition-all outline-none focus:border-slate-400 focus:bg-white focus:ring-4 focus:ring-slate-100 disabled:opacity-50"
 								placeholder="you@example.com"
 							/>
 						</div>
 
-						<div>
-							<label for="password" class="block text-sm font-medium text-[#1E1033]">Password</label>
+						<div class="space-y-2">
+							<label
+								for="password"
+								class="ml-1 text-xs font-bold tracking-widest text-slate-500 uppercase"
+								>Password</label
+							>
 							<input
 								id="password"
 								type="password"
@@ -195,55 +231,67 @@
 								minlength={8}
 								bind:value={password}
 								disabled={isLoading}
-								class="mt-1.5 w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-[#1E1033] placeholder:text-gray-400 focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 focus:outline-none disabled:opacity-60 transition-colors"
-								placeholder="Create a password"
+								class="w-full rounded-2xl border border-slate-200 bg-slate-50/50 px-6 py-4 text-base font-medium text-slate-900 transition-all outline-none focus:border-slate-400 focus:bg-white focus:ring-4 focus:ring-slate-100 disabled:opacity-50"
+								placeholder="Create password"
 							/>
-							<p class="mt-1.5 text-xs text-gray-400">Minimum 8 characters</p>
 						</div>
 
 						<button
 							type="submit"
 							disabled={isLoading}
-							class="gradient-bg flex w-full items-center justify-center rounded-xl py-3.5 text-sm font-semibold text-white shadow-sm transition-all hover:opacity-90 hover:shadow-md disabled:cursor-not-allowed disabled:opacity-60"
+							class="group relative mt-2 flex w-full items-center justify-center overflow-hidden rounded-2xl bg-slate-900 py-5 text-base font-bold text-white shadow-xl transition-all hover:scale-[1.02] hover:bg-slate-800 active:scale-95 disabled:opacity-50"
 						>
-							{#if isLoading}
-								<svg class="mr-2 h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
-									<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-									<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-								</svg>
-								Creating account…
-							{:else}
-								Create Account
-							{/if}
+							<span class="relative z-10 flex items-center gap-2">
+								{#if isLoading}
+									<svg class="h-5 w-5 animate-spin" fill="none" viewBox="0 0 24 24">
+										<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+										<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+									</svg>
+									Creating...
+								{:else}
+									Create Account
+								{/if}
+							</span>
 						</button>
 					</form>
 
-					<p class="mt-6 text-center text-sm text-[#4B5563]">
-						Already have an account?
-						<a href="/login" class="font-semibold text-violet-600 hover:text-violet-800 transition-colors">Log in</a>
-					</p>
+					<div class="mt-10 border-t border-slate-100 pt-8 text-center">
+						<p class="text-sm text-slate-500">
+							Already have an account?
+							<a
+								href="/login"
+								class="ml-1 font-bold text-slate-900 transition-colors hover:underline"
+								>Log in</a
+							>
+						</p>
+					</div>
 				{:else}
-					<!-- Email Confirmation Step -->
-					<div class="mb-6">
-						<h1 class="font-serif text-2xl font-bold text-[#1E1033]">Verify your email</h1>
-						<p class="mt-1.5 text-sm text-[#4B5563]">Enter the 6-digit code we sent to <span class="font-medium text-[#1E1033]">{email}</span>.</p>
+					<div class="mb-10">
+						<h1 class="font-serif text-4xl font-bold tracking-tight text-slate-900">Enter Code</h1>
+						<p class="mt-3 text-lg text-slate-500">
+							Please enter the 6-digit code sent to your email.
+						</p>
 					</div>
 
 					{#if errorMessage}
-						<div class="mb-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+						<div
+							class="mb-6 rounded-2xl border border-red-100 bg-red-50/50 px-5 py-4 text-sm font-bold text-red-600"
+						>
+							<span class="mr-2">⚠️</span>
 							{errorMessage}
 						</div>
 					{/if}
-
 					{#if successMessage}
-						<div class="mb-5 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">
+						<div
+							class="mb-6 rounded-2xl border border-green-100 bg-green-50/50 px-5 py-4 text-sm font-bold text-green-600"
+						>
+							<span class="mr-2">✅</span>
 							{successMessage}
 						</div>
 					{/if}
 
-					<form class="space-y-5" onsubmit={handleConfirm}>
-						<div>
-							<label for="code" class="block text-sm font-medium text-[#1E1033]">Verification code</label>
+					<form class="space-y-8" onsubmit={handleConfirm}>
+						<div class="space-y-2">
 							<input
 								id="code"
 								type="text"
@@ -253,7 +301,7 @@
 								maxlength={6}
 								bind:value={confirmationCode}
 								disabled={isLoading}
-								class="mt-1.5 w-full rounded-xl border border-gray-200 bg-white px-4 py-4 text-center font-mono text-2xl tracking-[0.6em] text-[#1E1033] focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 focus:outline-none disabled:opacity-60 transition-colors"
+								class="w-full rounded-2xl border border-slate-200 bg-slate-50/50 px-6 py-6 text-center font-mono text-3xl tracking-[0.6em] text-slate-900 transition-all outline-none focus:border-slate-400 focus:bg-white focus:ring-4 focus:ring-slate-100 disabled:opacity-50"
 								placeholder="000000"
 							/>
 						</div>
@@ -261,30 +309,31 @@
 						<button
 							type="submit"
 							disabled={isLoading}
-							class="gradient-bg flex w-full items-center justify-center rounded-xl py-3.5 text-sm font-semibold text-white shadow-sm transition-all hover:opacity-90 hover:shadow-md disabled:cursor-not-allowed disabled:opacity-60"
+							class="group relative flex w-full items-center justify-center overflow-hidden rounded-2xl bg-slate-900 py-5 text-base font-bold text-white shadow-xl transition-all hover:scale-[1.02] hover:bg-slate-800 active:scale-95 disabled:opacity-50"
 						>
-							{#if isLoading}
-								<svg class="mr-2 h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
-									<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-									<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-								</svg>
-								Verifying…
-							{:else}
-								Verify Email
-							{/if}
+							<span class="relative z-10 flex items-center gap-2">
+								{#if isLoading}
+									<svg class="h-5 w-5 animate-spin" fill="none" viewBox="0 0 24 24">
+										<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+										<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+									</svg>
+									Verifying...
+								{:else}
+									Verify Email
+								{/if}
+							</span>
 						</button>
 					</form>
 
-					<p class="mt-6 text-center text-sm text-[#4B5563]">
-						Didn&apos;t receive a code?
+					<div class="mt-10 border-t border-slate-100 pt-8 text-center">
 						<button
 							onclick={handleResend}
 							disabled={resendCooldown > 0}
-							class="font-semibold text-violet-600 hover:text-violet-800 transition-colors disabled:cursor-not-allowed disabled:opacity-60"
+							class="text-sm font-bold text-slate-500 transition-colors hover:text-slate-900 disabled:opacity-50 disabled:hover:text-slate-500"
 						>
-							{resendCooldown > 0 ? `Resend in ${resendCooldown}s` : 'Resend code'}
+							{resendCooldown > 0 ? `Resend code in ${resendCooldown}s` : 'Resend verification code'}
 						</button>
-					</p>
+					</div>
 				{/if}
 			</div>
 		</div>

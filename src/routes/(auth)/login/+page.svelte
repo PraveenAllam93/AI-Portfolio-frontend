@@ -31,97 +31,114 @@
 	<title>Log In — AIfolio</title>
 </svelte:head>
 
-<div class="flex min-h-screen">
-	<!-- Left panel — gradient brand side -->
+<div class="flex min-h-screen bg-[#fafafa]">
+	<!-- Left panel — Clean Brand Side -->
 	<div
-		class="gradient-bg relative hidden flex-col items-center justify-center overflow-hidden p-12 lg:flex lg:w-[45%]"
+		class="relative hidden flex-col items-center justify-center overflow-hidden border-r border-slate-200 bg-[#fafafa] p-12 lg:flex lg:w-[45%]"
 	>
-		<!-- Background depth blobs -->
+		<!-- Background decoration -->
 		<div
-			class="absolute -top-20 -left-20 h-72 w-72 rounded-full bg-white/10 blur-3xl"
-		></div>
-		<div
-			class="absolute -bottom-20 -right-20 h-72 w-72 rounded-full bg-white/10 blur-3xl"
+			class="pointer-events-none absolute inset-0 opacity-[0.03]"
+			style="background-image: radial-gradient(circle, #000 1px, transparent 1px); background-size: 40px 40px;"
 		></div>
 
 		<!-- Wordmark -->
 		<div class="relative z-10 text-center">
-			<a href="/" class="inline-block font-serif text-4xl font-bold text-white">
-				AIfolio
+			<a
+				href="/"
+				class="group mb-8 inline-flex items-center gap-2 text-4xl font-bold tracking-tight text-slate-900"
+			>
+				<div
+					class="flex h-12 w-14 items-center justify-center rounded-2xl bg-slate-900 text-white shadow-lg transition-transform group-hover:rotate-12"
+				>
+					<span class="text-lg font-black tracking-tighter">AI</span>
+				</div>
+				<span>folio</span>
 			</a>
-			<p class="mt-4 text-lg leading-relaxed text-white/80">
-				Turn your resume into a stunning<br />portfolio in minutes.
+			<p class="mt-6 text-xl leading-relaxed text-slate-600">
+				The easiest way to build your<br />professional presence online.
 			</p>
 		</div>
 
-		<!-- Feature pills -->
-		<div class="relative z-10 mt-12 flex flex-col gap-3">
-			{#each ['✦ AI-powered extraction', '✦ Instant deployment', '✦ Share your unique URL'] as item}
-				<div class="flex items-center gap-3 rounded-full bg-white/15 px-5 py-2.5 text-sm font-medium text-white backdrop-blur-sm">
-					{item}
+		<!-- Feature pills — Clean style -->
+		<div class="relative z-10 mt-16 flex flex-col gap-4">
+			{#each [{ text: 'Upload your resume', icon: '📄' }, { text: 'AI writes your content', icon: '✨' }, { text: 'Instant public URL', icon: '🌐' }] as item}
+				<div
+					class="flex items-center gap-4 rounded-2xl border border-slate-200 bg-white px-6 py-4 text-sm font-bold text-slate-700 shadow-sm transition-all hover:-translate-y-1 hover:shadow-md"
+				>
+					<span
+						class="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-50 text-lg"
+					>
+						{item.icon}
+					</span>
+					<span class="tracking-wide">{item.text}</span>
 				</div>
 			{/each}
 		</div>
-
-		<!-- Testimonial card -->
-		<div class="relative z-10 mt-12 w-full max-w-xs rounded-2xl bg-white/10 p-5 backdrop-blur-sm">
-			<p class="text-sm leading-relaxed text-white/90 italic">
-				"I uploaded my resume and had a live portfolio site within 5 minutes. Absolutely incredible."
-			</p>
-			<div class="mt-4 flex items-center gap-3">
-				<div class="flex h-8 w-8 items-center justify-center rounded-full bg-white/30 text-xs font-bold text-white">
-					S
-				</div>
-				<div>
-					<p class="text-xs font-semibold text-white">Sarah K.</p>
-					<p class="text-xs text-white/60">Product Designer</p>
-				</div>
-			</div>
-		</div>
 	</div>
 
-	<!-- Right panel — form -->
-	<div class="flex flex-1 flex-col items-center justify-center bg-[#F5F3FF] px-6 py-12">
-		<div class="w-full max-w-md" use:reveal={{ y: 18, delay: 80 }}>
+	<!-- Right panel — Form -->
+	<div class="relative flex flex-1 flex-col items-center justify-center bg-white px-6 py-12">
+		<div class="relative w-full max-w-md" use:reveal={{ y: 24, delay: 100 }}>
 			<!-- Mobile logo -->
-			<div class="mb-8 text-center lg:hidden">
-				<a href="/" class="font-serif text-2xl font-bold">
-					<span class="gradient-text">AI</span><span class="text-[#1E1033]">folio</span>
+			<div class="mb-10 text-center lg:hidden">
+				<a href="/" class="inline-flex items-center gap-2 text-3xl font-bold tracking-tight text-slate-900">
+					<div
+						class="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-900 text-white shadow-md"
+					>
+						<span class="text-sm font-black">AI</span>
+					</div>
+					<span>folio</span>
 				</a>
 			</div>
 
-			<div class="rounded-2xl bg-white p-8 shadow-sm ring-1 ring-black/5">
-				<div class="mb-6">
-					<h1 class="font-serif text-2xl font-bold text-[#1E1033]">Welcome back</h1>
-					<p class="mt-1.5 text-sm text-[#4B5563]">Log in to your AIfolio account.</p>
+			<div class="overflow-hidden rounded-[2.5rem] border border-slate-100 bg-white p-10 shadow-xl sm:p-12">
+				<div class="mb-10">
+					<h1 class="font-serif text-4xl font-bold tracking-tight text-slate-900">Welcome back</h1>
+					<p class="mt-3 text-lg text-slate-500">Log in to your workspace.</p>
 				</div>
 
-				<form class="space-y-5" onsubmit={handleSubmit}>
+				<form class="space-y-6" onsubmit={handleSubmit}>
 					{#if errorMessage}
-						<div class="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+						<div
+							class="rounded-2xl border border-red-100 bg-red-50/50 px-5 py-4 text-sm font-bold text-red-600"
+						>
+							<span class="mr-2">⚠️</span>
 							{errorMessage}
 						</div>
 					{/if}
 
-					<div>
-						<label for="email" class="block text-sm font-medium text-[#1E1033]">Email</label>
-						<input
-							id="email"
-							type="email"
-							autocomplete="email"
-							required
-							bind:value={email}
-							disabled={isLoading}
-							class="mt-1.5 w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-[#1E1033] placeholder:text-gray-400 focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 focus:outline-none disabled:opacity-60 transition-colors"
-							placeholder="you@example.com"
-						/>
+					<div class="space-y-2">
+						<label
+							for="email"
+							class="ml-1 text-xs font-bold tracking-widest text-slate-500 uppercase"
+							>Email Address</label
+						>
+						<div class="group relative">
+							<input
+								id="email"
+								type="email"
+								autocomplete="email"
+								required
+								bind:value={email}
+								disabled={isLoading}
+								class="w-full rounded-2xl border border-slate-200 bg-slate-50/50 px-6 py-4 text-base font-medium text-slate-900 transition-all outline-none placeholder:text-slate-400 focus:border-slate-400 focus:bg-white focus:ring-4 focus:ring-slate-100 disabled:opacity-50"
+								placeholder="you@example.com"
+							/>
+						</div>
 					</div>
 
-					<div>
-						<div class="flex items-center justify-between">
-							<label for="password" class="block text-sm font-medium text-[#1E1033]">Password</label>
-							<a href="/forgot-password" class="text-xs font-medium text-violet-600 hover:text-violet-800 transition-colors">
-								Forgot password?
+					<div class="space-y-2">
+						<div class="flex items-center justify-between px-1">
+							<label
+								for="password"
+								class="text-xs font-bold tracking-widest text-slate-500 uppercase">Password</label
+							>
+							<a
+								href="/forgot-password"
+								class="text-xs font-bold text-slate-900 transition-colors hover:text-slate-600"
+							>
+								Forgot?
 							</a>
 						</div>
 						<input
@@ -131,32 +148,51 @@
 							required
 							bind:value={password}
 							disabled={isLoading}
-							class="mt-1.5 w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-[#1E1033] placeholder:text-gray-400 focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 focus:outline-none disabled:opacity-60 transition-colors"
-							placeholder="Your password"
+							class="w-full rounded-2xl border border-slate-200 bg-slate-50/50 px-6 py-4 text-base font-medium text-slate-900 transition-all outline-none placeholder:text-slate-400 focus:border-slate-400 focus:bg-white focus:ring-4 focus:ring-slate-100 disabled:opacity-50"
+							placeholder="••••••••"
 						/>
 					</div>
 
 					<button
 						type="submit"
 						disabled={isLoading}
-						class="gradient-bg flex w-full items-center justify-center rounded-xl py-3.5 text-sm font-semibold text-white shadow-sm transition-all hover:opacity-90 hover:shadow-md disabled:cursor-not-allowed disabled:opacity-60"
+						class="group relative flex w-full items-center justify-center overflow-hidden rounded-2xl bg-slate-900 py-5 text-base font-bold text-white shadow-xl transition-all hover:scale-[1.02] hover:bg-slate-800 active:scale-95 disabled:opacity-50"
 					>
-						{#if isLoading}
-							<svg class="mr-2 h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
-								<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-								<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-							</svg>
-							Logging in…
-						{:else}
-							Log In
-						{/if}
+						<span class="relative z-10 flex items-center gap-2">
+							{#if isLoading}
+								<svg class="h-5 w-5 animate-spin" fill="none" viewBox="0 0 24 24">
+									<circle
+										class="opacity-25"
+										cx="12"
+										cy="12"
+										r="10"
+										stroke="currentColor"
+										stroke-width="4"
+									></circle>
+									<path
+										class="opacity-75"
+										fill="currentColor"
+										d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+									></path>
+								</svg>
+								Logging in...
+							{:else}
+								Log In
+							{/if}
+						</span>
 					</button>
 				</form>
 
-				<p class="mt-6 text-center text-sm text-[#4B5563]">
-					Don&apos;t have an account?
-					<a href="/signup" class="font-semibold text-violet-600 hover:text-violet-800 transition-colors">Sign up free</a>
-				</p>
+				<div class="mt-10 border-t border-slate-100 pt-8 text-center">
+					<p class="text-sm text-slate-500">
+						Don't have an account?
+						<a
+							href="/signup"
+							class="ml-1 font-bold text-slate-900 transition-colors hover:underline"
+							>Sign up</a
+						>
+					</p>
+				</div>
 			</div>
 		</div>
 	</div>

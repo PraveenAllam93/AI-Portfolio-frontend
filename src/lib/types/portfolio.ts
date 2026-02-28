@@ -11,6 +11,14 @@ export interface PortfolioAnalytics {
 	bySource: Record<string, number>;
 	byDevice: Record<string, number>;
 	timeline: AnalyticsTimeline[];
+	// enriched fields (may be absent on older records)
+	uniqueVisitors?: number;
+	avgTtfb?: number | null;
+	cacheHitRate?: number;
+	byHour?: Record<number, number>;
+	byDayOfWeek?: Record<string, number>;
+	byVersion?: Record<string, number>;
+	bestTimeToShare?: { hour: number; dayOfWeek: string | null } | null;
 }
 
 export type EditableField = 'bio' | 'headline' | 'uniqueValue';

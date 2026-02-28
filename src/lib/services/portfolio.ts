@@ -6,7 +6,9 @@ interface ServiceResult<T = undefined> {
 	error?: string;
 }
 
-export async function getPortfolioContent(userId: string): Promise<ServiceResult<PortfolioContent>> {
+export async function getPortfolioContent(
+	userId: string
+): Promise<ServiceResult<PortfolioContent>> {
 	try {
 		const res = await fetch(`/api/portfolio/${userId}`);
 		if (!res.ok) return { ok: false, error: 'Failed to load portfolio content' };

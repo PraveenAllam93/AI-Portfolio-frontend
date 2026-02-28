@@ -1,6 +1,11 @@
 import { json, error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import { cognitoLogin, setAuthCookies, decodeIdToken, parseCognitoError } from '$lib/server/cognito';
+import {
+	cognitoLogin,
+	setAuthCookies,
+	decodeIdToken,
+	parseCognitoError
+} from '$lib/server/cognito';
 
 export const POST: RequestHandler = async ({ request, cookies }) => {
 	let email: string, password: string;

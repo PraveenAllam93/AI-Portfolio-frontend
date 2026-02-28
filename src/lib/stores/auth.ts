@@ -14,10 +14,8 @@ function createAuthStore() {
 
 	return {
 		subscribe,
-		setUser: (user: AuthUser | null) =>
-			update((state) => ({ ...state, user, loading: false })),
-		setLoading: (loading: boolean) =>
-			update((state) => ({ ...state, loading })),
+		setUser: (user: AuthUser | null) => update((state) => ({ ...state, user, loading: false })),
+		setLoading: (loading: boolean) => update((state) => ({ ...state, loading })),
 		clear: () => set({ user: null, loading: false })
 	};
 }

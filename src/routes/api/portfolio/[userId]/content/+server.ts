@@ -25,10 +25,7 @@ export const PATCH: RequestHandler = async ({ params, cookies, request }) => {
 
 	if (!upstream.ok) {
 		const err = await upstream.json().catch(() => ({}));
-		throw error(
-			upstream.status,
-			(err as { message?: string }).message ?? 'Failed to save content'
-		);
+		throw error(upstream.status, (err as { message?: string }).message ?? 'Failed to save content');
 	}
 	return json(await upstream.json());
 };
