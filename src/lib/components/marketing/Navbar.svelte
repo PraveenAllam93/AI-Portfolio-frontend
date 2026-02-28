@@ -11,11 +11,19 @@
 	];
 
 	onMount(() => {
+		let rafId = 0;
 		function onScroll() {
-			scrolled = window.scrollY > 30;
+			if (rafId) return;
+			rafId = requestAnimationFrame(() => {
+				scrolled = window.scrollY > 30;
+				rafId = 0;
+			});
 		}
 		window.addEventListener('scroll', onScroll, { passive: true });
-		return () => window.removeEventListener('scroll', onScroll);
+		return () => {
+			window.removeEventListener('scroll', onScroll);
+			if (rafId) cancelAnimationFrame(rafId);
+		};
 	});
 </script>
 
@@ -65,10 +73,11 @@
 
 		<!-- Mobile hamburger -->
 		<button
-			class="flex items-center justify-center text-slate-900 transition-colors md:hidden"
+			class="flex h-11 w-11 items-center justify-center text-slate-900 transition-colors md:hidden"
 			onclick={() => (mobileMenuOpen = !mobileMenuOpen)}
 			aria-label={mobileMenuOpen ? 'Close menu' : 'Open menu'}
 			aria-expanded={mobileMenuOpen}
+			aria-controls="mobile-nav"
 		>
 			{#if mobileMenuOpen}
 				<svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -94,7 +103,7 @@
 
 	<!-- Mobile menu dropdown -->
 	{#if mobileMenuOpen}
-		<div class="border-t border-slate-100 bg-white px-6 py-4 md:hidden shadow-lg">
+		<div id="mobile-nav" class="border-t border-slate-100 bg-white px-6 py-4 md:hidden shadow-lg">
 			<div class="flex flex-col gap-4">
 				{#each navLinks as link}
 					<a
@@ -115,7 +124,7 @@
 				</a>
 				<a
 					href="/signup"
-					class="inline-block rounded-full bg-slate-900 px-5 py-2.5 text-center text-sm font-semibold text-white"
+					class="block w-full rounded-full bg-slate-900 px-5 py-3 text-center text-sm font-semibold text-white"
 					onclick={() => (mobileMenuOpen = false)}
 				>
 					Get Started

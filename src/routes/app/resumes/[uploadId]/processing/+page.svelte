@@ -5,6 +5,8 @@
 	import { fly, fade, scale } from 'svelte/transition';
 	import { elasticOut, cubicOut } from 'svelte/easing';
 	import { resumeProcessing } from '$lib/stores/resumeProcessing';
+	import Spinner from '$lib/components/common/Spinner.svelte';
+	import BreadcrumbHeader from '$lib/components/common/BreadcrumbHeader.svelte';
 	import type { FailureStage } from '$lib/services/resumeStatus';
 
 	const uploadId: string = $page.params.uploadId ?? '';
@@ -95,34 +97,9 @@
 	<title>Building your portfolio — AIfolio</title>
 </svelte:head>
 
-<div class="flex min-h-screen flex-col bg-[#fafafa]">
+<div class="flex min-h-screen flex-col bg-surface-subtle">
 	<!-- Header -->
-	<header class="sticky top-0 z-10 border-b border-slate-200 bg-white shadow-sm">
-		<div class="mx-auto flex max-w-7xl items-center gap-4 px-6 py-4">
-			<a
-				href="/app/dashboard"
-				class="flex items-center gap-1.5 text-sm font-bold text-slate-500 transition-colors hover:text-slate-900"
-			>
-				<svg
-					xmlns="http://www.w3.org/2000/svg"
-					fill="none"
-					viewBox="0 0 24 24"
-					stroke-width="2"
-					stroke="currentColor"
-					class="h-4 w-4"
-				>
-					<path
-						stroke-linecap="round"
-						stroke-linejoin="round"
-						d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18"
-					/>
-				</svg>
-				Dashboard
-			</a>
-			<span class="text-slate-300">/</span>
-			<span class="text-sm font-bold text-slate-900">Processing</span>
-		</div>
-	</header>
+	<BreadcrumbHeader title="Processing" />
 
 	<main class="mx-auto w-full max-w-lg flex-1 px-6 py-14">
 		<!-- ── Error state — backend signals canRetry ─────────────────────────────── -->
@@ -285,26 +262,7 @@
 												</svg>
 											</span>
 										{:else if active}
-											<svg
-												class="h-5 w-5 animate-spin"
-												xmlns="http://www.w3.org/2000/svg"
-												fill="none"
-												viewBox="0 0 24 24"
-											>
-												<circle
-													class="opacity-25"
-													cx="12"
-													cy="12"
-													r="10"
-													stroke="currentColor"
-													stroke-width="4"
-												></circle>
-												<path
-													class="opacity-75"
-													fill="currentColor"
-													d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
-												></path>
-											</svg>
+											<Spinner size="sm" />
 										{:else}
 											<svg
 												fill="none"
@@ -433,10 +391,7 @@
 						</div>
 					{:else if $resumeProcessing.polling}
 						<div class="mt-6 flex items-center justify-center gap-2 border-t border-slate-100 pt-6">
-							<svg class="h-4 w-4 animate-spin text-slate-400" fill="none" viewBox="0 0 24 24">
-								<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-								<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-							</svg>
+							<Spinner size="xs" class="text-slate-400" />
 							<span class="text-xs font-bold text-slate-400">Checking for updates…</span>
 						</div>
 					{/if}

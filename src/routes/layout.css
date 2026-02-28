@@ -1,5 +1,3 @@
-@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400..900;1,400..900&family=Inter:wght@300;400;500;600;700;800&display=swap');
-
 @import 'tailwindcss';
 @plugin '@tailwindcss/forms';
 @plugin '@tailwindcss/typography';
@@ -8,15 +6,10 @@
 	--font-serif: 'Playfair Display', serif;
 	--font-sans: 'Inter', system-ui, sans-serif;
 
-	/* Brand - More Vibrant/Futuristic */
+	/* Brand */
 	--color-brand: #7c3aed;
 	--color-brand-light: #a78bfa;
 	--color-brand-dark: #5b21b6;
-
-	/* Futuristic Accents */
-	--color-neon-purple: #c084fc;
-	--color-neon-pink: #f472b6;
-	--color-neon-blue: #38bdf8;
 
 	/* Surfaces */
 	--color-surface: #ffffff;
@@ -28,7 +21,7 @@
 	--color-ink-soft: #475569;
 	--color-ink-muted: #94a3b8;
 
-	/* Feature accents */
+	/* Accents */
 	--color-accent-emerald: #10b981;
 	--color-accent-amber: #f59e0b;
 	--color-accent-rose: #f43f5e;
@@ -51,99 +44,6 @@ body {
 	backdrop-filter: blur(12px);
 	-webkit-backdrop-filter: blur(12px);
 	border: 1px solid rgba(255, 255, 255, 0.3);
-}
-
-.glass-dark {
-	background: rgba(15, 23, 42, 0.6);
-	backdrop-filter: blur(12px);
-	-webkit-backdrop-filter: blur(12px);
-	border: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.glass-card {
-	background: rgba(255, 255, 255, 0.4);
-	backdrop-filter: blur(8px);
-	-webkit-backdrop-filter: blur(8px);
-	border: 1px solid rgba(255, 255, 255, 0.5);
-	box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.07);
-}
-
-/* ── Aurora / Mesh Gradients ─────────────────────────── */
-.aurora-bg {
-	position: relative;
-	background-color: #0f172a;
-	overflow: hidden;
-}
-
-.aurora-bg::before,
-.aurora-bg::after {
-	content: '';
-	position: absolute;
-	width: 800px;
-	height: 800px;
-	border-radius: 50%;
-	filter: blur(80px);
-	opacity: 0.4;
-	z-index: 0;
-}
-
-.aurora-bg::before {
-	background: radial-gradient(circle, #7c3aed, transparent);
-	top: -200px;
-	left: -200px;
-	animation: aurora-float 15s infinite alternate;
-}
-
-.aurora-bg::after {
-	background: radial-gradient(circle, #ec4899, transparent);
-	bottom: -200px;
-	right: -200px;
-	animation: aurora-float 18s infinite alternate-reverse;
-}
-
-@keyframes aurora-float {
-	0% {
-		transform: translate(0, 0) scale(1);
-	}
-	100% {
-		transform: translate(100px, 100px) scale(1.1);
-	}
-}
-
-/* ── Gradient utilities ──────────────────────────────── */
-.gradient-text {
-	background: linear-gradient(135deg, #7c3aed, #a855f7, #ec4899);
-	-webkit-background-clip: text;
-	-webkit-text-fill-color: transparent;
-	background-clip: text;
-}
-
-.gradient-bg {
-	background: linear-gradient(135deg, #7c3aed 0%, #a855f7 50%, #ec4899 100%);
-}
-
-.gradient-bg-subtle {
-	background: linear-gradient(135deg, #f5f3ff 0%, #faf5ff 50%, #fdf2f8 100%);
-}
-
-.gradient-border {
-	position: relative;
-	background: #fff;
-	background-clip: padding-box;
-	border: 2px solid transparent;
-}
-
-.gradient-border::before {
-	content: '';
-	position: absolute;
-	top: 0;
-	right: 0;
-	bottom: 0;
-	left: 0;
-	z-index: -1;
-	margin: -2px;
-	border-radius: inherit;
-	background: linear-gradient(135deg, #7c3aed, #ec4899);
 }
 
 /* ── Shimmer Effect ─────────────────────────────────── */
@@ -202,38 +102,6 @@ body {
 	animation: draw-check 0.6s ease forwards 0.3s;
 }
 
-/* ── Animations ──────────────────────────────────────── */
-@keyframes float {
-	0%,
-	100% {
-		transform: perspective(1000px) rotateX(5deg) translateY(0px);
-	}
-	50% {
-		transform: perspective(1000px) rotateX(5deg) translateY(-20px);
-	}
-}
-
-.animate-float {
-	animation: float 5s ease-in-out infinite;
-}
-
-.animate-float-slow {
-	animation: float 8s ease-in-out infinite;
-}
-
-.animate-glow {
-	animation: glow 3s ease-in-out infinite alternate;
-}
-
-@keyframes glow {
-	from {
-		box-shadow: 0 0 5px rgba(124, 58, 237, 0.2);
-	}
-	to {
-		box-shadow: 0 0 20px rgba(124, 58, 237, 0.6);
-	}
-}
-
 /* ── Infinite marquee (PortfolioShowcase) ─────────────── */
 @keyframes marquee {
 	from {
@@ -264,18 +132,16 @@ body {
 	animation-play-state: paused;
 }
 
-/* ── Drop-zone pulse ring (Upload idle state) ─────────── */
-@keyframes ring-pulse {
-	0% {
-		box-shadow: 0 0 0 0 rgba(124, 58, 237, 0.25);
+/* ── Reduced motion ──────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+	*,
+	::before,
+	::after {
+		animation-duration: 0.01ms !important;
+		animation-iteration-count: 1 !important;
+		transition-duration: 0.01ms !important;
 	}
-	70% {
-		box-shadow: 0 0 0 10px rgba(124, 58, 237, 0);
+	html {
+		scroll-behavior: auto;
 	}
-	100% {
-		box-shadow: 0 0 0 0 rgba(124, 58, 237, 0);
-	}
-}
-.animate-ring-pulse {
-	animation: ring-pulse 2.5s ease-out infinite;
 }

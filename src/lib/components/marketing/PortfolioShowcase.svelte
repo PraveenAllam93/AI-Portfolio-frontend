@@ -158,7 +158,7 @@
 			{#each cards1 as p}
                 {@const t = getThemeClasses(p.theme)}
 				<div
-					class="group w-80 shrink-0 rounded-[2rem] border p-6 shadow-sm transition-all duration-500 hover:-translate-y-1 hover:shadow-xl {t.card}"
+					class="group w-64 sm:w-80 shrink-0 rounded-[2rem] border p-6 shadow-sm transition-all duration-500 hover:-translate-y-1 hover:shadow-xl {t.card}"
 				>
 					<div class="flex items-center gap-4">
 						<div
@@ -175,7 +175,7 @@
 					<div class="mt-6 flex flex-wrap gap-2">
 						{#each p.skills as skill}
 							<span
-								class="rounded-lg border px-3 py-1.5 text-[11px] font-bold tracking-tight {t.skillBg}"
+								class="rounded-lg border px-3 py-1.5 text-xs font-bold tracking-tight {t.skillBg}"
 							>
 								{skill}
 							</span>
@@ -201,7 +201,7 @@
 			{#each cards2 as p}
                 {@const t = getThemeClasses(p.theme)}
 				<div
-					class="group w-80 shrink-0 rounded-[2rem] border p-6 shadow-sm transition-all duration-500 hover:-translate-y-1 hover:shadow-xl {t.card}"
+					class="group w-64 sm:w-80 shrink-0 rounded-[2rem] border p-6 shadow-sm transition-all duration-500 hover:-translate-y-1 hover:shadow-xl {t.card}"
 				>
 					<div class="flex items-center gap-4">
 						<div
@@ -218,7 +218,7 @@
 					<div class="mt-6 flex flex-wrap gap-2">
 						{#each p.skills as skill}
 							<span
-								class="rounded-lg border px-3 py-1.5 text-[11px] font-bold tracking-tight {t.skillBg}"
+								class="rounded-lg border px-3 py-1.5 text-xs font-bold tracking-tight {t.skillBg}"
 							>
 								{skill}
 							</span>

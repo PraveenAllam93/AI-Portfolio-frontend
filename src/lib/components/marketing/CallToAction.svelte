@@ -2,7 +2,7 @@
 	import { reveal } from '$lib/actions/animate';
 </script>
 
-<section class="bg-[#fafafa] py-24 md:py-32">
+<section class="bg-surface-subtle py-24 md:py-32">
 	<div class="mx-auto max-w-5xl px-6">
 		<div class="relative overflow-hidden rounded-[3rem] bg-slate-900 px-8 py-20 text-center shadow-2xl md:px-20 md:py-24">
 			<!-- Subtle glow background within the card -->

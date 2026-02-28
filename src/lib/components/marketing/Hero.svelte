@@ -2,7 +2,7 @@
 	import { reveal } from '$lib/actions/animate';
 </script>
 
-<section class="relative overflow-hidden pt-32 pb-24 md:pt-44 md:pb-32 bg-[#fafafa]">
+<section class="relative overflow-hidden pt-32 pb-24 md:pt-44 md:pb-32 bg-surface-subtle">
 	<!-- Background glow -->
 	<div class="pointer-events-none absolute inset-0 overflow-hidden flex justify-center items-center opacity-30">
 		<div class="w-[800px] h-[400px] bg-gradient-to-r from-brand/20 via-neon-pink/10 to-transparent blur-[100px] rounded-full"></div>

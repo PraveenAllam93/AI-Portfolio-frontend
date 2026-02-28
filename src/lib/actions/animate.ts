@@ -14,6 +14,11 @@ export function reveal(
 ) {
 	const { delay = 0, y = 22, threshold = 0.12 } = opts;
 
+	// Respect user's motion preference — skip animation entirely
+	if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+		return { destroy() {} };
+	}
+
 	node.style.opacity = '0';
 	node.style.transform = `translateY(${y}px)`;
 	node.style.transition = [

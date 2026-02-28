@@ -2,11 +2,11 @@
 	import { reveal } from '$lib/actions/animate';
 </script>
 
-<section id="features" class="bg-[#fafafa] py-24 md:py-32">
+<section id="features" class="bg-surface-subtle py-24 md:py-32">
 	<div class="mx-auto max-w-6xl px-6">
 		<div class="text-center mb-20" use:reveal>
 			<h2 class="font-serif text-4xl font-bold tracking-tight text-slate-900 md:text-5xl">
-				Everything you need. <br/> <span class="italic text-slate-500">Nothing you don't.</span>
+				Everything you need. <span class="italic text-slate-500">Nothing you don't.</span>
 			</h2>
 			<p class="mx-auto mt-6 max-w-2xl text-lg text-slate-600">
 				Powerful tools disguised as simple features, working silently to make you look your best.
@@ -14,10 +14,10 @@
 		</div>
 
 		<!-- Bento Grid -->
-		<div class="grid grid-cols-1 lg:grid-cols-3 gap-6 auto-rows-[320px]">
+		<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 md:auto-rows-[320px]">
 			
 			<!-- Card 1: AI Written Content (Wide) -->
-			<div use:reveal={{ delay: 100 }} class="group lg:col-span-2 relative overflow-hidden rounded-[2.5rem] bg-white p-8 shadow-sm border border-slate-200 transition-all duration-500 hover:shadow-xl hover:-translate-y-1">
+			<div use:reveal={{ delay: 100 }} class="group md:col-span-2 lg:col-span-2 relative overflow-hidden rounded-[2.5rem] bg-white p-8 shadow-sm border border-slate-200 transition-all duration-500 hover:shadow-xl hover:-translate-y-1">
 				<!-- Animated background glow -->
 				<div class="absolute -right-20 -top-20 w-80 h-80 bg-brand/5 rounded-full blur-3xl transition-transform duration-700 group-hover:scale-150 group-hover:bg-brand/10"></div>
 				
@@ -89,7 +89,7 @@
 			</div>
 
 			<!-- Card 3: Analytics (Small) -->
-			<div use:reveal={{ delay: 300 }} class="group lg:col-span-2 relative overflow-hidden rounded-[2.5rem] bg-white p-8 shadow-sm border border-slate-200 transition-all duration-500 hover:shadow-xl hover:-translate-y-1">
+			<div use:reveal={{ delay: 300 }} class="group md:col-span-2 lg:col-span-2 relative overflow-hidden rounded-[2.5rem] bg-white p-8 shadow-sm border border-slate-200 transition-all duration-500 hover:shadow-xl hover:-translate-y-1">
 				<div class="relative z-10 flex flex-col md:flex-row gap-8 h-full items-center">
 					<div class="flex-1 w-full flex items-end justify-center h-40 gap-3">
 						<!-- Animated Bar Chart -->

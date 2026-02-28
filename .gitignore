@@ -23,6 +23,7 @@ vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 
 .claudeignore
+.gemini/
 sample-media/
 
 # IDEs and Tools

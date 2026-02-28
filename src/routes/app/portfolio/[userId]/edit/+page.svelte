@@ -3,6 +3,9 @@
 	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
 	import { authStore } from '$lib/stores/auth';
+	import Spinner from '$lib/components/common/Spinner.svelte';
+	import AppHeader from '$lib/components/common/AppHeader.svelte';
+	import LoadingState from '$lib/components/common/LoadingState.svelte';
 	import {
 		getPortfolioContent,
 		savePortfolioContent,
@@ -185,36 +188,11 @@
 	<title>Edit Portfolio — AIfolio</title>
 </svelte:head>
 
-<div class="flex min-h-screen flex-col bg-[#fafafa]">
+<div class="flex min-h-screen flex-col bg-surface-subtle">
 	<!-- Header -->
-	<header class="sticky top-0 z-10 border-b border-slate-200 bg-white shadow-sm">
-		<div class="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
-			<a href="/" class="flex items-center gap-2 font-bold text-xl text-slate-900">
-                <div class="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-900 text-white shadow-md">
-                    <span class="text-xs font-black">AI</span>
-                </div>
-                folio
-			</a>
-			{#if $authStore.user}
-				<div class="flex items-center gap-3">
-					<div
-						class="flex h-9 w-9 items-center justify-center rounded-full text-sm font-bold text-slate-700 bg-slate-100 border border-slate-200 shadow-sm"
-					>
-						{$authStore.user.name
-							.split(' ')
-							.slice(0, 2)
-							.map((n) => n[0]?.toUpperCase() ?? '')
-							.join('')}
-					</div>
-					<span class="hidden text-sm font-medium text-slate-700 sm:block">
-						{$authStore.user.name}
-					</span>
-				</div>
-			{/if}
-		</div>
-	</header>
+	<AppHeader />
 
-	<main class="mx-auto w-full max-w-3xl flex-1 px-6 py-12">
+	<main class="mx-auto w-full max-w-3xl flex-1 px-6 py-8 sm:py-12">
 		<!-- Page title -->
 		<div use:reveal class="mb-10">
 			<a
@@ -240,22 +218,11 @@
 		</div>
 
 		{#if pageLoading}
-			<div class="flex flex-col items-center justify-center py-20 text-sm text-slate-500">
-				<svg class="h-8 w-8 animate-spin text-slate-300" fill="none" viewBox="0 0 24 24">
-					<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"
-					></circle>
-					<path
-						class="opacity-75"
-						fill="currentColor"
-						d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
-					></path>
-				</svg>
-				<span class="mt-4 font-bold text-slate-400">Loading your portfolio content…</span>
-			</div>
+			<LoadingState size="lg" message="Loading your portfolio content…" />
 		{:else}
 			<!-- Non-blocking load warning -->
 			{#if pageError}
-				<div class="mb-8 rounded-2xl bg-amber-50 px-5 py-4 ring-1 ring-amber-200">
+				<div role="alert" aria-live="polite" class="mb-8 rounded-2xl bg-amber-50 px-5 py-4 ring-1 ring-amber-200">
 					<p class="text-sm font-medium text-amber-800">{pageError}</p>
 				</div>
 			{/if}
@@ -286,14 +253,16 @@
 					>
 						<!-- Top accent bar when dirty -->
 						{#if f.value !== f.original}
-							<div class="h-1.5 w-full bg-amber-400"></div>
+							<div class="h-1.5 w-full bg-amber-400" aria-hidden="true"></div>
+							<span class="sr-only">Unsaved changes</span>
 						{:else if f.status === 'saved'}
-							<div class="h-1.5 w-full bg-emerald-400"></div>
+							<div class="h-1.5 w-full bg-emerald-400" aria-hidden="true"></div>
+							<span class="sr-only">Saved</span>
 						{:else}
-							<div class="h-1.5 w-full bg-slate-100"></div>
+							<div class="h-1.5 w-full bg-slate-100" aria-hidden="true"></div>
 						{/if}
 
-						<div class="p-8">
+						<div class="p-5 sm:p-8">
 							<!-- Label row -->
 							<div class="mb-4 flex items-center justify-between">
 								<label for="field-{key}" class="font-serif text-xl font-bold text-slate-900">{label}</label>
@@ -377,31 +346,18 @@
 											: 'bg-slate-900 text-white shadow-md hover:bg-slate-800 active:scale-95'}"
 								>
 									{#if f.status === 'saving'}
-										<svg class="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
-											<circle
-												class="opacity-25"
-												cx="12"
-												cy="12"
-												r="10"
-												stroke="currentColor"
-												stroke-width="4"
-											></circle>
-											<path
-												class="opacity-75"
-												fill="currentColor"
-												d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
-											></path>
-										</svg>
+										<Spinner size="xs" />
 										Saving…
 									{:else if f.status === 'saved'}
 										<svg
-											xmlns="http://www.w3.org/2000/svg"
-											fill="none"
-											viewBox="0 0 24 24"
-											stroke-width="2.5"
-											stroke="currentColor"
-											class="h-4 w-4"
-										>
+										xmlns="http://www.w3.org/2000/svg"
+										fill="none"
+										viewBox="0 0 24 24"
+										stroke-width="2.5"
+										stroke="currentColor"
+										class="h-4 w-4"
+										aria-hidden="true"
+									>
 											<path
 												stroke-linecap="round"
 												stroke-linejoin="round"
@@ -419,7 +375,7 @@
 
 							<!-- Per-field error -->
 							{#if f.status === 'error' && f.errorMsg}
-								<p class="mt-3 text-sm font-medium text-red-600">{f.errorMsg}</p>
+								<p role="alert" aria-live="assertive" class="mt-3 text-sm font-medium text-red-600">{f.errorMsg}</p>
 							{/if}
 
 							<!-- AI Panel -->
@@ -453,21 +409,7 @@
 												class="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-5 py-2 text-sm font-bold text-white shadow-md transition-all hover:bg-slate-800 active:scale-95 disabled:opacity-50 disabled:hover:scale-100"
 											>
 												{#if f.aiLoading}
-													<svg class="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
-														<circle
-															class="opacity-25"
-															cx="12"
-															cy="12"
-															r="10"
-															stroke="currentColor"
-															stroke-width="4"
-														></circle>
-														<path
-															class="opacity-75"
-															fill="currentColor"
-															d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
-														></path>
-													</svg>
+													<Spinner size="xs" />
 													Generating…
 												{:else}
 													Generate
@@ -478,7 +420,7 @@
 
 									<!-- AI error -->
 									{#if f.aiError}
-										<p class="mt-3 text-sm font-medium text-red-600">{f.aiError}</p>
+										<p role="alert" aria-live="assertive" class="mt-3 text-sm font-medium text-red-600">{f.aiError}</p>
 									{/if}
 
 									<!-- Suggestion comparison -->
@@ -536,11 +478,11 @@
 
 			<!-- Bottom save all -->
 			{#if isDirty}
-				<div class="mt-10 flex justify-end">
+				<div class="mt-10 flex justify-center sm:justify-end">
 					<button
 						onclick={saveAll}
 						disabled={isSavingAny}
-						class="rounded-full bg-slate-900 px-8 py-4 text-sm font-bold text-white shadow-xl transition-all hover:scale-105 hover:bg-slate-800 active:scale-95 disabled:opacity-50 disabled:hover:scale-100"
+						class="w-full rounded-full bg-slate-900 px-8 py-4 text-sm font-bold text-white shadow-xl transition-all hover:scale-105 hover:bg-slate-800 active:scale-95 disabled:opacity-50 disabled:hover:scale-100 sm:w-auto"
 					>
 						{isSavingAny ? 'Saving…' : 'Save All Changes'}
 					</button>

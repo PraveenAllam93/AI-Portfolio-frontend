@@ -27,7 +27,7 @@
 
 <footer class="bg-white border-t border-slate-200">
 	<div class="mx-auto max-w-7xl px-6 py-12 md:py-16">
-		<div class="grid gap-10 md:grid-cols-4">
+		<div class="grid gap-10 sm:grid-cols-2 md:grid-cols-4">
 			<div>
 				<a href="/" class="flex items-center gap-2 text-xl font-bold">
 					<div class="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-900 text-white">
@@ -65,9 +65,9 @@
 			</p>
             <div class="flex gap-4">
                 <!-- Social placeholders -->
-                <div class="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 transition-colors cursor-pointer"></div>
-                <div class="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 transition-colors cursor-pointer"></div>
-                <div class="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 transition-colors cursor-pointer"></div>
+                <div class="w-11 h-11 rounded-full bg-slate-100 hover:bg-slate-200 transition-colors cursor-pointer"></div>
+                <div class="w-11 h-11 rounded-full bg-slate-100 hover:bg-slate-200 transition-colors cursor-pointer"></div>
+                <div class="w-11 h-11 rounded-full bg-slate-100 hover:bg-slate-200 transition-colors cursor-pointer"></div>
             </div>
 		</div>
 	</div>

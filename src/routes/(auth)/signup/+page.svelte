@@ -2,6 +2,7 @@
 	import { goto } from '$app/navigation';
 	import { register, confirmEmail, resendConfirmationCode } from '$lib/services/auth';
 	import { reveal } from '$lib/actions/animate';
+import Spinner from '$lib/components/common/Spinner.svelte';
 
 	let step: 'register' | 'confirm' = $state('register');
 	let name = $state('');
@@ -74,10 +75,10 @@
 	<title>Sign Up — AIfolio</title>
 </svelte:head>
 
-<div class="flex min-h-screen bg-[#fafafa]">
+<div class="flex min-h-screen bg-surface-subtle">
 	<!-- Left panel — Clean Brand Side -->
 	<div
-		class="relative hidden flex-col items-center justify-center overflow-hidden border-r border-slate-200 bg-[#fafafa] p-12 lg:flex lg:w-[45%]"
+		class="relative hidden flex-col items-center justify-center overflow-hidden border-r border-slate-200 bg-surface-subtle p-12 lg:flex lg:w-[45%]"
 	>
 		<!-- Background decoration -->
 		<div
@@ -173,14 +174,17 @@
 
 					{#if errorMessage}
 						<div
+							id="register-error"
+							role="alert"
+							aria-live="assertive"
 							class="mb-6 rounded-2xl border border-red-100 bg-red-50/50 px-5 py-4 text-sm font-bold text-red-600"
 						>
-							<span class="mr-2">⚠️</span>
+							<span class="mr-2" aria-hidden="true">⚠️</span>
 							{errorMessage}
 						</div>
 					{/if}
 
-					<form class="space-y-5" onsubmit={handleRegister}>
+					<form class="space-y-5" onsubmit={handleRegister} aria-label="Create your account">
 						<div class="space-y-2">
 							<label
 								for="name"
@@ -194,60 +198,62 @@
 								required
 								bind:value={name}
 								disabled={isLoading}
-								class="w-full rounded-2xl border border-slate-200 bg-slate-50/50 px-6 py-4 text-base font-medium text-slate-900 transition-all outline-none focus:border-slate-400 focus:bg-white focus:ring-4 focus:ring-slate-100 disabled:opacity-50"
+								aria-describedby={errorMessage ? 'register-error' : undefined}
+								class="w-full rounded-2xl border border-slate-200 bg-slate-50/50 px-6 py-4 text-base font-medium text-slate-900 transition-all outline-none focus:border-slate-400 focus:bg-white focus:ring-2 focus:ring-slate-400/50 disabled:opacity-60"
 								placeholder="Jane Doe"
 							/>
 						</div>
 
 						<div class="space-y-2">
 							<label
-								for="email"
+								for="signup-email"
 								class="ml-1 text-xs font-bold tracking-widest text-slate-500 uppercase"
 								>Email Address</label
 							>
 							<input
-								id="email"
+								id="signup-email"
 								type="email"
 								autocomplete="email"
 								required
 								bind:value={email}
 								disabled={isLoading}
-								class="w-full rounded-2xl border border-slate-200 bg-slate-50/50 px-6 py-4 text-base font-medium text-slate-900 transition-all outline-none focus:border-slate-400 focus:bg-white focus:ring-4 focus:ring-slate-100 disabled:opacity-50"
+								aria-describedby={errorMessage ? 'register-error' : undefined}
+								class="w-full rounded-2xl border border-slate-200 bg-slate-50/50 px-6 py-4 text-base font-medium text-slate-900 transition-all outline-none focus:border-slate-400 focus:bg-white focus:ring-2 focus:ring-slate-400/50 disabled:opacity-60"
 								placeholder="you@example.com"
 							/>
 						</div>
 
 						<div class="space-y-2">
 							<label
-								for="password"
+								for="signup-password"
 								class="ml-1 text-xs font-bold tracking-widest text-slate-500 uppercase"
 								>Password</label
 							>
 							<input
-								id="password"
+								id="signup-password"
 								type="password"
 								autocomplete="new-password"
 								required
 								minlength={8}
 								bind:value={password}
 								disabled={isLoading}
-								class="w-full rounded-2xl border border-slate-200 bg-slate-50/50 px-6 py-4 text-base font-medium text-slate-900 transition-all outline-none focus:border-slate-400 focus:bg-white focus:ring-4 focus:ring-slate-100 disabled:opacity-50"
+								aria-describedby={errorMessage ? 'register-error' : 'password-hint'}
+								class="w-full rounded-2xl border border-slate-200 bg-slate-50/50 px-6 py-4 text-base font-medium text-slate-900 transition-all outline-none focus:border-slate-400 focus:bg-white focus:ring-2 focus:ring-slate-400/50 disabled:opacity-60"
 								placeholder="Create password"
 							/>
+							<p id="password-hint" class="ml-1 text-xs text-slate-400">Minimum 8 characters</p>
 						</div>
 
 						<button
 							type="submit"
 							disabled={isLoading}
+							aria-busy={isLoading}
 							class="group relative mt-2 flex w-full items-center justify-center overflow-hidden rounded-2xl bg-slate-900 py-5 text-base font-bold text-white shadow-xl transition-all hover:scale-[1.02] hover:bg-slate-800 active:scale-95 disabled:opacity-50"
 						>
 							<span class="relative z-10 flex items-center gap-2">
 								{#if isLoading}
-									<svg class="h-5 w-5 animate-spin" fill="none" viewBox="0 0 24 24">
-										<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-										<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-									</svg>
-									Creating...
+									<Spinner size="sm" />
+									<span>Creating...</span>
 								{:else}
 									Create Account
 								{/if}
@@ -275,23 +281,32 @@
 
 					{#if errorMessage}
 						<div
+							id="confirm-error"
+							role="alert"
+							aria-live="assertive"
 							class="mb-6 rounded-2xl border border-red-100 bg-red-50/50 px-5 py-4 text-sm font-bold text-red-600"
 						>
-							<span class="mr-2">⚠️</span>
+							<span class="mr-2" aria-hidden="true">⚠️</span>
 							{errorMessage}
 						</div>
 					{/if}
 					{#if successMessage}
 						<div
+							id="confirm-success"
+							role="status"
+							aria-live="polite"
 							class="mb-6 rounded-2xl border border-green-100 bg-green-50/50 px-5 py-4 text-sm font-bold text-green-600"
 						>
-							<span class="mr-2">✅</span>
+							<span class="mr-2" aria-hidden="true">✅</span>
 							{successMessage}
 						</div>
 					{/if}
 
-					<form class="space-y-8" onsubmit={handleConfirm}>
+					<form class="space-y-8" onsubmit={handleConfirm} aria-label="Verify your email">
 						<div class="space-y-2">
+							<label for="code" class="ml-1 text-xs font-bold tracking-widest text-slate-500 uppercase">
+								Verification Code
+							</label>
 							<input
 								id="code"
 								type="text"
@@ -301,7 +316,8 @@
 								maxlength={6}
 								bind:value={confirmationCode}
 								disabled={isLoading}
-								class="w-full rounded-2xl border border-slate-200 bg-slate-50/50 px-6 py-6 text-center font-mono text-3xl tracking-[0.6em] text-slate-900 transition-all outline-none focus:border-slate-400 focus:bg-white focus:ring-4 focus:ring-slate-100 disabled:opacity-50"
+								aria-describedby={errorMessage ? 'confirm-error' : successMessage ? 'confirm-success' : undefined}
+								class="w-full rounded-2xl border border-slate-200 bg-slate-50/50 px-6 py-6 text-center font-mono text-3xl tracking-[0.6em] text-slate-900 transition-all outline-none focus:border-slate-400 focus:bg-white focus:ring-2 focus:ring-slate-400/50 disabled:opacity-60"
 								placeholder="000000"
 							/>
 						</div>
@@ -309,15 +325,13 @@
 						<button
 							type="submit"
 							disabled={isLoading}
+							aria-busy={isLoading}
 							class="group relative flex w-full items-center justify-center overflow-hidden rounded-2xl bg-slate-900 py-5 text-base font-bold text-white shadow-xl transition-all hover:scale-[1.02] hover:bg-slate-800 active:scale-95 disabled:opacity-50"
 						>
 							<span class="relative z-10 flex items-center gap-2">
 								{#if isLoading}
-									<svg class="h-5 w-5 animate-spin" fill="none" viewBox="0 0 24 24">
-										<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-										<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-									</svg>
-									Verifying...
+									<Spinner size="sm" />
+									<span>Verifying...</span>
 								{:else}
 									Verify Email
 								{/if}
@@ -329,6 +343,7 @@
 						<button
 							onclick={handleResend}
 							disabled={resendCooldown > 0}
+							aria-label={resendCooldown > 0 ? `Resend available in ${resendCooldown} seconds` : 'Resend verification code'}
 							class="text-sm font-bold text-slate-500 transition-colors hover:text-slate-900 disabled:opacity-50 disabled:hover:text-slate-500"
 						>
 							{resendCooldown > 0 ? `Resend code in ${resendCooldown}s` : 'Resend verification code'}

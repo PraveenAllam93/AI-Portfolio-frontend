@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { uploadResume, isSupportedFileType } from '$lib/services/upload';
+	import BreadcrumbHeader from '$lib/components/common/BreadcrumbHeader.svelte';
 
 	type UploadStatus = 'idle' | 'uploading' | 'success' | 'error';
 	type WizardStep = 1 | 2 | 3;
@@ -113,22 +114,11 @@
 	<title>Upload Resume — AIfolio</title>
 </svelte:head>
 
-<div class="flex min-h-screen flex-col bg-[#fafafa]">
+<div class="flex min-h-screen flex-col bg-surface-subtle">
 	<!-- Header -->
-	<header class="sticky top-0 z-10 border-b border-slate-200 bg-white shadow-sm">
-		<div class="mx-auto flex max-w-5xl items-center gap-4 px-6 py-4">
-			<a
-				href="/app/dashboard"
-				class="text-sm font-bold text-slate-500 transition-colors hover:text-slate-900"
-			>
-				Dashboard
-			</a>
-			<span class="text-slate-300">/</span>
-			<span class="text-sm font-bold text-slate-900">Upload</span>
-		</div>
-	</header>
+	<BreadcrumbHeader title="Upload" />
 
-	<main class="mx-auto w-full max-w-2xl flex-1 px-6 py-16">
+	<main class="mx-auto w-full max-w-2xl flex-1 px-6 py-8 sm:py-16">
 		<div class="mb-10 text-center">
 			<h1 class="font-serif text-4xl font-bold text-slate-900">Build your portfolio</h1>
 			<p class="mt-3 text-lg text-slate-500">Upload your resume, pick a role and a theme.</p>
@@ -167,16 +157,18 @@
 			{#if wizardStep === 1}
 				<div>
 					<h2 class="font-serif text-2xl font-bold text-slate-900 mb-6">Upload your resume</h2>
-					<!-- svelte-ignore a11y_click_events_have_key_events -->
-					<!-- svelte-ignore a11y_no_static_element_interactions -->
 					<div
-						class="cursor-pointer rounded-2xl border-2 border-dashed p-10 text-center transition-all duration-200 {isDragOver ? 'border-slate-900 bg-slate-50' : selectedFile ? 'border-slate-300 bg-white' : 'border-slate-200 bg-slate-50 hover:border-slate-400'}"
+						role={selectedFile ? undefined : 'button'}
+						tabindex={selectedFile ? undefined : 0}
+						aria-label={selectedFile ? undefined : 'Upload resume — click or drag and drop a PDF or DOCX file'}
+						class="rounded-2xl border-2 border-dashed p-6 sm:p-10 text-center transition-all duration-200 {isDragOver ? 'border-slate-900 bg-slate-50' : selectedFile ? 'border-slate-300 bg-white' : 'cursor-pointer border-slate-200 bg-slate-50 hover:border-slate-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400/50'}"
 						ondrop={handleDrop}
 						ondragover={handleDragOver}
 						ondragleave={handleDragLeave}
 						onclick={() => { if (!selectedFile) document.getElementById('file-input')?.click(); }}
+						onkeydown={(e) => { if (!selectedFile && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); document.getElementById('file-input')?.click(); } }}
 					>
-						<input id="file-input" type="file" accept=".pdf,.doc,.docx" class="hidden" onchange={handleFileSelect} />
+						<input id="file-input" type="file" accept=".pdf,.doc,.docx" class="hidden" onchange={handleFileSelect} aria-label="Choose resume file" />
 						{#if selectedFile}
 							<div class="flex flex-col items-center gap-3">
 								<div class="flex h-16 w-16 items-center justify-center rounded-xl bg-slate-100 text-slate-900 border border-slate-200">
@@ -186,7 +178,7 @@
 									<p class="font-bold text-slate-900">{selectedFile.name}</p>
 									<p class="mt-1 text-sm text-slate-500">{formatFileSize(selectedFile.size)}</p>
 								</div>
-								<button type="button" class="mt-2 text-xs font-bold text-slate-500 hover:text-slate-900 hover:underline" onclick={(e) => { e.stopPropagation(); selectedFile = null; errorMessage = ''; }}>Change file</button>
+								<button type="button" class="mt-2 min-h-[44px] px-4 text-xs font-bold text-slate-500 hover:text-slate-900 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400/50 rounded-lg" onclick={(e) => { e.stopPropagation(); selectedFile = null; errorMessage = ''; }}>Change file</button>
 							</div>
 						{:else}
 							<div class="flex flex-col items-center gap-3">
@@ -202,7 +194,7 @@
 					</div>
 
 					{#if errorMessage}
-						<div class="mt-4 rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm font-medium text-red-600">{errorMessage}</div>
+						<div id="upload-error" role="alert" aria-live="assertive" class="mt-4 rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm font-medium text-red-600">{errorMessage}</div>
 					{/if}
 
 					<button onclick={goNext} disabled={!selectedFile} class="mt-8 flex w-full items-center justify-center gap-2 rounded-xl bg-slate-900 py-4 text-base font-bold text-white shadow-xl transition-all hover:bg-slate-800 active:scale-95 disabled:opacity-50 disabled:hover:scale-100">
@@ -233,7 +225,7 @@
 					<h2 class="font-serif text-2xl font-bold text-slate-900 mb-2">Choose a theme</h2>
 					<p class="mb-6 text-slate-500">Pick a starting style. You can change it later.</p>
 
-					<div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+					<div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
 						{#each templates as tmpl}
 							<button onclick={() => (selectedTemplateId = tmpl.id)} class="group flex flex-col items-start rounded-2xl border-2 p-1 text-left transition-all duration-200 {selectedTemplateId === tmpl.id ? 'border-slate-900 shadow-md' : 'border-slate-100 hover:border-slate-300'}">
 								<div class="h-24 w-full rounded-xl bg-slate-50 mb-3 border border-slate-100 overflow-hidden relative">

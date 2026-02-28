@@ -5,6 +5,9 @@
 	import { fade, scale } from 'svelte/transition';
 	import { cubicOut } from 'svelte/easing';
 	import { authStore } from '$lib/stores/auth';
+	import Spinner from '$lib/components/common/Spinner.svelte';
+	import AppHeader from '$lib/components/common/AppHeader.svelte';
+	import LoadingState from '$lib/components/common/LoadingState.svelte';
 	import { getPortfolioAnalytics } from '$lib/services/portfolio';
 	import { reveal } from '$lib/actions/animate';
 	import type { PortfolioAnalytics, AnalyticsTimeline } from '$lib/types/portfolio';
@@ -91,31 +94,40 @@
 		return `M${firstX},${CHART_BOTTOM} ${points} L${lastX},${CHART_BOTTOM} Z`;
 	}
 
-	function onMouseMove(event: MouseEvent) {
+	let _chartRafId = 0;
+	let _cachedChartRect: DOMRect | null = null;
+
+	function onPointerMove(event: PointerEvent) {
 		if (timeline.length === 0) return;
-		const svg = event.currentTarget as SVGSVGElement;
-		const rect = svg.getBoundingClientRect();
-		const mouseX = event.clientX - rect.left;
-		const svgX = (mouseX / rect.width) * SVG_W;
-		
-		let closestIdx = 0;
-		let minDistance = Infinity;
-		
-		for (let i = 0; i < timeline.length; i++) {
-			const x = PAD_L + (timeline.length > 1 ? i / (timeline.length - 1) : 0.5) * CHART_W;
-			const dist = Math.abs(x - svgX);
-			if (dist < minDistance) {
-				minDistance = dist;
-				closestIdx = i;
+		if (_chartRafId) return;
+		_chartRafId = requestAnimationFrame(() => {
+			_chartRafId = 0;
+			if (!_cachedChartRect) {
+				_cachedChartRect = (event.currentTarget as SVGSVGElement).getBoundingClientRect();
 			}
-		}
-		
-		hoveredIndex = closestIdx;
+			const mouseX = event.clientX - _cachedChartRect.left;
+			const svgX = (mouseX / _cachedChartRect.width) * SVG_W;
+
+			let closestIdx = 0;
+			let minDistance = Infinity;
+			for (let i = 0; i < timeline.length; i++) {
+				const x = PAD_L + (timeline.length > 1 ? i / (timeline.length - 1) : 0.5) * CHART_W;
+				const dist = Math.abs(x - svgX);
+				if (dist < minDistance) {
+					minDistance = dist;
+					closestIdx = i;
+				}
+			}
+			hoveredIndex = closestIdx;
+		});
 	}
 
-	function onMouseLeave() {
+	function onPointerLeave() {
+		if (_chartRafId) { cancelAnimationFrame(_chartRafId); _chartRafId = 0; }
+		_cachedChartRect = null;
 		hoveredIndex = null;
 	}
+
 
 	function buildXLabels(tl: AnalyticsTimeline[]): Array<{ x: number; label: string }> {
 		if (tl.length === 0) return [];
@@ -231,6 +243,11 @@
 	    return hr > 12 ? `${hr - 12} PM` : `${hr} AM`;
 	}
 
+    function focusOnMount(node: HTMLElement) {
+        node.focus();
+        return { destroy() {} };
+    }
+
     function getDayCount(day: string, record: Record<string, number> | undefined): number {
         if (!record) return 0;
         // Try exact match, then short version, case-insensitive
@@ -250,14 +267,21 @@
 
 <!-- Expanded Chart Modal -->
 {#if isChartExpanded && timeline.length > 0}
-	<div class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm sm:p-8" transition:fade={{ duration: 200 }}>
+	<div
+		role="dialog"
+		aria-modal="true"
+		aria-labelledby="chart-modal-title"
+		class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm sm:p-8"
+		transition:fade={{ duration: 200 }}
+		onkeydown={(e) => { if (e.key === 'Escape') isChartExpanded = false; }}
+	>
 		<div class="relative w-full max-w-6xl rounded-[2.5rem] bg-white p-6 shadow-2xl sm:p-10" transition:scale={{ start: 0.95, duration: 250, easing: cubicOut }}>
 			<div class="mb-8 flex items-center justify-between">
 				<div>
-					<h2 class="font-serif text-3xl font-bold text-slate-900">Traffic Over Time</h2>
+					<h2 id="chart-modal-title" class="font-serif text-3xl font-bold text-slate-900">Traffic Over Time</h2>
 					<p class="mt-1 text-slate-500">A detailed view of your portfolio's historical performance. Hover points for counts.</p>
 				</div>
-				<button onclick={() => isChartExpanded = false} class="flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 text-slate-500 transition-colors hover:bg-slate-200 hover:text-slate-900">
+				<button use:focusOnMount onclick={() => isChartExpanded = false} aria-label="Close chart" class="flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 text-slate-500 transition-colors hover:bg-slate-200 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400/50">
 					<svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
 						<path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
 					</svg>
@@ -275,11 +299,11 @@
 		viewBox="0 0 {SVG_W} {SVG_H}"
 		width="100%"
 		height="100%"
-		class="{cssClass} cursor-crosshair"
+		class="{cssClass} cursor-crosshair touch-none"
 		preserveAspectRatio="none"
 		aria-label="Portfolio views over time"
-		onmousemove={onMouseMove}
-		onmouseleave={onMouseLeave}
+		onpointermove={onPointerMove}
+		onpointerleave={onPointerLeave}
 	>
 		<defs>
 			<linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
@@ -326,25 +350,8 @@
 	</svg>
 {/snippet}
 
-<div class="flex min-h-screen flex-col bg-[#fafafa]">
-	<header class="sticky top-0 z-10 border-b border-slate-200 bg-white shadow-sm">
-		<div class="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
-			<a href="/" class="flex items-center gap-2 font-bold text-xl text-slate-900">
-                <div class="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-900 text-white shadow-md transition-transform hover:rotate-12">
-                    <span class="text-xs font-black">AI</span>
-                </div>
-                folio
-			</a>
-			{#if $authStore.user}
-				<div class="flex items-center gap-3">
-					<div class="flex h-9 w-9 items-center justify-center rounded-full text-sm font-bold text-slate-700 bg-slate-100 border border-slate-200 shadow-sm">
-						{$authStore.user.name.split(' ').slice(0, 2).map((n) => n[0]?.toUpperCase() ?? '').join('')}
-					</div>
-					<span class="hidden text-sm font-medium text-slate-700 sm:block">{$authStore.user.name}</span>
-				</div>
-			{/if}
-		</div>
-	</header>
+<div class="flex min-h-screen flex-col bg-surface-subtle">
+	<AppHeader />
 
 	<main class="mx-auto w-full max-w-7xl flex-1 px-6 py-8">
 		<div use:reveal class="mb-6">
@@ -358,13 +365,7 @@
 		</div>
 
 		{#if loadingStatus === 'loading'}
-			<div class="flex flex-col items-center justify-center py-24 text-sm text-slate-500">
-				<svg class="h-8 w-8 animate-spin text-slate-300" fill="none" viewBox="0 0 24 24">
-					<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-					<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-				</svg>
-				<span class="mt-4 font-bold text-slate-400">Loading metrics…</span>
-			</div>
+			<LoadingState size="lg" message="Loading metrics…" />
 		{:else if loadingStatus === 'error'}
 			<div class="rounded-3xl border border-red-100 bg-white p-10 text-center shadow-xl">
 				<p class="text-xl font-serif font-bold text-slate-900">Failed to load analytics</p>
@@ -373,7 +374,7 @@
 			</div>
 		{:else if analytics}
 			<!-- Primary Stats -->
-			<div use:reveal={{ delay: 60 }} class="mb-6 grid grid-cols-2 md:grid-cols-3 gap-4 xl:grid-cols-6">
+			<div use:reveal={{ delay: 60 }} class="mb-6 grid grid-cols-2 sm:grid-cols-3 gap-4 xl:grid-cols-6">
 				{#each [
 					{ label: 'Total Views', value: analytics.totalViews.toLocaleString(), icon: 'M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z' },
 					{ label: 'Last 30 Days', value: analytics.last30Days.toLocaleString(), icon: 'M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 0 1 2.25-2.25h13.5A2.25 2.25 0 0 1 21 7.5v11.25m-18 0A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75m-18 0v-7.5A2.25 2.25 0 0 1 5.25 9h13.5A2.25 2.25 0 0 1 21 11.25v7.5' },
@@ -384,14 +385,12 @@
 				] as stat}
 					<div class="flex flex-col items-start gap-2 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
 						<div class="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-50 border border-slate-100">
-							<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="h-4 w-4 text-slate-900">
-								{#each stat.icon.split(' M ').filter(Boolean) as _, i}
-									<path stroke-linecap="round" stroke-linejoin="round" d={i === 0 ? stat.icon.split(' M ')[0] : 'M ' + stat.icon.split(' M ')[i]} />
-								{/each}
+							<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="h-4 w-4 text-slate-900" aria-hidden="true">
+								<path stroke-linecap="round" stroke-linejoin="round" d={stat.icon} />
 							</svg>
 						</div>
 						<div>
-							<p class="text-[9px] font-bold tracking-widest text-slate-400 uppercase">{stat.label}</p>
+							<p class="text-[10px] font-bold tracking-widest text-slate-400 uppercase">{stat.label}</p>
 							<p class="font-serif text-xl font-bold text-slate-900">{stat.value}</p>
 						</div>
 					</div>
@@ -406,7 +405,7 @@
 							<h2 class="font-serif text-xl font-bold text-slate-900">Traffic Over Time</h2>
 							<p class="text-xs text-slate-500 mt-0.5">Daily view trends.</p>
 						</div>
-						<button onclick={() => isChartExpanded = true} class="h-8 w-8 flex items-center justify-center rounded-lg bg-slate-50 border border-slate-200 hover:bg-slate-100 transition-colors">
+						<button onclick={() => isChartExpanded = true} aria-label="Expand chart" class="h-11 w-11 flex items-center justify-center rounded-lg bg-slate-50 border border-slate-200 hover:bg-slate-100 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400/50">
 							<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="h-4 w-4 text-slate-400">
 								<path stroke-linecap="round" stroke-linejoin="round" d="M3.75 3.75v4.5m0-4.5h4.5m-4.5 0L9 9M3.75 20.25v-4.5m0 4.5h4.5m-4.5 0L9 15M20.25 3.75h-4.5m4.5 0v4.5m0-4.5L15 9m5.25 11.25h-4.5m4.5 0v-4.5m0 4.5L15 15" />
 							</svg>
@@ -426,7 +425,7 @@
 					<div class="absolute right-0 top-0 w-32 h-32 bg-white/5 rounded-full blur-3xl pointer-events-none"></div>
                     <div class="relative z-10 mb-6">
                         <h2 class="font-serif text-xl font-bold">Engagement</h2>
-                        <p class="text-slate-400 text-[11px]">Peak activity periods.</p>
+                        <p class="text-slate-400 text-xs">Peak activity periods.</p>
                     </div>
 
                     <div class="space-y-4 relative z-10">
@@ -477,7 +476,7 @@
                                     </svg>
                                 </div>
                                 
-                                <div class="flex justify-between mt-2 text-[8px] font-bold text-slate-500 uppercase tracking-tighter">
+                                <div class="flex justify-between mt-2 text-[9px] font-bold text-slate-500 uppercase tracking-tighter">
                                     {#each weekDays as day}
                                         <span>{day.charAt(0)}</span>
                                     {/each}
@@ -518,7 +517,7 @@
                         <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Efficiency</span>
                     </div>
                     {#if analytics.byVersion && Object.keys(analytics.byVersion).length > 0}
-                        <div class="space-y-4 max-h-[120px] overflow-y-auto custom-scrollbar pr-2">
+                        <div class="space-y-4 max-h-[160px] md:max-h-[200px] overflow-y-auto custom-scrollbar pr-2">
                             {#each Object.entries(analytics.byVersion).sort((a, b) => b[1] - a[1]) as [version, count]}
                                 <div class="flex items-center gap-4 group">
                                     <span class="w-12 text-xs font-bold text-slate-900 uppercase group-hover:text-emerald-600 transition-colors">{version}</span>
@@ -537,7 +536,7 @@
             </div>
 
             <!-- Detailed Breakdowns -->
-			<div use:reveal={{ delay: 180 }} class="grid grid-cols-1 gap-6 md:grid-cols-3">
+			<div use:reveal={{ delay: 180 }} class="grid grid-cols-1 sm:grid-cols-2 gap-6 md:grid-cols-3">
 				<!-- By Country -->
 				<div class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm hover:shadow-md transition-shadow">
 					<h2 class="mb-6 font-serif text-xl font-bold text-slate-900 border-b border-slate-100 pb-3">By Country</h2>

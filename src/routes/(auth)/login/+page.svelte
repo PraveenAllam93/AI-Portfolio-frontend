@@ -3,6 +3,7 @@
 	import { login } from '$lib/services/auth';
 	import { authStore } from '$lib/stores/auth';
 	import { reveal } from '$lib/actions/animate';
+import Spinner from '$lib/components/common/Spinner.svelte';
 
 	let email = $state('');
 	let password = $state('');
@@ -31,10 +32,10 @@
 	<title>Log In — AIfolio</title>
 </svelte:head>
 
-<div class="flex min-h-screen bg-[#fafafa]">
+<div class="flex min-h-screen bg-surface-subtle">
 	<!-- Left panel — Clean Brand Side -->
 	<div
-		class="relative hidden flex-col items-center justify-center overflow-hidden border-r border-slate-200 bg-[#fafafa] p-12 lg:flex lg:w-[45%]"
+		class="relative hidden flex-col items-center justify-center overflow-hidden border-r border-slate-200 bg-surface-subtle p-12 lg:flex lg:w-[45%]"
 	>
 		<!-- Background decoration -->
 		<div
@@ -98,12 +99,15 @@
 					<p class="mt-3 text-lg text-slate-500">Log in to your workspace.</p>
 				</div>
 
-				<form class="space-y-6" onsubmit={handleSubmit}>
+				<form class="space-y-6" onsubmit={handleSubmit} aria-label="Log in to your account">
 					{#if errorMessage}
 						<div
+							id="login-error"
+							role="alert"
+							aria-live="assertive"
 							class="rounded-2xl border border-red-100 bg-red-50/50 px-5 py-4 text-sm font-bold text-red-600"
 						>
-							<span class="mr-2">⚠️</span>
+							<span class="mr-2" aria-hidden="true">⚠️</span>
 							{errorMessage}
 						</div>
 					{/if}
@@ -122,7 +126,8 @@
 								required
 								bind:value={email}
 								disabled={isLoading}
-								class="w-full rounded-2xl border border-slate-200 bg-slate-50/50 px-6 py-4 text-base font-medium text-slate-900 transition-all outline-none placeholder:text-slate-400 focus:border-slate-400 focus:bg-white focus:ring-4 focus:ring-slate-100 disabled:opacity-50"
+								aria-describedby={errorMessage ? 'login-error' : undefined}
+								class="w-full rounded-2xl border border-slate-200 bg-slate-50/50 px-6 py-4 text-base font-medium text-slate-900 transition-all outline-none placeholder:text-slate-400 focus:border-slate-400 focus:bg-white focus:ring-2 focus:ring-slate-400/50 disabled:opacity-60"
 								placeholder="you@example.com"
 							/>
 						</div>
@@ -148,7 +153,8 @@
 							required
 							bind:value={password}
 							disabled={isLoading}
-							class="w-full rounded-2xl border border-slate-200 bg-slate-50/50 px-6 py-4 text-base font-medium text-slate-900 transition-all outline-none placeholder:text-slate-400 focus:border-slate-400 focus:bg-white focus:ring-4 focus:ring-slate-100 disabled:opacity-50"
+							aria-describedby={errorMessage ? 'login-error' : undefined}
+							class="w-full rounded-2xl border border-slate-200 bg-slate-50/50 px-6 py-4 text-base font-medium text-slate-900 transition-all outline-none placeholder:text-slate-400 focus:border-slate-400 focus:bg-white focus:ring-2 focus:ring-slate-400/50 disabled:opacity-60"
 							placeholder="••••••••"
 						/>
 					</div>
@@ -156,26 +162,13 @@
 					<button
 						type="submit"
 						disabled={isLoading}
+						aria-busy={isLoading}
 						class="group relative flex w-full items-center justify-center overflow-hidden rounded-2xl bg-slate-900 py-5 text-base font-bold text-white shadow-xl transition-all hover:scale-[1.02] hover:bg-slate-800 active:scale-95 disabled:opacity-50"
 					>
 						<span class="relative z-10 flex items-center gap-2">
 							{#if isLoading}
-								<svg class="h-5 w-5 animate-spin" fill="none" viewBox="0 0 24 24">
-									<circle
-										class="opacity-25"
-										cx="12"
-										cy="12"
-										r="10"
-										stroke="currentColor"
-										stroke-width="4"
-									></circle>
-									<path
-										class="opacity-75"
-										fill="currentColor"
-										d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
-									></path>
-								</svg>
-								Logging in...
+								<Spinner size="sm" />
+								<span>Logging in...</span>
 							{:else}
 								Log In
 							{/if}
