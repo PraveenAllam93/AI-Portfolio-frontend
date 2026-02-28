@@ -17,6 +17,7 @@
 		"@eslint/compat": "^2.0.1",
 		"@eslint/js": "^9.39.2",
 		"@sveltejs/adapter-auto": "^7.0.0",
+		"@sveltejs/adapter-vercel": "^6.3.3",
 		"@sveltejs/kit": "^2.50.1",
 		"@sveltejs/vite-plugin-svelte": "^6.2.4",
 		"@tailwindcss/forms": "^0.5.11",
@@ -36,5 +37,9 @@
 		"typescript": "^5.9.3",
 		"typescript-eslint": "^8.53.1",
 		"vite": "^7.3.1"
+	},
+	"dependencies": {
+		"@aws-sdk/client-cognito-identity-provider": "^3.997.0",
+		"aws-amplify": "^6.16.2"
 	}
 }

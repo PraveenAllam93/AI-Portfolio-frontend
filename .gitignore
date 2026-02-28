@@ -23,6 +23,19 @@ vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 
 .claudeignore
+.gemini/
 sample-media/
 
+# IDEs and Tools
 .vscode/
+.idea/
+.claude/
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+CLAUDE.md

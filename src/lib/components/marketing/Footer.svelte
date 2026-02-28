@@ -25,27 +25,30 @@
 	];
 </script>
 
-<footer class="border-t border-peach-200 bg-peach-50">
+<footer class="bg-white border-t border-slate-200">
 	<div class="mx-auto max-w-7xl px-6 py-12 md:py-16">
-		<div class="grid gap-10 md:grid-cols-4">
-			<!-- Brand -->
+		<div class="grid gap-10 sm:grid-cols-2 md:grid-cols-4">
 			<div>
-				<a href="/" class="font-serif text-xl font-bold text-charcoal">AIfolio</a>
-				<p class="mt-3 text-sm leading-relaxed text-charcoal-light">
+				<a href="/" class="flex items-center gap-2 text-xl font-bold">
+					<div class="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-900 text-white">
+						<span class="text-xs font-black">AI</span>
+					</div>
+					<span class="text-slate-900">folio</span>
+				</a>
+				<p class="mt-4 text-sm leading-relaxed text-slate-500">
 					Turn your resume into a stunning portfolio website with the power of AI.
 				</p>
 			</div>
 
-			<!-- Link columns -->
 			{#each footerLinks as column}
 				<div>
-					<h4 class="text-sm font-semibold text-charcoal">{column.title}</h4>
+					<h4 class="text-sm font-semibold text-slate-900">{column.title}</h4>
 					<ul class="mt-4 space-y-3">
 						{#each column.links as link}
 							<li>
 								<a
 									href={link.href}
-									class="text-sm text-charcoal-light transition-colors hover:text-charcoal"
+									class="text-sm text-slate-500 transition-colors hover:text-slate-900"
 								>
 									{link.label}
 								</a>
@@ -56,10 +59,16 @@
 			{/each}
 		</div>
 
-		<div class="mt-12 border-t border-peach-200 pt-8">
-			<p class="text-center text-sm text-charcoal-light">
+		<div class="mt-12 border-t border-slate-100 pt-8 flex flex-col md:flex-row justify-between items-center gap-4">
+			<p class="text-sm text-slate-500">
 				&copy; {new Date().getFullYear()} AIfolio. All rights reserved.
 			</p>
+            <div class="flex gap-4">
+                <!-- Social placeholders -->
+                <div class="w-11 h-11 rounded-full bg-slate-100 hover:bg-slate-200 transition-colors cursor-pointer"></div>
+                <div class="w-11 h-11 rounded-full bg-slate-100 hover:bg-slate-200 transition-colors cursor-pointer"></div>
+                <div class="w-11 h-11 rounded-full bg-slate-100 hover:bg-slate-200 transition-colors cursor-pointer"></div>
+            </div>
 		</div>
 	</div>
 </footer>

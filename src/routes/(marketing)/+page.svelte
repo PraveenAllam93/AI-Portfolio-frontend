@@ -2,6 +2,7 @@
 	import Hero from '$lib/components/marketing/Hero.svelte';
 	import Features from '$lib/components/marketing/Features.svelte';
 	import HowItWorks from '$lib/components/marketing/HowItWorks.svelte';
+	import PortfolioShowcase from '$lib/components/marketing/PortfolioShowcase.svelte';
 	import TemplatePreview from '$lib/components/marketing/TemplatePreview.svelte';
 	import CallToAction from '$lib/components/marketing/CallToAction.svelte';
 </script>
@@ -17,5 +18,6 @@
 <Hero />
 <Features />
 <HowItWorks />
+<PortfolioShowcase />
 <TemplatePreview />
 <CallToAction />
