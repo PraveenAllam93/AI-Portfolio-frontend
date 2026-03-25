@@ -93,6 +93,40 @@ export async function resendConfirmationCode(email: string): Promise<AuthResult>
 	return { success: true };
 }
 
+export async function forgotPassword(email: string): Promise<AuthResult> {
+	const res = await fetch('/api/auth/forgot-password', {
+		method: 'POST',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify({ email })
+	});
+
+	if (!res.ok) {
+		const text = await res.text();
+		return { success: false, error: text || 'Could not send reset email.' };
+	}
+
+	return { success: true };
+}
+
+export async function resetPassword(
+	email: string,
+	code: string,
+	newPassword: string
+): Promise<AuthResult> {
+	const res = await fetch('/api/auth/reset-password', {
+		method: 'POST',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify({ email, code, newPassword })
+	});
+
+	if (!res.ok) {
+		const text = await res.text();
+		return { success: false, error: text || 'Password reset failed.' };
+	}
+
+	return { success: true };
+}
+
 export async function logout(): Promise<void> {
 	await fetch('/api/auth/logout', { method: 'POST' });
 }

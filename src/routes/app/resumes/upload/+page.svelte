@@ -1,13 +1,13 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import { uploadResume, isSupportedFileType } from '$lib/services/upload';
+	import { uploadResume, isSupportedFileType, type ResumeCategory } from '$lib/services/upload';
 	import BreadcrumbHeader from '$lib/components/common/BreadcrumbHeader.svelte';
 
 	type UploadStatus = 'idle' | 'uploading' | 'success' | 'error';
 	type WizardStep = 1 | 2 | 3;
 
 	interface PortfolioType {
-		id: string;
+		id: ResumeCategory;
 		label: string;
 		description: string;
 	}
@@ -24,11 +24,11 @@
 	let errorMessage = $state('');
 	let selectedFile: File | null = $state(null);
 	let isDragOver = $state(false);
-	let selectedTypeId = $state('');
+	let selectedTypeId = $state<ResumeCategory | ''>('');
 	let selectedTemplateId = $state('');
 
 	const portfolioTypes: PortfolioType[] = [
-		{ id: 'software', label: 'Software Engineer', description: 'Dev, tech & coding' },
+		{ id: 'software_engineer', label: 'Software Engineer', description: 'Dev, tech & coding' },
 		{ id: 'designer', label: 'Designer', description: 'UI/UX, creative & visual' },
 		{ id: 'marketing', label: 'Marketing', description: 'Growth, content & brand' },
 		{ id: 'finance', label: 'Finance', description: 'Analyst, banking & consulting' }
@@ -37,7 +37,12 @@
 	const templates: Template[] = [
 		{ id: 'minimal', name: 'Minimal', tag: 'Clean' },
 		{ id: 'bold', name: 'Bold', tag: 'Popular' },
-		{ id: 'creative', name: 'Creative', tag: 'Trendy' }
+		{ id: 'creative', name: 'Creative', tag: 'Trendy' },
+		{ id: 'modern', name: 'Modern', tag: 'Sleek' },
+		{ id: 'aurora', name: 'Aurora', tag: 'Vibrant' },
+		{ id: 'executive', name: 'Executive', tag: 'Formal' },
+		{ id: 'luxury', name: 'Luxury', tag: 'Premium' },
+		{ id: 'nebula', name: 'Nebula', tag: 'Cyberpunk' }
 	];
 
 	const stepLabels = ['File', 'Role', 'Theme'];
@@ -95,7 +100,7 @@
 		progress = 0;
 		errorMessage = '';
 
-		const result = await uploadResume(selectedFile, (pct) => {
+		const result = await uploadResume(selectedFile, selectedTypeId as ResumeCategory, selectedTemplateId, (pct) => {
 			progress = pct;
 		});
 
