@@ -671,6 +671,7 @@
 		const items = sections[sectionKey].filter((_, i) => i !== itemIdx);
 		sections = { ...sections, [sectionKey]: items };
 		savePortfolioSection(userId, sectionKey, items.map((it) => it.data));
+		queuePreviewRefresh();
 	}
 
 	async function saveItem(sectionKey: string, itemIdx: number) {
@@ -995,7 +996,7 @@
 
 				{#if activeTab === 'profile'}
 					{#if isProfileDirty}
-						<div class="flex flex-col sm:flex-row items-center justify-between gap-4 rounded-2xl bg-slate-900 px-6 py-4 shadow-xl">
+						<div class="sticky top-0 z-10 flex flex-col sm:flex-row items-center justify-between gap-4 rounded-2xl bg-slate-900 px-6 py-4 shadow-xl">
 							<p class="text-sm font-bold text-white">You have unsaved changes.</p>
 							<button onclick={saveAllProfile} disabled={isProfileSavingAny} class="w-full sm:w-auto rounded-xl bg-white px-5 py-2 text-sm font-bold text-slate-900 disabled:opacity-50">{isProfileSavingAny ? 'Saving…' : 'Save All Changes'}</button>
 						</div>
@@ -1088,7 +1089,7 @@
 				{:else if activeTab === 'skills'}
 					<div class="space-y-4">
 						{#if isSkillsDirty}
-							<div class="flex flex-col sm:flex-row items-center justify-between gap-4 rounded-2xl bg-slate-900 px-6 py-4 shadow-xl">
+							<div class="sticky top-0 z-10 flex flex-col sm:flex-row items-center justify-between gap-4 rounded-2xl bg-slate-900 px-6 py-4 shadow-xl">
 								<p class="text-sm font-bold text-white">Unsaved changes in Skills.</p>
 								<button onclick={saveSkills} disabled={skillsStatus === 'saving'} class="w-full sm:w-auto rounded-xl bg-white px-5 py-2 text-sm font-bold text-slate-900 disabled:opacity-50">{skillsStatus === 'saving' ? 'Saving…' : 'Save Skills'}</button>
 							</div>
