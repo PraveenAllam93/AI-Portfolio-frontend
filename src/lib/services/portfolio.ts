@@ -27,6 +27,7 @@ export async function getPortfolioData(userId: string): Promise<ServiceResult<Po
 				portfolioContent: raw.portfolioContent ?? { bio: '', headline: '', uniqueValue: '' },
 				parsedData: raw.parsedData ?? {},
 				category: raw.category ?? 'software_engineer',
+				templateId: raw.templateId ?? undefined,
 				sectionOrder: raw.sectionOrder ?? undefined,
 				hiddenSections: raw.hiddenSections ?? undefined
 			}

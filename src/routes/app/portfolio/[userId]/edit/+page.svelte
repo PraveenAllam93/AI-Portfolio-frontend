@@ -21,9 +21,12 @@
 	import type {
 		EditableField,
 		ParsedData,
+		PortfolioContent,
 		SkillGroup
 	} from '$lib/types/portfolio';
 	import { DEFAULT_SECTION_ORDER } from '$lib/types/portfolio';
+	import { renderPortfolio } from '$lib/templates';
+	import { EDITOR_JS, EDITOR_SCRIPT } from '$lib/templates/base';
 
 	const userId: string = $derived($page.params.userId ?? '');
 
@@ -334,20 +337,80 @@
 	let sectionOrder = $state<string[]>([...DEFAULT_SECTION_ORDER]);
 	let hiddenSections = $state<Set<string>>(new Set());
 
-	// ── Preview ────────────────────────────────────────────────────────────────
-	let draftUrl = $state('');
-	let publishedUrl = $state('');   // fallback: last published portfolio
-	let draftExists = $state(false);
-	let iframeKey = $state(0);
-	let previewStatus = $state<'idle' | 'updating' | 'ready' | 'timeout'>('idle');
-	let previewRefreshTimer: ReturnType<typeof setTimeout> | null = null;
-	let previewPollTimer: ReturnType<typeof setTimeout> | null = null;
+	// ── Template ───────────────────────────────────────────────────────────────
+	let templateId = $state('modern');
 
-	// The URL actually shown in the iframe:
-	// • after a save attempt → draftUrl (poll until ready)
-	// • on first load with no draft → publishedUrl (last published)
-	// • nothing published yet → empty (show placeholder)
-	const activePreviewUrl = $derived(draftExists ? draftUrl : publishedUrl);
+	// ── Live preview (client-side rendering) ───────────────────────────────────
+	// Reconstruct ParsedData from in-memory editor state so the preview re-renders
+	// instantly on every keystroke without any server round-trip.
+	const liveParsedData = $derived<ParsedData>({
+		profile: {
+			full_name:    rawProfile.full_name,
+			headline:     rawProfile.headline,
+			email:        rawProfile.email,
+			phone:        rawProfile.phone,
+			location:     rawProfile.location,
+			summary:      rawProfile.summary,
+			social_links: {
+				...(rawProfile.social_linkedin  ? { linkedin:  rawProfile.social_linkedin  } : {}),
+				...(rawProfile.social_github    ? { github:    rawProfile.social_github    } : {}),
+				...(rawProfile.social_gitlab    ? { gitlab:    rawProfile.social_gitlab    } : {}),
+				...(rawProfile.social_portfolio ? { portfolio: rawProfile.social_portfolio } : {}),
+				...(rawProfile.social_twitter   ? { twitter:   rawProfile.social_twitter   } : {}),
+			}
+		},
+		skills:               skillGroups,
+		// eslint-disable-next-line @typescript-eslint/no-explicit-any
+		experience:           (sections.experience           ?? []).map(it => it.data as any),
+		// eslint-disable-next-line @typescript-eslint/no-explicit-any
+		projects:             (sections.projects             ?? []).map(it => it.data as any),
+		// eslint-disable-next-line @typescript-eslint/no-explicit-any
+		education:            (sections.education            ?? []).map(it => it.data as any),
+		// eslint-disable-next-line @typescript-eslint/no-explicit-any
+		certifications:       (sections.certifications       ?? []).map(it => it.data as any),
+		// eslint-disable-next-line @typescript-eslint/no-explicit-any
+		achievements:         (sections.achievements         ?? []).map(it => it.data as any),
+		// eslint-disable-next-line @typescript-eslint/no-explicit-any
+		awards:               (sections.awards               ?? []).map(it => it.data as any),
+		// eslint-disable-next-line @typescript-eslint/no-explicit-any
+		campaigns:            (sections.campaigns            ?? []).map(it => it.data as any),
+		// eslint-disable-next-line @typescript-eslint/no-explicit-any
+		financial_modeling:   (sections.financial_modeling   ?? []).map(it => it.data as any),
+		// eslint-disable-next-line @typescript-eslint/no-explicit-any
+		investment_portfolios:(sections.investment_portfolios?? []).map(it => it.data as any),
+		design_philosophy:    stringSections.design_philosophy ?? '',
+		software_proficiency: (stringSections.software_proficiency ?? '').split('\n').map(s => s.trim()).filter(Boolean),
+	});
+
+	const livePortfolioContent = $derived<PortfolioContent>({
+		bio:         profileFields.bio.value,
+		headline:    profileFields.headline.value,
+		uniqueValue: profileFields.uniqueValue.value,
+	});
+
+	const renderedHTML = $derived(
+		renderPortfolio(templateId, liveParsedData, livePortfolioContent, category, sectionOrder, [...hiddenSections])
+	);
+
+	// ── Delete confirmation modal ──────────────────────────────────────────────
+	let deleteModal = $state<{ open: boolean; sectionKey: string; itemIdx: number }>({ open: false, sectionKey: '', itemIdx: -1 });
+
+	function promptDeleteItem(sectionKey: string, itemIdx: number) {
+		deleteModal = { open: true, sectionKey, itemIdx };
+	}
+
+	function confirmDelete() {
+		const { sectionKey, itemIdx } = deleteModal;
+		deleteModal = { open: false, sectionKey: '', itemIdx: -1 };
+		const items = sections[sectionKey].filter((_, i) => i !== itemIdx);
+		sections = { ...sections, [sectionKey]: items };
+		savePortfolioSection(userId, sectionKey, items.map((it) => it.data));
+		queuePreviewRefresh();
+	}
+
+	function cancelDelete() {
+		deleteModal = { open: false, sectionKey: '', itemIdx: -1 };
+	}
 
 	// ── Publish ────────────────────────────────────────────────────────────────
 	let hasUnpublishedChanges = $state(false);
@@ -432,7 +495,8 @@
 		stringSectionOriginals = { design_philosophy: dp, software_proficiency: sp };
 		stringSectionStatus = { design_philosophy: 'idle', software_proficiency: 'idle' };
 
-		// Section order + visibility from API
+		// Template + section order + visibility from API
+		if (result.data?.templateId) templateId = result.data.templateId;
 		if (result.data?.sectionOrder) sectionOrder = result.data.sectionOrder;
 		if (result.data?.hiddenSections) hiddenSections = new Set(result.data.hiddenSections);
 
@@ -449,27 +513,6 @@
 			.concat(visibleKeys.filter(k => !sectionOrder.includes(k)));
 		dndItems = sortedVisible.map(k => ({ id: k }));
 
-		// Load preview URLs and check what's already built in S3
-		try {
-			const urlRes = await fetch('/api/portfolio/url');
-			if (urlRes.ok) {
-				const urlData = await urlRes.json();
-				draftUrl = urlData.draftUrl ?? '';
-				publishedUrl = urlData.url ?? '';
-				// Server-side check (no CORS restrictions) for what exists in S3
-				try {
-					const checkRes = await fetch('/api/portfolio/draft-ready');
-					if (checkRes.ok) {
-						const checkData = await checkRes.json();
-						draftExists = checkData.ready === true;
-						// If no draft yet, check whether the published portfolio exists
-						if (!draftExists && publishedUrl) {
-							publishedUrl = checkData.publishedReady === true ? publishedUrl : '';
-						}
-					}
-				} catch { /* non-critical */ }
-			}
-		} catch { /* non-critical */ }
 	});
 
 	// ── Profile save/AI ─────────────────────────────────────────────────────────
@@ -658,20 +701,46 @@
 		sections = { ...sections, [sectionKey]: items };
 	}
 
-	function addItem(sectionKey: string) {
+	function addItem(sectionKey: string): number {
 		const cfg = SECTION_CONFIG[sectionKey];
 		const newItem = emptyItemState(cfg.emptyItem());
 		newItem.expanded = true;
 		newItem.isDirty = true;
-		sections = { ...sections, [sectionKey]: [...sections[sectionKey], newItem] };
+		const newItems = [...sections[sectionKey], newItem];
+		sections = { ...sections, [sectionKey]: newItems };
+		return newItems.length - 1; // index of new item
 	}
 
-	function deleteItem(sectionKey: string, itemIdx: number) {
-		if (!confirm('Delete this item? This cannot be undone.')) return;
-		const items = sections[sectionKey].filter((_, i) => i !== itemIdx);
-		sections = { ...sections, [sectionKey]: items };
-		savePortfolioSection(userId, sectionKey, items.map((it) => it.data));
-		queuePreviewRefresh();
+
+
+	async function saveAllItems(sectionKey: string) {
+		const items = sections[sectionKey] ?? [];
+		const dirtyIdxs = items.map((it, i) => ({ it, i })).filter(({ it }) => it.isDirty).map(({ i }) => i);
+		if (!dirtyIdxs.length) return;
+
+		const saving = [...items];
+		for (const i of dirtyIdxs) saving[i] = { ...saving[i], isSaving: true, saveError: '' };
+		sections = { ...sections, [sectionKey]: saving };
+
+		const allData = sections[sectionKey].map((it) => it.data);
+		const result = await savePortfolioSection(userId, sectionKey, allData);
+
+		const done = [...sections[sectionKey]];
+		if (result.ok) {
+			for (const i of dirtyIdxs) {
+				done[i] = { ...done[i], original: JSON.parse(JSON.stringify(done[i].data)), isDirty: false, isSaving: false, saveSuccess: true, saveError: '' };
+			}
+			sections = { ...sections, [sectionKey]: done };
+			queuePreviewRefresh();
+			setTimeout(() => {
+				const reset = [...sections[sectionKey]];
+				for (const i of dirtyIdxs) { if (reset[i]) reset[i] = { ...reset[i], saveSuccess: false }; }
+				sections = { ...sections, [sectionKey]: reset };
+			}, 2500);
+		} else {
+			for (const i of dirtyIdxs) done[i] = { ...done[i], isSaving: false, saveError: result.error ?? 'Save failed.' };
+			sections = { ...sections, [sectionKey]: done };
+		}
 	}
 
 	async function saveItem(sectionKey: string, itemIdx: number) {
@@ -797,45 +866,10 @@
 	}
 
 	// ── Preview refresh ──────────────────────────────────────────────────────────
+	// Preview is now client-side rendered — no polling needed.
+	// This function is called after every save to track unpublished changes.
 	function queuePreviewRefresh() {
 		hasUnpublishedChanges = true;
-		previewStatus = 'updating';
-
-		// Cancel any in-progress poll/timer
-		if (previewRefreshTimer) { clearTimeout(previewRefreshTimer); previewRefreshTimer = null; }
-		if (previewPollTimer) { clearTimeout(previewPollTimer); previewPollTimer = null; }
-
-		// Poll the draft URL until the file is ready (Content-Type: text/html)
-		// Timeout after 45 seconds to avoid polling forever
-		const pollStart = Date.now();
-		const POLL_INTERVAL = 2500;
-		const POLL_TIMEOUT = 45_000;
-
-		function poll() {
-			fetch('/api/portfolio/draft-ready')
-				.then((res) => res.json())
-				.then((data: { ready: boolean }) => {
-					if (data.ready) {
-						draftExists = true;
-						iframeKey += 1;
-						previewStatus = 'ready';
-					} else if (Date.now() - pollStart > POLL_TIMEOUT) {
-						previewStatus = 'timeout';
-					} else {
-						previewPollTimer = setTimeout(poll, POLL_INTERVAL);
-					}
-				})
-				.catch(() => {
-					if (Date.now() - pollStart > POLL_TIMEOUT) {
-						previewStatus = 'timeout';
-					} else {
-						previewPollTimer = setTimeout(poll, POLL_INTERVAL);
-					}
-				});
-		}
-
-		// Small initial delay to let the Lambda start before first poll
-		previewRefreshTimer = setTimeout(poll, 3000);
 	}
 
 	// ── Section ordering / visibility ────────────────────────────────────────────
@@ -875,6 +909,396 @@
 			publishToast = result.error ?? 'Publish failed. Please try again.';
 			setTimeout(() => { publishStatus = 'idle'; publishToast = ''; }, 5000);
 		}
+	}
+
+	// ── Inline editor overlays ────────────────────────────────────────────────
+	let iframeEl = $state<HTMLIFrameElement | null>(null);
+
+	interface AiToolbarState {
+		path: string;
+		selectedText: string;
+		iframeRect: DOMRect;
+		selectionRect: { top: number; left: number; bottom: number; right: number; width: number; height: number };
+		instruction: string;
+		loading: boolean;
+		error: string;
+	}
+	let aiToolbar = $state<AiToolbarState | null>(null);
+
+	interface ListEditorState {
+		path: string;
+		items: string[];
+		iframeRect: DOMRect;
+		fieldRect: { top: number; left: number; bottom: number; right: number; width: number };
+		saving: boolean;
+		error: string;
+	}
+	let listEditor = $state<ListEditorState | null>(null);
+
+	// Single-line data-paths that should have newlines collapsed
+	const _MULTILINE_FIELDS = new Set(['description', 'design_concept', 'design_philosophy', 'outcome', 'performance_return', 'bio', 'uniqueValue', 'headline', 'summary']);
+
+	function _normalizeInlineValue(path: string, raw: string): string {
+		const field = path.split('.').pop() ?? '';
+		const isMultiline = _MULTILINE_FIELDS.has(field) || path === 'portfolio.bio' || path === 'design_philosophy';
+		return isMultiline
+			? raw.replace(/[\u200B\uFEFF\u00AD]/g, '').trimEnd()
+			: raw.replace(/[\u200B\uFEFF\u00AD]/g, '').replace(/[\r\n]+/g, ' ').trim();
+	}
+
+	// Updates parent state from an iframe postMessage without triggering re-render
+	function updateFieldFromIframe(path: string, rawValue: string) {
+		const value = _normalizeInlineValue(path, rawValue);
+		const parts = path.split('.');
+		const [ns, idxOrKey, field] = parts;
+
+		if (ns === 'profile') {
+			rawProfile = { ...rawProfile, [idxOrKey]: value };
+		} else if (ns === 'portfolio') {
+			profileFields = {
+				...profileFields,
+				[idxOrKey]: { ...profileFields[idxOrKey as EditableField], value }
+			};
+		} else if (ns === 'skills') {
+			if (field === 'category') {
+				const idx = parseInt(idxOrKey);
+				const grps = [...skillGroups];
+				grps[idx] = { ...grps[idx], category: value };
+				skillGroups = grps;
+			}
+		} else if (ns === 'design_philosophy') {
+			stringSections = { ...stringSections, design_philosophy: value };
+		} else {
+			const idx = parseInt(idxOrKey);
+			const arr = [...(sections[ns] ?? [])];
+			if (arr[idx]) {
+				const newData = { ...arr[idx].data, [field]: value };
+				arr[idx] = { ...arr[idx], data: newData, isDirty: JSON.stringify(newData) !== JSON.stringify(arr[idx].original) };
+				sections = { ...sections, [ns]: arr };
+			}
+		}
+	}
+
+	// Debounced per-field save after inline edit blur
+	const _saveTimers: Record<string, ReturnType<typeof setTimeout>> = {};
+
+	function scheduleSaveFromIframe(path: string) {
+		if (_saveTimers[path]) clearTimeout(_saveTimers[path]);
+		_saveTimers[path] = setTimeout(() => performSaveFromPath(path), 1500);
+	}
+
+	async function performSaveFromPath(path: string) {
+		const parts = path.split('.');
+		const [ns, idxOrKey] = parts;
+		hasUnpublishedChanges = true;
+		if (ns === 'profile') {
+			// Rebuild the same shape saveRawProfile() uses
+			const social_links: Record<string, string> = {};
+			if (rawProfile.social_linkedin)  social_links.linkedin  = rawProfile.social_linkedin;
+			if (rawProfile.social_github)    social_links.github    = rawProfile.social_github;
+			if (rawProfile.social_gitlab)    social_links.gitlab    = rawProfile.social_gitlab;
+			if (rawProfile.social_portfolio) social_links.portfolio = rawProfile.social_portfolio;
+			if (rawProfile.social_twitter)   social_links.twitter   = rawProfile.social_twitter;
+			await savePortfolioSection(userId, 'profile', {
+				full_name: rawProfile.full_name, headline: rawProfile.headline,
+				email: rawProfile.email, phone: rawProfile.phone,
+				location: rawProfile.location, summary: rawProfile.summary, social_links,
+			});
+		} else if (ns === 'portfolio') {
+			await savePortfolioContent(userId, idxOrKey as EditableField, profileFields[idxOrKey as EditableField].value);
+		} else if (ns === 'skills') {
+			await savePortfolioSection(userId, 'skills', skillGroups);
+		} else if (ns === 'design_philosophy') {
+			await savePortfolioSection(userId, 'design_philosophy', stringSections.design_philosophy);
+		} else {
+			const result = await savePortfolioSection(userId, ns, (sections[ns] ?? []).map((it) => it.data));
+			if (result.ok) {
+				// Inline edit auto-saved successfully  mark all items clean so the
+				// section banner and item-level "Unsaved changes" labels clear.
+				const cleaned = (sections[ns] ?? []).map((it) => ({
+					...it,
+					original: JSON.parse(JSON.stringify(it.data)),
+					isDirty: false
+				}));
+				sections = { ...sections, [ns]: cleaned };
+			}
+		}
+	}
+
+	function openListEditor(path: string, fieldRect: ListEditorState['fieldRect'], iframeNode: HTMLIFrameElement) {
+		const parts = path.split('.');
+		const [ns, idxStr, field] = parts;
+		let items: string[] = [];
+		if (ns === 'skills') {
+			items = [...(skillGroups[parseInt(idxStr)]?.skills ?? [])];
+		} else {
+			// eslint-disable-next-line @typescript-eslint/no-explicit-any
+			const data = sections[ns]?.[parseInt(idxStr)]?.data ?? {} as any;
+			items = [...(data[field] ?? [])];
+		}
+		listEditor = { path, items, iframeRect: iframeNode.getBoundingClientRect(), fieldRect, saving: false, error: '' };
+	}
+
+	async function saveListEditor() {
+		if (!listEditor) return;
+		listEditor = { ...listEditor, saving: true };
+		const { path, items } = listEditor;
+		const parts = path.split('.');
+		const [ns, idxStr, field] = parts;
+		const cleanItems = items.filter(Boolean);
+		if (ns === 'skills') {
+			const idx = parseInt(idxStr);
+			const grps = [...skillGroups];
+			grps[idx] = { ...grps[idx], skills: cleanItems };
+			skillGroups = grps;
+			await savePortfolioSection(userId, 'skills', skillGroups);
+		} else {
+			const idx = parseInt(idxStr);
+			const arr = [...(sections[ns] ?? [])];
+			arr[idx] = { ...arr[idx], data: { ...arr[idx].data, [field]: cleanItems } };
+			sections = { ...sections, [ns]: arr };
+			await savePortfolioSection(userId, ns, arr.map((it) => it.data));
+		}
+		hasUnpublishedChanges = true;
+		listEditor = null;
+	}
+
+	let listEditorEl = $state<HTMLDivElement | null>(null);
+	let rightPanelEl = $state<HTMLDivElement | null>(null);
+
+	/** Scrolls the right panel so the item card sits below the sticky banner.
+	 *  If the AI panel is open, scrolls further so its bottom is flush with the panel bottom. */
+	function scrollRightPanelToItem(sectionKey: string, idx: number) {
+		if (!rightPanelEl) return;
+		// Single-pass scroll — fires after Svelte has flushed any expand/ai-panel
+		// state changes (expand at t=0, this fires at t+150ms).
+		setTimeout(() => {
+			if (!rightPanelEl) return;
+			const aiPanel = rightPanelEl.querySelector<HTMLElement>(`[data-ai-panel="${sectionKey}-${idx}"]`);
+			const card = rightPanelEl.querySelector<HTMLElement>(`[data-item-card="${sectionKey}-${idx}"]`);
+			const BANNER_OFFSET = 90;
+			const pr = rightPanelEl.getBoundingClientRect();
+
+			if (aiPanel) {
+				const ar = aiPanel.getBoundingClientRect();
+				// Always position the AI panel so its BOTTOM sits near the panel bottom
+				// (positive delta = scroll down, negative = scroll up).
+				// This gives a consistent "AI box at the bottom" feel regardless of
+				// whether we're coming from above or below the item.
+				const delta = ar.bottom - pr.bottom + 20;
+				if (Math.abs(delta) > 4) {
+					rightPanelEl.scrollBy({ top: delta, behavior: 'smooth' });
+				}
+			} else if (card) {
+				// No AI panel yet (e.g. add-item) → show card top below the sticky banner
+				const cr = card.getBoundingClientRect();
+				const delta = cr.top - pr.top - BANNER_OFFSET;
+				if (Math.abs(delta) > 4) {
+					rightPanelEl.scrollBy({ top: delta, behavior: 'smooth' });
+				}
+			}
+		}, 150);
+	}
+
+	/** Scrolls the right panel to the bottom (used for skills). */
+	function scrollRightPanelToBottom() {
+		setTimeout(() => {
+			if (rightPanelEl) rightPanelEl.scrollTop = rightPanelEl.scrollHeight;
+		}, 60);
+	}
+
+	function focusListItem(index: number) {
+		setTimeout(() => {
+			const inputs = listEditorEl?.querySelectorAll<HTMLInputElement>('[data-list-input]');
+			inputs?.[index]?.focus();
+		}, 0);
+	}
+
+	function handleListItemKeydown(e: KeyboardEvent, i: number) {
+		if (!listEditor) return;
+		if (e.key === 'Enter') {
+			e.preventDefault();
+			const items = [...listEditor.items];
+			items.splice(i + 1, 0, '');
+			listEditor = { ...listEditor, items };
+			focusListItem(i + 1);
+		} else if (e.key === 'Backspace' && listEditor.items[i] === '') {
+			if (listEditor.items.length === 1) return;
+			e.preventDefault();
+			const items = [...listEditor.items];
+			items.splice(i, 1);
+			listEditor = { ...listEditor, items };
+			focusListItem(Math.max(0, i - 1));
+		}
+	}
+
+	function updateListItem(i: number, value: string) {
+		if (!listEditor) return;
+		const items = [...listEditor.items];
+		items[i] = value;
+		listEditor = { ...listEditor, items };
+	}
+
+	function removeListItem(i: number) {
+		if (!listEditor) return;
+		const items = [...listEditor.items];
+		items.splice(i, 1);
+		listEditor = { ...listEditor, items: items.length ? items : [''] };
+		focusListItem(Math.max(0, i - 1));
+	}
+
+	function addListItem() {
+		if (!listEditor) return;
+		listEditor = { ...listEditor, items: [...listEditor.items, ''] };
+		focusListItem(listEditor.items.length - 1);
+	}
+
+	async function runAiFromToolbar() {
+		if (!aiToolbar) return;
+		const { path, selectedText, instruction } = aiToolbar;
+		if (!instruction.trim()) return;
+		aiToolbar = { ...aiToolbar, loading: true, error: '' };
+		const parts = path.split('.');
+		const [ns, idxStr, field] = parts;
+		// eslint-disable-next-line @typescript-eslint/no-explicit-any
+		let result: { ok: boolean; data?: { suggestion: string | string[] }; error?: string } = { ok: false };
+		if (ns === 'portfolio') {
+			result = await getAiEnhancement(userId, idxStr as EditableField, instruction, selectedText);
+		} else {
+			result = await getAiItemEnhancement(userId, ns, parseInt(idxStr), field, instruction);
+		}
+		if (!result.ok || !result.data) {
+			aiToolbar = { ...aiToolbar, loading: false, error: result.error ?? 'AI enhancement failed.' };
+			return;
+		}
+		const suggestion = Array.isArray(result.data.suggestion)
+			? result.data.suggestion.join('\n')
+			: result.data.suggestion;
+		updateFieldFromIframe(path, suggestion);
+		scheduleSaveFromIframe(path);
+		iframeEl?.contentWindow?.postMessage({ type: 'update-field', path, value: suggestion }, '*');
+		aiToolbar = null;
+	}
+
+	// ── iframeEditor action ────────────────────────────────────────────────────
+	// Replaces iframePreview. Handles postMessage events for inline editing,
+	// pauses re-renders while a field is being edited, and resumes on blur.
+	function iframeEditor(node: HTMLIFrameElement, html: string) {
+		iframeEl = node;
+		let timer: ReturnType<typeof setTimeout> | null = null;
+		let pendingHtml: string | null = null;
+		let paused = false;
+
+		function paint(h: string) {
+			const win = node.contentWindow;
+			const doc = node.contentDocument;
+			if (!doc) return;
+			const sy = win?.scrollY ?? 0;
+			// Strip inline EDITOR_SCRIPT before writing — we inject programmatically
+			// below so we can reset the __ceReady guard on every paint. Without this,
+			// doc.open() does NOT clear custom document properties, so __ceReady
+			// persists from the previous paint and the guard blocks re-initialization.
+			const hStripped = h.split(EDITOR_SCRIPT).join('');
+			doc.open();
+			doc.write(hStripped);
+			doc.close();
+			try {
+				const sc = doc.createElement('script');
+				// Reset __ceReady so EDITOR_JS always initialises fresh on each paint.
+				sc.textContent = 'document.__ceReady=false;' + EDITOR_JS;
+				(doc.body ?? doc.documentElement)?.appendChild(sc);
+			} catch (_) { /* sandbox may block in edge cases */ }
+			if (sy > 0) requestAnimationFrame(() => win?.scrollTo(0, sy));
+		}
+
+		function handleMessage(event: MessageEvent) {
+			const d = event.data;
+			if (!d?.type) return;
+			switch (d.type) {
+				case 'field-focus':
+					paused = true;
+					// Cancel any pending re-render timer started before focus.
+					// Without this, a 300ms timer fires mid-edit and wipes the iframe.
+					if (timer) { clearTimeout(timer); timer = null; }
+					break;
+				case 'field-change':
+					updateFieldFromIframe(d.path, d.value);
+					break;
+				case 'field-blur':
+					updateFieldFromIframe(d.path, d.value);
+					paused = false;
+					pendingHtml = null; // discard stale queue; Svelte will push fresh renderedHTML
+					scheduleSaveFromIframe(d.path);
+					break;
+				case 'selection':
+					aiToolbar = {
+						path: d.path, selectedText: d.text,
+						iframeRect: node.getBoundingClientRect(), selectionRect: d.rect,
+						instruction: '', loading: false, error: ''
+					};
+					break;
+				case 'open-list-editor':
+					openListEditor(d.path, d.rect, node);
+					break;
+				case 'add-item': {
+					const sec = d.section as string;
+					activeTab = sec;
+					mobileTab = 'edit';
+					if (sec === 'skills') {
+						addSkillGroup();
+						scrollRightPanelToBottom();
+					} else {
+						const newIdx = addItem(sec);
+						scrollRightPanelToItem(sec, newIdx);
+					}
+					break;
+				}
+				case 'open-ai-panel': {
+					const sec = d.section as string;
+					const idx = d.index as number;
+					activeTab = sec;
+					mobileTab = 'edit';
+					if (sec === 'skills') {
+						showSkillsAiPanel = true;
+						scrollRightPanelToBottom();
+					} else {
+						// Expand the item if it is collapsed
+						if (sections[sec]?.[idx] && !sections[sec][idx].expanded) {
+							toggleItemExpand(sec, idx);
+						}
+						setTimeout(() => {
+							// Only OPEN the panel — never close it from a preview click.
+							// toggleItemAiPanel is a toggle: calling it when already open
+							// would close the panel and leave the scroll pointing at the card top.
+							if (!sections[sec]?.[idx]?.showAiPanel) {
+								toggleItemAiPanel(sec, idx);
+							}
+							scrollRightPanelToItem(sec, idx);
+						}, 80);
+					}
+					break;
+				}
+				case 'delete-item':
+					promptDeleteItem(d.section, d.index);
+					break;
+			}
+		}
+
+		window.addEventListener('message', handleMessage);
+		paint(html);
+
+		return {
+			update(h: string) {
+				if (paused) { pendingHtml = h; return; }
+				if (timer) clearTimeout(timer);
+				timer = setTimeout(() => { if (!paused) paint(h); }, 300);
+			},
+			destroy() {
+				if (timer) clearTimeout(timer);
+				window.removeEventListener('message', handleMessage);
+				iframeEl = null;
+			}
+		};
 	}
 </script>
 
@@ -949,40 +1373,20 @@
 		<div class="{mobileTab === 'preview' ? 'flex' : 'hidden'} sm:flex flex-1 flex-col overflow-hidden border-r border-slate-200 bg-slate-100">
 			<div class="flex flex-shrink-0 items-center justify-between border-b border-slate-200 bg-white px-4 py-2">
 				<span class="text-sm font-bold text-slate-600">Preview</span>
-				<div class="flex items-center gap-3">
-					{#if previewStatus === 'updating'}
-						<span class="flex items-center gap-1.5 text-xs text-amber-600"><Spinner size="sm" /> Updating…</span>
-					{/if}
-					<button onclick={() => { iframeKey += 1; }} class="rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-bold text-slate-600 hover:bg-slate-50">↺ Refresh</button>
-				</div>
+				<span class="text-xs text-slate-400">Click any text to edit · select text for AI ✦</span>
 			</div>
 			<div class="relative flex-1 overflow-hidden">
-				{#if !activePreviewUrl && previewStatus !== 'updating'}
-					{#if previewStatus === 'timeout'}
-						<div class="flex h-full flex-col items-center justify-center gap-3">
-							<p class="text-sm text-slate-400">Preview is taking longer than expected.</p>
-							<button onclick={queuePreviewRefresh} class="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-bold text-slate-600 hover:bg-slate-50">Retry</button>
-						</div>
-					{:else}
-						<div class="flex h-full items-center justify-center"><p class="text-sm text-slate-400">No portfolio generated yet.</p></div>
-					{/if}
+				{#if pageLoading}
+					<div class="flex h-full items-center justify-center">
+						<p class="text-sm text-slate-400">Loading preview…</p>
+					</div>
 				{:else}
-					{#key iframeKey}
-						<iframe src={activePreviewUrl} title="Portfolio Preview" class="h-full w-full border-0" sandbox="allow-scripts allow-same-origin"></iframe>
-					{/key}
-					{#if previewStatus === 'updating'}
-						<div class="absolute inset-0 flex items-center justify-center bg-white/80 backdrop-blur-sm">
-							<div class="flex items-center gap-2 rounded-2xl bg-white px-5 py-3 shadow-xl ring-1 ring-slate-100">
-								<Spinner size="sm" />
-								<span class="text-sm font-bold text-slate-700">Building preview…</span>
-							</div>
-						</div>
-					{/if}
+					<iframe use:iframeEditor={renderedHTML} title="Portfolio Preview" class="h-full w-full border-0" sandbox="allow-scripts allow-same-origin"></iframe>
 				{/if}
 			</div>
 		</div>
 
-		<div class="{mobileTab === 'edit' ? 'flex' : 'hidden'} sm:flex w-full sm:w-[460px] sm:flex-shrink-0 flex-col overflow-y-auto">
+		<div bind:this={rightPanelEl} class="{mobileTab === 'edit' ? 'flex' : 'hidden'} sm:flex w-full sm:w-[460px] sm:flex-shrink-0 flex-col overflow-y-auto">
 			<div class="p-4 sm:p-6 space-y-4">
 
 			{#if pageLoading}
@@ -1095,7 +1499,7 @@
 							</div>
 						{/if}
 						{#each skillGroups as group, gi}
-							<div class="rounded-[1.5rem] border border-slate-100 bg-white p-6 shadow-sm">
+							<div data-item-card="skills-{gi}" class="rounded-[1.5rem] border border-slate-100 bg-white p-6 shadow-sm">
 								<div class="mb-3 flex items-center gap-3">
 									<input type="text" value={group.category} oninput={(e) => updateSkillGroupCategory(gi, (e.target as HTMLInputElement).value)} placeholder="Category (e.g. Frontend, Backend)" class="min-w-0 flex-1 rounded-xl border border-slate-200 bg-slate-50/50 px-4 py-2 text-sm font-bold text-slate-900 outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-400/30" />
 									<button onclick={() => removeSkillGroup(gi)} class="flex-shrink-0 rounded-xl border border-red-100 bg-red-50 px-3 py-2 text-xs font-bold text-red-500 hover:bg-red-100">Remove</button>
@@ -1139,9 +1543,17 @@
 					{@const sKey = activeTab}
 					{@const cfg = SECTION_CONFIG[sKey]}
 					{@const items = sections[sKey] ?? []}
+					{@const hasDirtyItems = items.some(it => it.isDirty)}
+					{@const isSavingAny = items.some(it => it.isSaving)}
 					<div class="space-y-4">
+						{#if hasDirtyItems}
+							<div class="sticky top-0 z-10 flex flex-col sm:flex-row items-center justify-between gap-4 rounded-2xl bg-slate-900 px-6 py-4 shadow-xl">
+								<p class="text-sm font-bold text-white">Unsaved {cfg.label} changes.</p>
+								<button onclick={() => saveAllItems(sKey)} disabled={isSavingAny} class="w-full sm:w-auto rounded-xl bg-white px-5 py-2 text-sm font-bold text-slate-900 disabled:opacity-50">{isSavingAny ? 'Saving…' : `Save ${cfg.label}`}</button>
+							</div>
+						{/if}
 						{#each items as item, idx}
-							<div class="overflow-hidden rounded-[1.5rem] border border-slate-100 bg-white shadow-sm">
+							<div data-item-card="{sKey}-{idx}" class="overflow-hidden rounded-[1.5rem] border border-slate-100 bg-white shadow-sm">
 								<div class="flex w-full items-center justify-between px-6 py-4">
 									<button type="button" onclick={() => toggleItemExpand(sKey, idx)} class="flex min-w-0 flex-1 items-center gap-3 text-left">
 										<div class="min-w-0 flex-1">
@@ -1151,7 +1563,7 @@
 										</div>
 										<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="h-4 w-4 flex-shrink-0 text-slate-400 transition-transform {item.expanded ? 'rotate-180' : ''}"><path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" /></svg>
 									</button>
-									<button type="button" onclick={() => deleteItem(sKey, idx)} class="ml-3 flex-shrink-0 rounded-lg border border-red-100 bg-red-50 px-2.5 py-1 text-xs font-bold text-red-500 hover:bg-red-100">Delete</button>
+									<button type="button" onclick={() => promptDeleteItem(sKey, idx)} class="ml-3 flex-shrink-0 rounded-lg border border-red-100 bg-red-50 px-2.5 py-1 text-xs font-bold text-red-500 hover:bg-red-100">Delete</button>
 								</div>
 								{#if item.expanded}
 									<div class="space-y-4 border-t border-slate-100 px-6 pb-6 pt-4">
@@ -1172,7 +1584,7 @@
 										</div>
 										{#if item.showAiPanel}
 											{@const enhanceable = cfg.fields.filter((f) => f.aiEnhanceable)}
-											<div class="mt-2 rounded-xl border border-amber-100 bg-amber-50/50 p-4">
+											<div data-ai-panel="{sKey}-{idx}" class="mt-2 rounded-xl border border-amber-100 bg-amber-50/50 p-4">
 												<p class="mb-3 text-xs font-bold uppercase tracking-widest text-amber-700">AI Enhancement</p>
 												{#if enhanceable.length > 1}
 													<div class="mb-3 flex flex-wrap gap-2">{#each enhanceable as ef}<button type="button" onclick={() => setItemAiField(sKey, idx, ef.key)} class="rounded-lg px-3 py-1 text-xs font-bold transition-all {item.aiField === ef.key ? 'bg-amber-500 text-white' : 'border border-amber-200 bg-white text-amber-700'}">{ef.label}</button>{/each}</div>
@@ -1228,3 +1640,104 @@
 
 	</div>
 </div>
+
+<!-- Overlay backdrop — dismisses AI toolbar and list editor on outside click -->
+{#if aiToolbar || listEditor}
+	<!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
+	<div class="fixed inset-0 z-40" onclick={() => { aiToolbar = null; listEditor = null; }}></div>
+{/if}
+
+<!-- Floating AI toolbar — appears above selected text in preview -->
+{#if aiToolbar}
+	{@const toolbarTop = aiToolbar.iframeRect.top + aiToolbar.selectionRect.top - 64}
+	{@const toolbarLeft = Math.max(8, aiToolbar.iframeRect.left + aiToolbar.selectionRect.left + aiToolbar.selectionRect.width / 2 - 160)}
+	<div class="fixed z-50 w-80 rounded-2xl bg-slate-900 p-3 shadow-2xl" style="top:{toolbarTop}px;left:{toolbarLeft}px">
+		<p class="mb-1.5 text-xs font-bold text-white">✦ AI Enhance</p>
+		<p class="mb-2 truncate text-xs text-slate-400">"{aiToolbar.selectedText.length > 60 ? aiToolbar.selectedText.slice(0, 60) + '…' : aiToolbar.selectedText}"</p>
+		<!-- svelte-ignore a11y_autofocus -->
+		<input autofocus bind:value={aiToolbar.instruction} placeholder="e.g. Make it more impactful…"
+			onkeydown={(e) => { if (e.key === 'Enter') runAiFromToolbar(); if (e.key === 'Escape') aiToolbar = null; }}
+			class="mb-2 w-full rounded-lg bg-slate-800 px-3 py-2 text-sm text-white placeholder-slate-500 outline-none focus:ring-2 focus:ring-indigo-500" />
+		<div class="flex gap-2">
+			<button onclick={runAiFromToolbar} disabled={aiToolbar.loading}
+				class="flex-1 rounded-lg bg-indigo-600 py-1.5 text-xs font-bold text-white hover:bg-indigo-500 disabled:opacity-50">
+				{aiToolbar.loading ? 'Enhancing…' : 'Enhance'}
+			</button>
+			<button onclick={() => aiToolbar = null}
+				class="rounded-lg bg-slate-700 px-3 py-1.5 text-xs font-bold text-slate-300 hover:bg-slate-600">
+				Cancel
+			</button>
+		</div>
+		{#if aiToolbar.error}<p class="mt-1.5 text-xs text-red-400">{aiToolbar.error}</p>{/if}
+	</div>
+{/if}
+
+<!-- Floating list editor — appears near a clicked list in preview -->
+{#if listEditor}
+	{@const listTop = Math.min(listEditor.iframeRect.top + listEditor.fieldRect.top, (typeof window !== 'undefined' ? window.innerHeight : 800) - 380)}
+	{@const listLeft = Math.max(8, listEditor.iframeRect.left + listEditor.fieldRect.left)}
+	<div bind:this={listEditorEl} class="fixed z-50 w-80 rounded-2xl border border-slate-200 bg-white shadow-2xl" style="top:{Math.max(8, listTop)}px;left:{listLeft}px">
+		<div class="flex items-center justify-between border-b border-slate-100 px-4 py-3">
+			<p class="text-sm font-bold text-slate-900">Edit items</p>
+			<button onclick={() => listEditor = null} class="text-lg leading-none text-slate-400 hover:text-slate-700">×</button>
+		</div>
+		<div class="max-h-72 overflow-y-auto px-3 py-2">
+			{#each listEditor.items as item, i}
+				<div class="group flex items-center gap-1 rounded-lg px-1 py-0.5 hover:bg-slate-50">
+					<span class="w-5 flex-shrink-0 text-center text-sm font-bold text-indigo-400">•</span>
+					<input
+						data-list-input
+						type="text"
+						value={item}
+						oninput={(e) => updateListItem(i, (e.target as HTMLInputElement).value)}
+						onkeydown={(e) => handleListItemKeydown(e, i)}
+						placeholder="Enter item…"
+						class="min-w-0 flex-1 bg-transparent py-1.5 text-sm text-slate-800 outline-none placeholder:text-slate-300"
+					/>
+					{#if listEditor.items.length > 1}
+						<button onclick={() => removeListItem(i)} class="flex-shrink-0 rounded p-0.5 text-slate-200 opacity-0 hover:text-red-400 group-hover:opacity-100">
+							<svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" /></svg>
+						</button>
+					{/if}
+				</div>
+			{/each}
+			<button onclick={addListItem} class="mt-1 flex w-full items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-medium text-indigo-500 hover:bg-indigo-50">
+				<svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd" /></svg>
+				Add item
+			</button>
+		</div>
+		{#if listEditor.error}<p class="px-4 pb-1 text-xs text-red-500">{listEditor.error}</p>{/if}
+		<div class="flex gap-2 border-t border-slate-100 px-4 py-3">
+			<button onclick={() => listEditor = null}
+				class="flex-1 rounded-xl border border-slate-200 py-2 text-sm font-bold text-slate-600 hover:bg-slate-50">
+				Cancel
+			</button>
+			<button onclick={saveListEditor} disabled={listEditor.saving}
+				class="flex-1 rounded-xl bg-slate-900 py-2 text-sm font-bold text-white hover:bg-slate-800 disabled:opacity-40">
+				{listEditor.saving ? 'Saving…' : 'Save'}
+			</button>
+		</div>
+	</div>
+{/if}
+
+<!-- Delete confirmation modal -->
+{#if deleteModal.open}
+	<!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
+	<div class="fixed inset-0 z-50 flex items-center justify-center p-4" onclick={cancelDelete}>
+		<div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"></div>
+		<div class="relative w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl" onclick={(e) => e.stopPropagation()}>
+			<!-- Icon -->
+			<div class="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-red-50">
+				<svg class="h-6 w-6 text-red-500" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+					<path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+				</svg>
+			</div>
+			<h3 class="mb-1 text-base font-bold text-slate-900">Delete this item?</h3>
+			<p class="mb-6 text-sm text-slate-500">This action cannot be undone.</p>
+			<div class="flex gap-3">
+				<button onclick={cancelDelete} class="flex-1 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 transition hover:bg-slate-50">Cancel</button>
+				<button onclick={confirmDelete} class="flex-1 rounded-xl bg-red-500 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-red-600">Delete</button>
+			</div>
+		</div>
+	</div>
+{/if}

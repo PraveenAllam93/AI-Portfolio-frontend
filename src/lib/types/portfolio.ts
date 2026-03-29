@@ -145,6 +145,7 @@ export interface PortfolioData {
 	portfolioContent: PortfolioContent;
 	parsedData: ParsedData;
 	category: string;
+	templateId?: string;
 	sectionOrder?: string[];
 	hiddenSections?: string[];
 }
