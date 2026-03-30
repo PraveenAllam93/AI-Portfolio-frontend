@@ -161,11 +161,13 @@ export const EDITOR_JS = `(function(){
     if(el){el.innerText=e.data.value;}
   });
 
+  var _NO_AI_SECTIONS=['education','certifications','awards','investment_portfolios'];
   function injectAiBtns(){
     document.querySelectorAll('[data-item-wrap]').forEach(function(wrap){
       if(wrap.querySelector('.ce-ai-btn'))return;
       var del=wrap.querySelector('[data-del-section]');
       if(!del)return;
+      if(_NO_AI_SECTIONS.indexOf(del.getAttribute('data-del-section'))>=0)return;
       var btn=document.createElement('button');
       btn.className='ce-ai-btn';
       btn.setAttribute('data-ai-section',del.getAttribute('data-del-section'));

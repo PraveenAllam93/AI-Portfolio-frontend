@@ -1578,12 +1578,14 @@
 											</div>
 										{/each}
 										{#if item.saveError}<p class="text-xs font-bold text-red-500">{item.saveError}</p>{/if}
+										{@const enhanceable = cfg.fields.filter((f) => f.aiEnhanceable)}
 										<div class="flex items-center gap-2 pt-2">
 											<button onclick={() => saveItem(sKey, idx)} disabled={!item.isDirty || item.isSaving} class="rounded-xl bg-slate-900 px-4 py-2 text-sm font-bold text-white hover:bg-slate-800 disabled:opacity-40">{item.isSaving ? 'Saving…' : 'Save'}</button>
+											{#if enhanceable.length > 0}
 											<button onclick={() => toggleItemAiPanel(sKey, idx)} class="rounded-xl border border-amber-200 bg-amber-50 px-4 py-2 text-sm font-bold text-amber-700 hover:bg-amber-100">✦ AI Enhance</button>
+											{/if}
 										</div>
-										{#if item.showAiPanel}
-											{@const enhanceable = cfg.fields.filter((f) => f.aiEnhanceable)}
+										{#if item.showAiPanel && enhanceable.length > 0}
 											<div data-ai-panel="{sKey}-{idx}" class="mt-2 rounded-xl border border-amber-100 bg-amber-50/50 p-4">
 												<p class="mb-3 text-xs font-bold uppercase tracking-widest text-amber-700">AI Enhancement</p>
 												{#if enhanceable.length > 1}
