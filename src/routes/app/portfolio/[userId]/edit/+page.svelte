@@ -109,7 +109,7 @@
 				{ key: 'location', label: 'Location', inputType: 'text', limit: 200 },
 				{ key: 'start_year', label: 'Start Year', inputType: 'text', placeholder: 'e.g. 2016', limit: 10 },
 				{ key: 'end_year', label: 'End Year', inputType: 'text', placeholder: 'e.g. 2020', limit: 10 },
-				{ key: 'grade_or_score', label: 'Grade / Score', inputType: 'text', aiEnhanceable: true, limit: 100 }
+				{ key: 'grade_or_score', label: 'Grade / Score', inputType: 'text', limit: 100 }
 			],
 			emptyItem: () => ({ degree: '', field_of_study: '', institution: '', location: '', start_year: '', end_year: '', grade_or_score: '' })
 		},
@@ -119,7 +119,7 @@
 			type: 'array',
 			itemTitle: (item, i) => (item.name as string) || `Certification ${i + 1}`,
 			fields: [
-				{ key: 'name', label: 'Certification Name', inputType: 'text', aiEnhanceable: true, limit: 300 },
+				{ key: 'name', label: 'Certification Name', inputType: 'text', limit: 300 },
 				{ key: 'issuer', label: 'Issuing Body', inputType: 'text', limit: 200 },
 				{ key: 'year', label: 'Year', inputType: 'text', placeholder: 'e.g. 2023', limit: 10 },
 				{ key: 'certification_url', label: 'Certificate URL', inputType: 'url', limit: 500 }
@@ -145,7 +145,7 @@
 			type: 'array',
 			itemTitle: (item, i) => (item.title as string) || `Award ${i + 1}`,
 			fields: [
-				{ key: 'title', label: 'Award Title', inputType: 'text', aiEnhanceable: true, limit: 300 },
+				{ key: 'title', label: 'Award Title', inputType: 'text', limit: 300 },
 				{ key: 'awarding_body', label: 'Awarding Body', inputType: 'text', limit: 200 },
 				{ key: 'year', label: 'Year', inputType: 'text', placeholder: 'e.g. 2023', limit: 10 },
 				{ key: 'award_url', label: 'URL', inputType: 'url', limit: 500 }
@@ -186,7 +186,7 @@
 			fields: [
 				{ key: 'portfolio_type', label: 'Portfolio Type', inputType: 'text', limit: 200 },
 				{ key: 'assets_under_management', label: 'Assets Under Management', inputType: 'text', limit: 200 },
-				{ key: 'performance_return', label: 'Performance / Return', inputType: 'textarea', aiEnhanceable: true, limit: 1000 }
+				{ key: 'performance_return', label: 'Performance / Return', inputType: 'textarea', limit: 1000 }
 			],
 			emptyItem: () => ({ portfolio_type: '', assets_under_management: '', performance_return: '' })
 		},
