@@ -35,14 +35,13 @@
 	];
 
 	const templates: Template[] = [
-		{ id: 'minimal', name: 'Minimal', tag: 'Clean' },
-		{ id: 'bold', name: 'Bold', tag: 'Popular' },
-		{ id: 'creative', name: 'Creative', tag: 'Trendy' },
-		{ id: 'modern', name: 'Modern', tag: 'Sleek' },
-		{ id: 'aurora', name: 'Aurora', tag: 'Vibrant' },
-		{ id: 'executive', name: 'Executive', tag: 'Formal' },
-		{ id: 'luxury', name: 'Luxury', tag: 'Premium' },
-		{ id: 'nebula', name: 'Nebula', tag: 'Cyberpunk' }
+		{ id: 'nebula', name: 'Nebula', tag: 'Cyberpunk' },
+		{ id: 'galaxy', name: 'Galaxy', tag: 'Dark Purple' },
+		{ id: 'codex', name: 'Codex', tag: 'Light Tech' },
+		{ id: 'neon', name: 'Neon', tag: 'Cyber Green' },
+		{ id: 'circuit', name: 'Circuit', tag: 'Dark Tech' },
+		{ id: 'navy-gold', name: 'Navy Gold', tag: 'Elegant' },
+		{ id: 'cosmos', name: 'Cosmos', tag: 'Space' }
 	];
 
 	const stepLabels = ['File', 'Role', 'Theme'];

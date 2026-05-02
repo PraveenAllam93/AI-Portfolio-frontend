@@ -551,7 +551,7 @@ function _achievements(v: NormalizedData): string {
     const year = ach.year ? String(ach.year) : '';
     out += `<div class="card" data-item-wrap>` +
       `<button class="ce-del-btn" data-del-section="achievements" data-del-index="${i}">×</button>` +
-      `<div class="card-title" ${_editable(`achievements.${i}.title`)}>${ach.title || ''}${year ? `&nbsp;<span class="yr">${year}</span>` : ''}</div>` +
+      `<div class="card-title"><span ${_editable(`achievements.${i}.title`)}>${ach.title || ''}</span>${year ? `&nbsp;<span class="yr">${year}</span>` : ''}</div>` +
       (ach.description ? `<p class="card-body" ${_editable(`achievements.${i}.description`, true)}>${ach.description}</p>` : '') +
       `</div>`;
   }

@@ -136,6 +136,16 @@ export const EDITOR_JS = `(function(){
   });
 
   document.addEventListener('click',function(e){
+    var wrap=e.target.closest('[data-item-wrap]');
+    if(!wrap)return;
+    var del=wrap.querySelector('[data-del-section]');
+    if(!del)return;
+    window.parent.postMessage({type:'focus-item',
+      section:del.getAttribute('data-del-section'),
+      index:parseInt(del.getAttribute('data-del-index'),10)},'*');
+  });
+
+  document.addEventListener('click',function(e){
     var btn=e.target.closest('[data-add-section]');
     if(!btn)return;
     window.parent.postMessage({type:'add-item',section:btn.dataset.addSection},'*');
@@ -156,9 +166,29 @@ export const EDITOR_JS = `(function(){
   });
 
   window.addEventListener('message',function(e){
-    if(!e.data||e.data.type!=='update-field')return;
-    var el=document.querySelector('[data-path="'+e.data.path+'"]');
-    if(el){el.innerText=e.data.value;}
+    if(!e.data)return;
+    if(e.data.type==='update-field'){
+      var el=document.querySelector('[data-path="'+e.data.path+'"]');
+      if(el){el.innerText=e.data.value;}
+    } else if(e.data.type==='scroll-to-item'){
+      var btn=document.querySelector('[data-del-section="'+e.data.section+'"][data-del-index="'+e.data.index+'"]');
+      var wrap=btn&&btn.closest('[data-item-wrap]');
+      if(wrap){
+        var navEl=document.querySelector('nav');
+        var navH=navEl?navEl.getBoundingClientRect().height:0;
+        var rect=wrap.getBoundingClientRect();
+        window.scrollBy({top:rect.top-navH-24,behavior:'smooth'});
+      }
+    } else if(e.data.type==='scroll-to-section'){
+      var sec=document.getElementById(e.data.section)||document.querySelector('[data-add-section="'+e.data.section+'"]');
+      var target=sec&&(sec.tagName==='SECTION'?sec:(sec.closest('section')||sec));
+      if(target){
+        var navEl2=document.querySelector('nav');
+        var navH2=navEl2?navEl2.getBoundingClientRect().height:0;
+        var rect2=target.getBoundingClientRect();
+        window.scrollBy({top:rect2.top-navH2-24,behavior:'smooth'});
+      }
+    }
   });
 
   var _NO_AI_SECTIONS=['education','certifications','awards','investment_portfolios'];
@@ -194,6 +224,7 @@ export interface NormalizedData {
 	email: string;
 	phone: string;
 	location: string;
+	profile_image: string;
 	linkedin_url: string;
 	github_url: string;
 	portfolio_url: string;
@@ -232,6 +263,7 @@ export interface NormalizedData {
 		project_category: string;
 		design_concept: string;
 		software_used: string[];
+		images: string[];
 	}>;
 	// Designer
 	design_philosophy: string;
@@ -274,6 +306,7 @@ export function normalize(
 	const email = _e(profile.email);
 	const phone = _e(profile.phone);
 	const location = _e(profile.location);
+	const profile_image = _safeUrl(profile.profile_image);
 
 	const linkedin_url = _safeUrl(social['linkedin']);
 	const github_url = _safeUrl(social['github']);
@@ -284,7 +317,7 @@ export function normalize(
 		.filter((g) => g.category || g.skills?.length)
 		.map((g) => ({
 			category: _e(g.category),
-			skills: (g.skills ?? []).filter(Boolean).map(_e)
+			skills: (Array.isArray(g.skills) ? g.skills : []).filter(Boolean).map(_e)
 		}));
 
 	const experience = (parsedData.experience ?? []).map((exp) => {
@@ -298,23 +331,24 @@ export function normalize(
 			location: _e(exp.location),
 			duration: _e(duration),
 			description: _e(exp.description),
-			key_points: (exp.key_points ?? []).filter(Boolean).map(_e),
-			channels_managed: (exp.channels_managed ?? []).filter(Boolean).map(_e),
-			financial_metrics_managed: (exp.financial_metrics_managed ?? []).filter(Boolean).map(_e)
+			key_points: (Array.isArray(exp.key_points) ? exp.key_points : []).filter(Boolean).map(_e),
+			channels_managed: (Array.isArray(exp.channels_managed) ? exp.channels_managed : []).filter(Boolean).map(_e),
+			financial_metrics_managed: (Array.isArray(exp.financial_metrics_managed) ? exp.financial_metrics_managed : []).filter(Boolean).map(_e)
 		};
 	});
 
 	const projects = (parsedData.projects ?? []).map((p) => ({
 		title: _e(p.title),
 		description: _e(p.description),
-		responsibilities: (p.responsibilities ?? []).filter(Boolean).map(_e),
-		measurable_outcomes: (p.measurable_outcomes ?? []).filter(Boolean).map(_e),
-		tech_stack: (p.tech_stack ?? []).filter(Boolean).map(_e),
+		responsibilities: (Array.isArray(p.responsibilities) ? p.responsibilities : []).filter(Boolean).map(_e),
+		measurable_outcomes: (Array.isArray(p.measurable_outcomes) ? p.measurable_outcomes : []).filter(Boolean).map(_e),
+		tech_stack: (Array.isArray(p.tech_stack) ? p.tech_stack : []).filter(Boolean).map(_e),
 		github_repo: _safeUrl(p.github_repo),
 		project_url: _safeUrl(p.project_url),
 		project_category: _e(p.project_category),
 		design_concept: _e(p.design_concept),
-		software_used: (p.software_used ?? []).filter(Boolean).map(_e)
+		software_used: (Array.isArray(p.software_used) ? p.software_used : []).filter(Boolean).map(_e),
+		images: (Array.isArray(p.images) ? p.images : []).map(_safeUrl).filter(Boolean)
 	}));
 
 	const education = (parsedData.education ?? []).map((edu) => {
@@ -350,7 +384,7 @@ export function normalize(
 		}));
 
 	const design_philosophy = _e(parsedData.design_philosophy);
-	const software_proficiency = (parsedData.software_proficiency ?? []).filter(Boolean).map(_e);
+	const software_proficiency = (Array.isArray(parsedData.software_proficiency) ? parsedData.software_proficiency : []).filter(Boolean).map(_e);
 
 	const awards = (parsedData.awards ?? [])
 		.filter((a) => a.title)
@@ -399,6 +433,7 @@ export function normalize(
 		email,
 		phone,
 		location,
+		profile_image,
 		linkedin_url,
 		github_url,
 		portfolio_url,

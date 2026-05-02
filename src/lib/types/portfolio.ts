@@ -124,6 +124,7 @@ export interface ParsedData {
 		phone?: string;
 		location?: string;
 		social_links?: Record<string, string>;
+		profile_image?: string;
 	};
 	skills?: SkillGroup[];
 	experience?: ExperienceItem[];

@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
+	import { onMount, tick } from 'svelte';
 	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
 	import { authStore } from '$lib/stores/auth';
@@ -14,7 +14,10 @@
 		getAiItemEnhancement,
 		getAiSkillsEnhancement,
 		updatePortfolioConfig,
-		publishPortfolio
+		publishPortfolio,
+		getImageUploadUrl,
+		getAiSuggestions,
+		type LlmSuggestion
 	} from '$lib/services/portfolio';
 	import { dndzone } from 'svelte-dnd-action';
 	import { reveal } from '$lib/actions/animate';
@@ -43,7 +46,7 @@
 	interface FieldConfig {
 		key: string;
 		label: string;
-		inputType: 'text' | 'textarea' | 'list' | 'url';
+		inputType: 'text' | 'textarea' | 'list' | 'url' | 'images';
 		aiEnhanceable?: boolean;
 		placeholder?: string;
 		limit?: number;
@@ -73,7 +76,7 @@
 				{ key: 'end_date', label: 'End Date', inputType: 'text', placeholder: 'e.g. Mar 2023 or Present', limit: 50 },
 				{ key: 'description', label: 'Description', inputType: 'textarea', aiEnhanceable: true, limit: 1500 },
 				{ key: 'key_points', label: 'Key Points (one per line)', inputType: 'list', aiEnhanceable: true },
-				{ key: 'images', label: 'Image URLs (one per line)', inputType: 'list' }
+				{ key: 'images', label: 'Images (max 3)', inputType: 'images' }
 			],
 			emptyItem: () => ({ role: '', company: '', location: '', start_date: '', end_date: '', description: '', key_points: [], images: [] })
 		},
@@ -92,7 +95,7 @@
 				{ key: 'measurable_outcomes', label: 'Outcomes (one per line)', inputType: 'list', aiEnhanceable: true },
 				{ key: 'design_concept', label: 'Design Concept', inputType: 'textarea', limit: 1000 },
 				{ key: 'software_used', label: 'Software Used (one per line)', inputType: 'list' },
-				{ key: 'images', label: 'Image URLs (one per line)', inputType: 'list' }
+				{ key: 'images', label: 'Images (max 3)', inputType: 'images' }
 			],
 			emptyItem: () => ({ title: '', description: '', tech_stack: [], github_repo: '', project_url: '', responsibilities: [], measurable_outcomes: [], images: [] })
 		},
@@ -258,16 +261,21 @@
 		social_gitlab: string;
 		social_portfolio: string;
 		social_twitter: string;
+		profile_image: string;
 	}
 
 	function emptyRawProfile(): RawProfileState {
-		return { full_name: '', headline: '', email: '', phone: '', location: '', summary: '', social_linkedin: '', social_github: '', social_gitlab: '', social_portfolio: '', social_twitter: '' };
+		return { full_name: '', headline: '', email: '', phone: '', location: '', summary: '', social_linkedin: '', social_github: '', social_gitlab: '', social_portfolio: '', social_twitter: '', profile_image: '' };
 	}
 
 	let rawProfile: RawProfileState = $state(emptyRawProfile());
 	let rawProfileOriginal: RawProfileState = $state(emptyRawProfile());
 	let rawProfileStatus = $state<'idle' | 'saving' | 'saved' | 'error'>('idle');
 	let rawProfileError: string = $state('');
+
+	// Profile image upload state
+	let imageUploadStatus = $state<'idle' | 'uploading' | 'done' | 'error'>('idle');
+	let imageUploadError: string = $state('');
 
 	const isRawProfileDirty = $derived(JSON.stringify(rawProfile) !== JSON.stringify(rawProfileOriginal));
 
@@ -287,6 +295,8 @@
 		aiSuggestion: string | string[] | null;
 		aiError: string;
 		showAiPanel: boolean;
+		activeSuggestionId: string; // tracks which LLM suggestion activated this panel
+		hidden: boolean; // item hidden from portfolio (data._hidden persists this)
 	}
 
 	function emptyItemState(data: Record<string, unknown>): ItemState {
@@ -303,7 +313,9 @@
 			aiLoading: false,
 			aiSuggestion: null,
 			aiError: '',
-			showAiPanel: false
+			showAiPanel: false,
+			activeSuggestionId: '',
+			hidden: !!(data._hidden as boolean)
 		};
 	}
 
@@ -338,19 +350,20 @@
 	let hiddenSections = $state<Set<string>>(new Set());
 
 	// ── Template ───────────────────────────────────────────────────────────────
-	let templateId = $state('modern');
+	let templateId = $state('neon');
 
 	// ── Live preview (client-side rendering) ───────────────────────────────────
 	// Reconstruct ParsedData from in-memory editor state so the preview re-renders
 	// instantly on every keystroke without any server round-trip.
 	const liveParsedData = $derived<ParsedData>({
 		profile: {
-			full_name:    rawProfile.full_name,
-			headline:     rawProfile.headline,
-			email:        rawProfile.email,
-			phone:        rawProfile.phone,
-			location:     rawProfile.location,
-			summary:      rawProfile.summary,
+			full_name:     rawProfile.full_name,
+			headline:      rawProfile.headline,
+			email:         rawProfile.email,
+			phone:         rawProfile.phone,
+			location:      rawProfile.location,
+			summary:       rawProfile.summary,
+			profile_image: rawProfile.profile_image || undefined,
 			social_links: {
 				...(rawProfile.social_linkedin  ? { linkedin:  rawProfile.social_linkedin  } : {}),
 				...(rawProfile.social_github    ? { github:    rawProfile.social_github    } : {}),
@@ -361,23 +374,23 @@
 		},
 		skills:               skillGroups,
 		// eslint-disable-next-line @typescript-eslint/no-explicit-any
-		experience:           (sections.experience           ?? []).map(it => it.data as any),
+		experience:           (sections.experience           ?? []).filter(it => !it.hidden).map(it => it.data as any),
 		// eslint-disable-next-line @typescript-eslint/no-explicit-any
-		projects:             (sections.projects             ?? []).map(it => it.data as any),
+		projects:             (sections.projects             ?? []).filter(it => !it.hidden).map(it => it.data as any),
 		// eslint-disable-next-line @typescript-eslint/no-explicit-any
-		education:            (sections.education            ?? []).map(it => it.data as any),
+		education:            (sections.education            ?? []).filter(it => !it.hidden).map(it => it.data as any),
 		// eslint-disable-next-line @typescript-eslint/no-explicit-any
-		certifications:       (sections.certifications       ?? []).map(it => it.data as any),
+		certifications:       (sections.certifications       ?? []).filter(it => !it.hidden).map(it => it.data as any),
 		// eslint-disable-next-line @typescript-eslint/no-explicit-any
-		achievements:         (sections.achievements         ?? []).map(it => it.data as any),
+		achievements:         (sections.achievements         ?? []).filter(it => !it.hidden).map(it => it.data as any),
 		// eslint-disable-next-line @typescript-eslint/no-explicit-any
-		awards:               (sections.awards               ?? []).map(it => it.data as any),
+		awards:               (sections.awards               ?? []).filter(it => !it.hidden).map(it => it.data as any),
 		// eslint-disable-next-line @typescript-eslint/no-explicit-any
-		campaigns:            (sections.campaigns            ?? []).map(it => it.data as any),
+		campaigns:            (sections.campaigns            ?? []).filter(it => !it.hidden).map(it => it.data as any),
 		// eslint-disable-next-line @typescript-eslint/no-explicit-any
-		financial_modeling:   (sections.financial_modeling   ?? []).map(it => it.data as any),
+		financial_modeling:   (sections.financial_modeling   ?? []).filter(it => !it.hidden).map(it => it.data as any),
 		// eslint-disable-next-line @typescript-eslint/no-explicit-any
-		investment_portfolios:(sections.investment_portfolios?? []).map(it => it.data as any),
+		investment_portfolios:(sections.investment_portfolios?? []).filter(it => !it.hidden).map(it => it.data as any),
 		design_philosophy:    stringSections.design_philosophy ?? '',
 		software_proficiency: (stringSections.software_proficiency ?? '').split('\n').map(s => s.trim()).filter(Boolean),
 	});
@@ -397,6 +410,48 @@
 
 	function promptDeleteItem(sectionKey: string, itemIdx: number) {
 		deleteModal = { open: true, sectionKey, itemIdx };
+	}
+
+	function moveItemUp(sKey: string, idx: number) {
+		if (idx === 0) return;
+		const items = [...sections[sKey]];
+		[items[idx - 1], items[idx]] = [items[idx], items[idx - 1]];
+		sections = { ...sections, [sKey]: items };
+		savePortfolioSection(userId, sKey, items.map(it => it.data));
+		// LLM suggestion indices are now stale — drop them so we fall back to
+		// the static derived suggestions which always reflect current order.
+		llmSuggestions = [];
+		llmSuggestionsLoaded = false;
+		queuePreviewRefresh();
+	}
+
+	function moveItemDown(sKey: string, idx: number) {
+		const items = sections[sKey];
+		if (idx >= items.length - 1) return;
+		const updated = [...items];
+		[updated[idx], updated[idx + 1]] = [updated[idx + 1], updated[idx]];
+		sections = { ...sections, [sKey]: updated };
+		savePortfolioSection(userId, sKey, updated.map(it => it.data));
+		// LLM suggestion indices are now stale — drop them.
+		llmSuggestions = [];
+		llmSuggestionsLoaded = false;
+		queuePreviewRefresh();
+	}
+
+	function toggleItemHidden(sKey: string, idx: number) {
+		const items = [...sections[sKey]];
+		const newHidden = !items[idx].hidden;
+		const newData = { ...items[idx].data };
+		if (newHidden) newData._hidden = true;
+		else delete newData._hidden;
+		items[idx] = { ...items[idx], hidden: newHidden, data: newData };
+		sections = { ...sections, [sKey]: items };
+		savePortfolioSection(userId, sKey, items.map(it => it.data));
+		// Drop stale LLM suggestions — liveParsedData excludes hidden items so
+		// indices from a previous LLM run no longer map correctly to sections[].
+		llmSuggestions = [];
+		llmSuggestionsLoaded = false;
+		queuePreviewRefresh();
 	}
 
 	function confirmDelete() {
@@ -420,6 +475,237 @@
 	// ── Mobile layout ──────────────────────────────────────────────────────────
 	let mobileTab = $state<'sections' | 'preview' | 'edit'>('edit');
 
+	// ── AI Suggestions ─────────────────────────────────────────────────────────
+
+	interface SuggestionItem {
+		id: string;
+		section: string;
+		index?: number;
+		field?: string;
+		profileKey?: EditableField;
+		label: string;
+		sublabel: string;
+		instruction: string;
+		priority: 'high' | 'medium' | 'low';
+	}
+
+	let dismissedSuggestions = $state<Set<string>>(new Set());
+	let activeSkillsSuggestionId = $state('');
+	let activeProfileSuggestionIds = $state<Record<string, string>>({});
+	let llmSuggestions = $state<LlmSuggestion[]>([]);
+	let llmSuggestionsLoading = $state(false);
+	let llmSuggestionsLoaded = $state(false);
+	let llmSuggestionsError = $state('');
+
+	async function fetchLlmSuggestions() {
+		llmSuggestionsLoading = true;
+		llmSuggestionsError = '';
+		// Pass current in-memory state so the LLM always sees what the user sees,
+		// regardless of whether auto-save debounce has flushed to DynamoDB yet.
+		const result = await getAiSuggestions(userId, {
+			parsedData: liveParsedData,
+			portfolioContent: livePortfolioContent,
+			category
+		});
+		llmSuggestionsLoading = false;
+		llmSuggestionsLoaded = true;
+		if (result.ok && result.data) {
+			llmSuggestions = result.data.suggestions;
+			// Clear dismissed when refreshed so new suggestions aren't hidden
+			dismissedSuggestions = new Set();
+		} else {
+			llmSuggestionsError = result.error ?? 'Failed to load suggestions';
+		}
+	}
+
+	interface CompletionItem { label: string; done: boolean; points: number; }
+	const completionItems = $derived.by((): CompletionItem[] => {
+		const exp = sections.experience ?? [];
+		const proj = sections.projects ?? [];
+		const edu = sections.education ?? [];
+		const hasSocial = !!(rawProfile.social_linkedin || rawProfile.social_github || rawProfile.social_twitter || rawProfile.social_portfolio);
+		return [
+			{ label: 'Add your full name',                            done: !!rawProfile.full_name.trim(),                                                                points: 7  },
+			{ label: 'Add a professional headline',                   done: !!(rawProfile.headline.trim() || profileFields.headline.value.trim()),                       points: 7  },
+			{ label: 'Write a bio (80+ characters)',                  done: (profileFields.bio.value ?? '').trim().length >= 80,                                         points: 10 },
+			{ label: 'Add a unique value proposition',                done: (profileFields.uniqueValue.value ?? '').trim().length >= 40,                                  points: 7  },
+			{ label: 'Upload a profile photo',                        done: !!rawProfile.profile_image.trim(),                                                            points: 6  },
+			{ label: 'Add your email address',                        done: !!rawProfile.email.trim(),                                                                    points: 4  },
+			{ label: 'Add a social link (LinkedIn, GitHub, etc.)',    done: hasSocial,                                                                                    points: 4  },
+			{ label: 'Add at least one experience entry',             done: exp.some(it => (it.data.role as string)?.trim()),                                             points: 14 },
+			{ label: 'Add at least 2 skill groups',                   done: skillGroups.length >= 2,                                                                      points: 9  },
+			{ label: 'Add at least one project',                      done: proj.some(it => (it.data.title as string)?.trim()),                                           points: 12 },
+			{ label: 'Add your education',                            done: edu.some(it => (it.data.degree as string)?.trim()),                                           points: 8  },
+			{ label: 'Add certifications',                            done: (sections.certifications ?? []).length > 0,                                                   points: 6  },
+			{ label: 'Add achievements',                              done: (sections.achievements ?? []).length > 0,                                                     points: 6  },
+		];
+	});
+
+	// Derived from completionItems so score is always consistent with the checklist.
+	// Points are calibrated to sum to 100 when all items are done.
+	const completionScore = $derived(
+		completionItems.reduce((sum, item) => item.done ? sum + item.points : sum, 0)
+	);
+
+	let showCompletionChecklist = $state(false);
+
+	const aiSuggestions = $derived.by(() => {
+		const list: SuggestionItem[] = [];
+
+		// ── Profile ──
+		const bioVal = (profileFields.bio.value ?? '').trim();
+		const uqVal  = (profileFields.uniqueValue.value ?? '').trim();
+
+		if (bioVal.length === 0) {
+			list.push({ id: 'profile-bio', section: 'profile', profileKey: 'bio', label: 'About', sublabel: 'Write your bio', instruction: 'Write a compelling 3-4 sentence intro highlighting my background, expertise, and what drives me', priority: 'high' });
+		} else if (bioVal.length < 80) {
+			list.push({ id: 'profile-bio', section: 'profile', profileKey: 'bio', label: 'About', sublabel: 'Expand your bio', instruction: 'Expand this into a compelling 3-4 sentence intro highlighting my background, expertise, and what drives me', priority: 'medium' });
+		}
+
+		if (uqVal.length === 0) {
+			list.push({ id: 'profile-uniqueValue', section: 'profile', profileKey: 'uniqueValue', label: 'About', sublabel: 'Define your unique value', instruction: 'Describe in 2-3 sentences what sets me apart from others in my field — my unique combination of skills, experience, and perspective', priority: 'high' });
+		} else if (uqVal.length < 40) {
+			list.push({ id: 'profile-uniqueValue', section: 'profile', profileKey: 'uniqueValue', label: 'About', sublabel: 'Strengthen unique value', instruction: 'Expand this to clearly articulate what sets me apart from others in my field', priority: 'medium' });
+		}
+
+		// ── Experience ──
+		for (const [i, it] of (sections.experience ?? []).entries()) {
+			if (it.hidden) continue;
+			const d = it.data;
+			const role = ((d.role as string) ?? '').trim();
+			const company = ((d.company as string) ?? '').trim();
+			const label = role ? (company ? `${role} @ ${company}` : role) : `Experience ${i + 1}`;
+
+			const desc = ((d.description as string) ?? '').trim();
+			const kp   = Array.isArray(d.key_points) ? (d.key_points as string[]) : [];
+
+			if (desc.length < 60) {
+				list.push({ id: `experience-${i}-description`, section: 'experience', index: i, field: 'description', label, sublabel: 'Add job summary', instruction: 'Write a 2-3 sentence summary of what this role involved, the team/product context, and my core responsibilities', priority: desc.length === 0 ? 'high' : 'medium' });
+			}
+			const kpWeak = kp.length > 0 && kp.every(k => k.trim().length < 50);
+			if (kp.length < 3) {
+				list.push({ id: `experience-${i}-key_points`, section: 'experience', index: i, field: 'key_points', label, sublabel: 'Strengthen achievements', instruction: 'Rewrite as 4-6 bullet points with specific metrics: what I did, how I did it, and measurable impact (e.g. reduced load time by 40%, led team of 5)', priority: kp.length === 0 ? 'high' : 'medium' });
+			} else if (kpWeak) {
+				list.push({ id: `experience-${i}-key_points`, section: 'experience', index: i, field: 'key_points', label, sublabel: 'Make achievements more impactful', instruction: 'Rewrite these bullet points to be more result-oriented with specific metrics and measurable business impact', priority: 'low' });
+			}
+		}
+
+		// ── Projects ──
+		for (const [i, it] of (sections.projects ?? []).entries()) {
+			if (it.hidden) continue;
+			const d = it.data;
+			const title = ((d.title as string) ?? `Project ${i + 1}`).trim();
+			const desc  = ((d.description as string) ?? '').trim();
+			const resp  = Array.isArray(d.responsibilities) ? (d.responsibilities as string[]) : [];
+			const out   = Array.isArray(d.measurable_outcomes) ? (d.measurable_outcomes as string[]) : [];
+
+			if (desc.length < 100) {
+				list.push({ id: `projects-${i}-description`, section: 'projects', index: i, field: 'description', label: title, sublabel: 'Sharpen project description', instruction: 'Rewrite as a concise 2-3 sentence summary highlighting the problem solved, my role, and the key technologies used', priority: desc.length === 0 ? 'high' : 'medium' });
+			}
+			if (resp.length < 2) {
+				list.push({ id: `projects-${i}-responsibilities`, section: 'projects', index: i, field: 'responsibilities', label: title, sublabel: 'Define your responsibilities', instruction: 'List 3-5 specific technical responsibilities I owned in this project — what I built, designed, architected, or led', priority: resp.length === 0 ? 'high' : 'medium' });
+			}
+			if (out.length < 2) {
+				list.push({ id: `projects-${i}-measurable_outcomes`, section: 'projects', index: i, field: 'measurable_outcomes', label: title, sublabel: 'Add measurable outcomes', instruction: 'Add 3-4 outcomes with concrete metrics: performance improvements in %, users impacted, cost saved, time reduced, or other quantifiable results', priority: out.length === 0 ? 'high' : 'medium' });
+			}
+		}
+
+		// ── Skills ──
+		if (skillGroups.length < 2) {
+			list.push({ id: 'skills-organize', section: 'skills', label: 'Skills', sublabel: 'Organize into categories', instruction: 'Group my skills into clear categories like Frontend, Backend, Tools, etc. and expand each with specific technologies', priority: skillGroups.length === 0 ? 'high' : 'medium' });
+		} else {
+			for (const [i, g] of skillGroups.entries()) {
+				if (g.skills.length < 3) {
+					list.push({ id: `skills-${i}-expand`, section: 'skills', label: `Skills · ${g.category || `Group ${i+1}`}`, sublabel: 'Expand this skill group', instruction: `Add more specific skills to the "${g.category}" category based on my experience and projects`, priority: 'low' });
+				}
+			}
+		}
+
+		// Sort: high → medium → low, filter dismissed
+		const order = { high: 0, medium: 1, low: 2 };
+		return list
+			.filter(s => !dismissedSuggestions.has(s.id))
+			.sort((a, b) => order[a.priority] - order[b.priority]);
+	});
+
+	// Visible suggestions: LLM results when loaded, static fallback while loading.
+	// Always filters: dismissed, and suggestions for hidden items.
+	const visibleSuggestions = $derived.by(() => {
+		const base = llmSuggestionsLoaded ? llmSuggestions : aiSuggestions;
+		return base.filter(s => {
+			if (dismissedSuggestions.has(s.id)) return false;
+			// Hide suggestions that belong to a currently-hidden item
+			if (s.index != null && sections[s.section]?.[s.index]?.hidden) return false;
+			return true;
+		});
+	});
+
+	function activateSuggestion(s: SuggestionItem | LlmSuggestion) {
+		activeTab = s.section;
+		mobileTab = 'edit';
+
+		if (s.section === 'profile' && s.profileKey) {
+			const pk = s.profileKey as EditableField;
+			if (pk in profileFields) {
+				profileFields[pk].aiInstruction = s.instruction;
+				profileFields[pk].showAiPanel = true;
+				activeProfileSuggestionIds = { ...activeProfileSuggestionIds, [pk]: s.id };
+			}
+			iframeEl?.contentWindow?.postMessage({ type: 'scroll-to-section', section: 'profile' }, '*');
+			setTimeout(() => {
+				if (!rightPanelEl) return;
+				const el = rightPanelEl.querySelector<HTMLElement>(`[data-profile-ai-panel="${pk}"]`);
+				if (el) {
+					const pr = rightPanelEl.getBoundingClientRect();
+					const delta = el.getBoundingClientRect().bottom - pr.bottom + 20;
+					if (Math.abs(delta) > 4) rightPanelEl.scrollBy({ top: delta, behavior: 'smooth' });
+				}
+			}, 200);
+			return;
+		}
+
+		if (s.section === 'skills') {
+			showSkillsAiPanel = true;
+			skillsAiInstruction = s.instruction;
+			activeSkillsSuggestionId = s.id;
+			iframeEl?.contentWindow?.postMessage({ type: 'scroll-to-section', section: 'skills' }, '*');
+			setTimeout(() => {
+				if (!rightPanelEl) return;
+				const el = rightPanelEl.querySelector<HTMLElement>('[data-skills-ai-panel]');
+				if (el) {
+					const pr = rightPanelEl.getBoundingClientRect();
+					const delta = el.getBoundingClientRect().bottom - pr.bottom + 20;
+					if (Math.abs(delta) > 4) rightPanelEl.scrollBy({ top: delta, behavior: 'smooth' });
+				}
+			}, 200);
+			return;
+		}
+
+		if (s.index == null) return;
+		const sec = s.section;
+		const idx = s.index;
+
+		const items = [...sections[sec]];
+		items[idx] = {
+			...items[idx],
+			expanded: true,
+			showAiPanel: true,
+			aiSuggestion: null,
+			aiError: '',
+			aiField: s.field ?? '',
+			aiInstruction: s.instruction,
+			activeSuggestionId: s.id
+		};
+		sections = { ...sections, [sec]: items };
+		// Scroll the visible (non-hidden) index in the preview.
+		// Hidden items are filtered from liveParsedData so preview indices differ from sections indices.
+		const previewIdx = (sections[sec] ?? []).slice(0, idx + 1).filter(it => !it.hidden).length - 1;
+		setTimeout(() => {
+			iframeEl?.contentWindow?.postMessage({ type: 'scroll-to-item', section: sec, index: previewIdx }, '*');
+			scrollRightPanelToItem(sec, idx);
+		}, 200);
+	}
+
 	const visibleSectionKeys = $derived(
 		Object.entries(SECTION_CONFIG)
 			.filter(([key, cfg]) => {
@@ -434,8 +720,14 @@
 	// ── Load ────────────────────────────────────────────────────────────────────
 
 	onMount(async () => {
-		const result = await getPortfolioData(userId);
-		pageLoading = false;
+		let result: Awaited<ReturnType<typeof getPortfolioData>> = { ok: false, error: 'Loading' };
+		try {
+			result = await getPortfolioData(userId);
+		} catch {
+			result = { ok: false, error: 'Network error' };
+		} finally {
+			pageLoading = false;
+		}
 
 		// Non-blocking: show error but still render the (empty) form
 		if (!result.ok || !result.data) {
@@ -452,12 +744,13 @@
 		const prof = (parsedData.profile ?? {}) as Record<string, unknown>;
 		const soc = (prof.social_links ?? {}) as Record<string, string>;
 		const loadedRaw: RawProfileState = {
-			full_name:        (prof.full_name as string)  ?? '',
-			headline:         (prof.headline as string)   ?? '',
-			email:            (prof.email as string)      ?? '',
-			phone:            (prof.phone as string)      ?? '',
-			location:         (prof.location as string)   ?? '',
-			summary:          (prof.summary as string)    ?? '',
+			full_name:        (prof.full_name as string)     ?? '',
+			headline:         (prof.headline as string)      ?? '',
+			email:            (prof.email as string)         ?? '',
+			phone:            (prof.phone as string)         ?? '',
+			location:         (prof.location as string)      ?? '',
+			summary:          (prof.summary as string)       ?? '',
+			profile_image:    (prof.profile_image as string) ?? '',
 			social_linkedin:  soc.linkedin   ?? '',
 			social_github:    soc.github     ?? '',
 			social_gitlab:    soc.gitlab     ?? '',
@@ -513,6 +806,8 @@
 			.concat(visibleKeys.filter(k => !sectionOrder.includes(k)));
 		dndItems = sortedVisible.map(k => ({ id: k }));
 
+		// Fetch LLM suggestions non-blockingly after data loads
+		fetchLlmSuggestions();
 	});
 
 	// ── Profile save/AI ─────────────────────────────────────────────────────────
@@ -562,7 +857,7 @@
 		if (rawProfile.social_gitlab)    social_links.gitlab    = rawProfile.social_gitlab;
 		if (rawProfile.social_portfolio) social_links.portfolio = rawProfile.social_portfolio;
 		if (rawProfile.social_twitter)   social_links.twitter   = rawProfile.social_twitter;
-		const profileData = {
+		const profileData: Record<string, unknown> = {
 			full_name: rawProfile.full_name,
 			headline:  rawProfile.headline,
 			email:     rawProfile.email,
@@ -571,6 +866,9 @@
 			summary:   rawProfile.summary,
 			social_links,
 		};
+		if (rawProfile.profile_image) {
+			profileData.profile_image = rawProfile.profile_image;
+		}
 		const result = await savePortfolioSection(userId, 'profile', profileData);
 		if (result.ok) {
 			rawProfileOriginal = JSON.parse(JSON.stringify(rawProfile));
@@ -581,6 +879,123 @@
 			rawProfileStatus = 'error';
 			rawProfileError = result.error ?? 'Save failed. Please try again.';
 		}
+	}
+
+	async function uploadProfileImage(file: File) {
+		if (imageUploadStatus === 'uploading') return;
+		imageUploadStatus = 'uploading';
+		imageUploadError = '';
+
+		// 1. Get presigned URL from our backend
+		const urlResult = await getImageUploadUrl(userId, file.type);
+		if (!urlResult.ok || !urlResult.data) {
+			imageUploadStatus = 'error';
+			imageUploadError = urlResult.error ?? 'Failed to get upload URL';
+			return;
+		}
+		const { uploadUrl, imageUrl } = urlResult.data;
+
+		// 2. PUT the file directly to S3
+		try {
+			const putRes = await fetch(uploadUrl, {
+				method: 'PUT',
+				headers: { 'Content-Type': file.type },
+				body: file
+			});
+			if (!putRes.ok) {
+				imageUploadStatus = 'error';
+				imageUploadError = 'Upload to storage failed';
+				return;
+			}
+		} catch {
+			imageUploadStatus = 'error';
+			imageUploadError = 'Network error during upload';
+			return;
+		}
+
+		// 3. Persist the CloudFront URL into profile state and save
+		rawProfile = { ...rawProfile, profile_image: imageUrl };
+		rawProfileOriginal = { ...rawProfileOriginal, profile_image: imageUrl };
+		imageUploadStatus = 'done';
+		queuePreviewRefresh();
+
+		// Save the updated profile (with new profile_image) to DynamoDB
+		const social_links: Record<string, string> = {};
+		if (rawProfile.social_linkedin)  social_links.linkedin  = rawProfile.social_linkedin;
+		if (rawProfile.social_github)    social_links.github    = rawProfile.social_github;
+		if (rawProfile.social_gitlab)    social_links.gitlab    = rawProfile.social_gitlab;
+		if (rawProfile.social_portfolio) social_links.portfolio = rawProfile.social_portfolio;
+		if (rawProfile.social_twitter)   social_links.twitter   = rawProfile.social_twitter;
+		await savePortfolioSection(userId, 'profile', {
+			full_name: rawProfile.full_name, headline: rawProfile.headline,
+			email: rawProfile.email, phone: rawProfile.phone,
+			location: rawProfile.location, summary: rawProfile.summary,
+			social_links, profile_image: imageUrl,
+		});
+
+		setTimeout(() => { imageUploadStatus = 'idle'; }, 3000);
+	}
+
+	// Per-item image upload state: key = `${sKey}-${idx}`, value = 'idle'|'uploading'|'error'
+	let itemImageUploadStatus: Record<string, string> = $state({});
+	let itemImageUploadError: Record<string, string> = $state({});
+
+	const MAX_ITEM_IMAGES = 3;
+
+	async function uploadSectionImage(sKey: string, idx: number, file: File) {
+		const stateKey = `${sKey}-${idx}`;
+		if (itemImageUploadStatus[stateKey] === 'uploading') return;
+
+		const currentImages = (sections[sKey]?.[idx]?.data?.images as string[]) ?? [];
+		if (currentImages.length >= MAX_ITEM_IMAGES) {
+			itemImageUploadError = { ...itemImageUploadError, [stateKey]: `Maximum ${MAX_ITEM_IMAGES} images allowed` };
+			return;
+		}
+
+		itemImageUploadStatus = { ...itemImageUploadStatus, [stateKey]: 'uploading' };
+		itemImageUploadError = { ...itemImageUploadError, [stateKey]: '' };
+
+		const urlResult = await getImageUploadUrl(userId, file.type);
+		if (!urlResult.ok || !urlResult.data) {
+			itemImageUploadStatus = { ...itemImageUploadStatus, [stateKey]: 'error' };
+			itemImageUploadError = { ...itemImageUploadError, [stateKey]: urlResult.error ?? 'Failed to get upload URL' };
+			return;
+		}
+		const { uploadUrl, imageUrl } = urlResult.data;
+
+		try {
+			const putRes = await fetch(uploadUrl, {
+				method: 'PUT',
+				headers: { 'Content-Type': file.type },
+				body: file
+			});
+			if (!putRes.ok) {
+				itemImageUploadStatus = { ...itemImageUploadStatus, [stateKey]: 'error' };
+				itemImageUploadError = { ...itemImageUploadError, [stateKey]: 'Upload to storage failed' };
+				return;
+			}
+		} catch {
+			itemImageUploadStatus = { ...itemImageUploadStatus, [stateKey]: 'error' };
+			itemImageUploadError = { ...itemImageUploadError, [stateKey]: 'Network error during upload' };
+			return;
+		}
+
+		// Add new image URL to the item's images array and save
+		const updatedImages = [...currentImages, imageUrl];
+		const items = [...sections[sKey]];
+		items[idx] = { ...items[idx], data: { ...items[idx].data, images: updatedImages }, isDirty: true };
+		sections = { ...sections, [sKey]: items };
+		itemImageUploadStatus = { ...itemImageUploadStatus, [stateKey]: 'idle' };
+		await saveItem(sKey, idx);
+	}
+
+	function removeSectionImage(sKey: string, idx: number, imageIdx: number) {
+		const items = [...sections[sKey]];
+		const currentImages = [...((items[idx].data.images as string[]) ?? [])];
+		currentImages.splice(imageIdx, 1);
+		items[idx] = { ...items[idx], data: { ...items[idx].data, images: currentImages }, isDirty: true };
+		sections = { ...sections, [sKey]: items };
+		autoSaveItem(sKey, idx);
 	}
 
 	async function enhanceProfileField(key: EditableField) {
@@ -606,6 +1021,22 @@
 		profileFields[key].showAiPanel = false;
 		profileFields[key].aiInstruction = '';
 		profileFields[key].aiError = '';
+		autoSaveProfileField(key);
+		// Remove matching suggestion from left pane — match by tracked ID, derived ID,
+		// AND by section+profileKey to handle LLM ID format variance.
+		const trackedId = activeProfileSuggestionIds[key];
+		const derivedId = `profile-${key}`;
+		dismissedSuggestions = new Set([...dismissedSuggestions, derivedId, ...(trackedId ? [trackedId] : [])]);
+		llmSuggestions = llmSuggestions.filter(sg =>
+			sg.id !== derivedId &&
+			sg.id !== trackedId &&
+			!(sg.section === 'profile' && sg.profileKey === key)
+		);
+		if (trackedId) {
+			const updated = { ...activeProfileSuggestionIds };
+			delete updated[key];
+			activeProfileSuggestionIds = updated;
+		}
 	}
 
 	// ── Skills ──────────────────────────────────────────────────────────────────
@@ -649,6 +1080,13 @@
 		showSkillsAiPanel = false;
 		skillsAiInstruction = '';
 		skillsAiError = '';
+		autoSaveSkills();
+		// Dismiss the LLM suggestion that triggered this panel
+		if (activeSkillsSuggestionId) {
+			dismissedSuggestions = new Set([...dismissedSuggestions, activeSkillsSuggestionId]);
+			llmSuggestions = llmSuggestions.filter(sg => sg.id !== activeSkillsSuggestionId);
+			activeSkillsSuggestionId = '';
+		}
 	}
 
 	function addSkillGroup() {
@@ -657,6 +1095,22 @@
 
 	function removeSkillGroup(i: number) {
 		skillGroups = skillGroups.filter((_, idx) => idx !== i);
+	}
+
+	function moveSkillGroupUp(i: number) {
+		if (i === 0) return;
+		const updated = [...skillGroups];
+		[updated[i - 1], updated[i]] = [updated[i], updated[i - 1]];
+		skillGroups = updated;
+		autoSaveSkills();
+	}
+
+	function moveSkillGroupDown(i: number) {
+		if (i >= skillGroups.length - 1) return;
+		const updated = [...skillGroups];
+		[updated[i], updated[i + 1]] = [updated[i + 1], updated[i]];
+		skillGroups = updated;
+		autoSaveSkills();
 	}
 
 	function updateSkillGroupCategory(i: number, val: string) {
@@ -776,6 +1230,47 @@
 		}
 	}
 
+	// ── Auto-save (debounced, triggered on field blur) ───────────────────────────
+	const _formSaveTimers: Record<string, ReturnType<typeof setTimeout>> = {};
+
+	function autoSaveItem(sectionKey: string, itemIdx: number) {
+		const tk = `item-${sectionKey}-${itemIdx}`;
+		if (_formSaveTimers[tk]) clearTimeout(_formSaveTimers[tk]);
+		_formSaveTimers[tk] = setTimeout(() => {
+			if (sections[sectionKey]?.[itemIdx]?.isDirty) saveItem(sectionKey, itemIdx);
+		}, 800);
+	}
+
+	function autoSaveSkills() {
+		if (_formSaveTimers['skills']) clearTimeout(_formSaveTimers['skills']);
+		_formSaveTimers['skills'] = setTimeout(() => {
+			if (isSkillsDirty) saveSkills();
+		}, 800);
+	}
+
+	function autoSaveRawProfile() {
+		if (_formSaveTimers['rawProfile']) clearTimeout(_formSaveTimers['rawProfile']);
+		_formSaveTimers['rawProfile'] = setTimeout(() => {
+			if (isRawProfileDirty) saveRawProfile();
+		}, 800);
+	}
+
+	function autoSaveProfileField(key: EditableField) {
+		const tk = `pf-${key}`;
+		if (_formSaveTimers[tk]) clearTimeout(_formSaveTimers[tk]);
+		_formSaveTimers[tk] = setTimeout(() => {
+			if (profileFields[key].value !== profileFields[key].original) saveProfileField(key);
+		}, 800);
+	}
+
+	function autoSaveStringSection(sKey: string) {
+		const tk = `str-${sKey}`;
+		if (_formSaveTimers[tk]) clearTimeout(_formSaveTimers[tk]);
+		_formSaveTimers[tk] = setTimeout(() => {
+			if (stringSections[sKey] !== stringSectionOriginals[sKey]) saveStringSection(sKey);
+		}, 800);
+	}
+
 	async function enhanceItem(sectionKey: string, itemIdx: number) {
 		const item = sections[sectionKey][itemIdx];
 		if (!item.aiField || !item.aiInstruction.trim() || item.aiLoading) return;
@@ -796,11 +1291,12 @@
 		sections = { ...sections, [sectionKey]: u };
 	}
 
-	function acceptItemSuggestion(sectionKey: string, itemIdx: number) {
+	async function acceptItemSuggestion(sectionKey: string, itemIdx: number) {
 		const item = sections[sectionKey][itemIdx];
 		if (!item.aiSuggestion) return;
+		const acceptedField = item.aiField;
 		const updatedData = { ...item.data };
-		updatedData[item.aiField] = item.aiSuggestion;
+		updatedData[acceptedField] = item.aiSuggestion;
 		const updated = [...sections[sectionKey]];
 		updated[itemIdx] = {
 			...updated[itemIdx],
@@ -810,9 +1306,24 @@
 			showAiPanel: false,
 			aiField: '',
 			aiInstruction: '',
-			aiError: ''
+			aiError: '',
+			activeSuggestionId: ''
 		};
 		sections = { ...sections, [sectionKey]: updated };
+		autoSaveItem(sectionKey, itemIdx);
+		// Remove matching suggestion from left pane — match by derived ID, tracked ID,
+		// AND by section+index+field to handle LLM ID format variance.
+		const derivedId = `${sectionKey}-${itemIdx}-${acceptedField}`;
+		const trackedId = item.activeSuggestionId;
+		dismissedSuggestions = new Set([...dismissedSuggestions, derivedId, ...(trackedId ? [trackedId] : [])]);
+		llmSuggestions = llmSuggestions.filter(sg =>
+			sg.id !== derivedId &&
+			sg.id !== trackedId &&
+			!(sg.section === sectionKey && sg.index === itemIdx && sg.field === acceptedField)
+		);
+		// Force preview repaint immediately — bypasses the 'paused' guard in iframeEditor
+		await tick();
+		if (_forcePaint) _forcePaint(renderedHTML);
 	}
 
 	function toggleItemAiPanel(sectionKey: string, itemIdx: number) {
@@ -824,7 +1335,10 @@
 			const enhanceable = SECTION_CONFIG[sectionKey]?.fields.filter((f) => f.aiEnhanceable) ?? [];
 			if (enhanceable.length === 1) autoField = enhanceable[0].key;
 		}
-		items[itemIdx] = { ...items[itemIdx], showAiPanel: opening, aiSuggestion: null, aiError: '', aiInstruction: '', aiField: autoField };
+		// When opening: preserve any pre-filled instruction (e.g. from AI Insights panel).
+		// When closing: clear state so next open is fresh.
+		const instruction = opening ? items[itemIdx].aiInstruction : '';
+		items[itemIdx] = { ...items[itemIdx], showAiPanel: opening, aiSuggestion: null, aiError: '', aiInstruction: instruction, aiField: autoField };
 		sections = { ...sections, [sectionKey]: items };
 	}
 
@@ -901,7 +1415,7 @@
 		const result = await publishPortfolio(userId);
 		if (result.ok) {
 			publishStatus = 'done';
-			publishToast = 'Publishing started — live in ~15s';
+			publishToast = 'Portfolio published! Changes are live.';
 			hasUnpublishedChanges = false;
 			setTimeout(() => { publishStatus = 'idle'; publishToast = ''; }, 8000);
 		} else {
@@ -913,6 +1427,7 @@
 
 	// ── Inline editor overlays ────────────────────────────────────────────────
 	let iframeEl = $state<HTMLIFrameElement | null>(null);
+	let _forcePaint: ((h: string) => void) | null = null;
 
 	interface AiToolbarState {
 		path: string;
@@ -999,11 +1514,13 @@
 			if (rawProfile.social_gitlab)    social_links.gitlab    = rawProfile.social_gitlab;
 			if (rawProfile.social_portfolio) social_links.portfolio = rawProfile.social_portfolio;
 			if (rawProfile.social_twitter)   social_links.twitter   = rawProfile.social_twitter;
-			await savePortfolioSection(userId, 'profile', {
+			const profilePayload: Record<string, unknown> = {
 				full_name: rawProfile.full_name, headline: rawProfile.headline,
 				email: rawProfile.email, phone: rawProfile.phone,
 				location: rawProfile.location, summary: rawProfile.summary, social_links,
-			});
+			};
+			if (rawProfile.profile_image) profilePayload.profile_image = rawProfile.profile_image;
+			await savePortfolioSection(userId, 'profile', profilePayload);
 		} else if (ns === 'portfolio') {
 			await savePortfolioContent(userId, idxOrKey as EditableField, profileFields[idxOrKey as EditableField].value);
 		} else if (ns === 'skills') {
@@ -1107,6 +1624,53 @@
 		}, 60);
 	}
 
+	/**
+	 * Scrolls the right panel so the clicked field is at a consistent vertical position.
+	 *
+	 * Target: the field's label+input wrapper top-edge sits at 38% from the panel top.
+	 * This is the same fraction regardless of element height (input vs tall textarea),
+	 * so every field lands in the same place.
+	 *
+	 * Uses scrollTo with an absolute scrollTop rather than scrollBy (relative delta)
+	 * so any in-progress smooth-scroll animation cannot skew the position calculation.
+	 * The browser naturally clamps scrollTop at max-scroll, so end-of-content fields
+	 * land as low as they can without any special-casing.
+	 */
+	function scrollRightPanelToField(id: string, delay = 150) {
+		setTimeout(() => {
+			if (!rightPanelEl) return;
+			const el = rightPanelEl.querySelector<HTMLElement>(`#${CSS.escape(id)}`);
+			if (!el) return;
+			// Prefer the parent wrapper div (contains label + input) as the scroll
+			// target so the label is also visible. Fall back to the element itself if
+			// the parent is too tall to be a simple label+field wrapper (e.g. a card).
+			const parent = el.parentElement;
+			const target = (parent && parent.getBoundingClientRect().height < 220) ? parent : el;
+			const pr = rightPanelEl.getBoundingClientRect();
+			const er = target.getBoundingClientRect();
+			// Absolute target scrollTop: move the panel so `target` top sits at 38% of panel height.
+			const targetScrollTop = rightPanelEl.scrollTop + (er.top - pr.top) - pr.height * 0.38;
+			rightPanelEl.scrollTo({ top: Math.max(0, targetScrollTop), behavior: 'smooth' });
+		}, delay);
+	}
+
+	/**
+	 * Maps visible index (template index, excludes hidden) → actual sections[] index.
+	 * e.g. if sections.projects = [hidden, visible, visible]
+	 * then visibleToActual.projects = [1, 2]
+	 */
+	const visibleToActual = $derived.by(() => {
+		const result: Record<string, number[]> = {};
+		for (const [sec, items] of Object.entries(sections)) {
+			const mapping: number[] = [];
+			(items as ItemState[]).forEach((item, actualIdx) => {
+				if (!item.hidden) mapping.push(actualIdx);
+			});
+			result[sec] = mapping;
+		}
+		return result;
+	});
+
 	function focusListItem(index: number) {
 		setTimeout(() => {
 			const inputs = listEditorEl?.querySelectorAll<HTMLInputElement>('[data-list-input]');
@@ -1180,6 +1744,17 @@
 		aiToolbar = null;
 	}
 
+	// ── Auto-resize textarea action ────────────────────────────────────────────
+	function autoResize(node: HTMLTextAreaElement) {
+		function resize() {
+			node.style.height = 'auto';
+			node.style.height = node.scrollHeight + 'px';
+		}
+		resize();
+		node.addEventListener('input', resize);
+		return { update() { resize(); }, destroy() { node.removeEventListener('input', resize); } };
+	}
+
 	// ── iframeEditor action ────────────────────────────────────────────────────
 	// Replaces iframePreview. Handles postMessage events for inline editing,
 	// pauses re-renders while a field is being edited, and resumes on blur.
@@ -1188,6 +1763,16 @@
 		let timer: ReturnType<typeof setTimeout> | null = null;
 		let pendingHtml: string | null = null;
 		let paused = false;
+		// Tracks the pending scroll-to-card timer from a focus-item event.
+		let focusItemTimer: ReturnType<typeof setTimeout> | null = null;
+		// When a field-specific click (field-focus / open-list-editor) is detected,
+		// this flag is set so that the *subsequent* focus-item message (which always
+		// arrives after, because click fires after focusin and open-list-editor is
+		// registered before focus-item in EDITOR_JS) skips its card-top scroll.
+		// Without this, focus-item's card scroll races with the field scroll and
+		// wins on first click (item not yet at top, large delta) even though the
+		// field scroll fires 30ms later — the card animation is still running.
+		let suppressNextFocusItemScroll = false;
 
 		function paint(h: string) {
 			const win = node.contentWindow;
@@ -1203,6 +1788,11 @@
 			doc.write(hStripped);
 			doc.close();
 			try {
+				const st = doc.createElement('style');
+				st.textContent = '::-webkit-scrollbar{display:none}html,body{scrollbar-width:none;-ms-overflow-style:none;}';
+				(doc.head ?? doc.documentElement)?.appendChild(st);
+			} catch (_) { /* ignore */ }
+			try {
 				const sc = doc.createElement('script');
 				// Reset __ceReady so EDITOR_JS always initialises fresh on each paint.
 				sc.textContent = 'document.__ceReady=false;' + EDITOR_JS;
@@ -1215,19 +1805,59 @@
 			const d = event.data;
 			if (!d?.type) return;
 			switch (d.type) {
-				case 'field-focus':
+				case 'field-focus': {
 					paused = true;
 					// Cancel any pending re-render timer started before focus.
 					// Without this, a 300ms timer fires mid-edit and wipes the iframe.
 					if (timer) { clearTimeout(timer); timer = null; }
+					// Switch the right panel to the relevant tab and scroll to the field.
+					const path = d.path as string;
+					const parts = path.split('.');
+					const ns = parts[0];
+					if (ns === 'profile') {
+						// profile.full_name → rp-full-name, profile.headline → rp-headline, etc.
+						activeTab = 'profile';
+						mobileTab = 'edit';
+						const fieldKey = parts[1] ?? '';
+						scrollRightPanelToField('rp-' + fieldKey.replace(/_/g, '-'), 80);
+					} else if (ns === 'portfolio') {
+						// portfolio.bio / portfolio.headline / portfolio.uniqueValue → pf-{key}
+						activeTab = 'profile';
+						mobileTab = 'edit';
+						const pfKey = parts[1] ?? '';
+						scrollRightPanelToField('pf-' + pfKey, 80);
+					} else if (ns === 'design_philosophy') {
+						activeTab = 'design_philosophy';
+						mobileTab = 'edit';
+					} else if (ns === 'skills') {
+						activeTab = 'skills';
+						mobileTab = 'edit';
+					} else if (ns && parts.length >= 3) {
+						// {section}.{visibleIdx}.{field} — map visible index to actual index
+						const visibleIdx = parseInt(parts[1]);
+						const fieldKey = parts[2];
+						const actualIdx = visibleToActual[ns]?.[visibleIdx] ?? visibleIdx;
+						activeTab = ns;
+						mobileTab = 'edit';
+						if (sections[ns]?.[actualIdx] && !sections[ns][actualIdx].expanded) {
+							toggleItemExpand(ns, actualIdx);
+						}
+						// Cancel any stale card scroll already in flight, and flag the
+						// *incoming* focus-item (which fires after focusin) to skip its
+						// card scroll — the field scroll below is more specific.
+						if (focusItemTimer) { clearTimeout(focusItemTimer); focusItemTimer = null; }
+						suppressNextFocusItemScroll = true;
+						scrollRightPanelToField(`${ns}-${actualIdx}-${fieldKey}`, 260);
+					}
 					break;
+				}
 				case 'field-change':
 					updateFieldFromIframe(d.path, d.value);
 					break;
 				case 'field-blur':
 					updateFieldFromIframe(d.path, d.value);
 					paused = false;
-					pendingHtml = null; // discard stale queue; Svelte will push fresh renderedHTML
+					if (pendingHtml) { const h = pendingHtml; pendingHtml = null; paint(h); }
 					scheduleSaveFromIframe(d.path);
 					break;
 				case 'selection':
@@ -1237,9 +1867,30 @@
 						instruction: '', loading: false, error: ''
 					};
 					break;
-				case 'open-list-editor':
+				case 'open-list-editor': {
 					openListEditor(d.path, d.rect, node);
+					// Also switch the right panel to the relevant section and scroll to the field,
+					// so the user can see the field they just clicked alongside the list editor.
+					const listPath = d.path as string;
+					const listParts = listPath.split('.');
+					if (listParts.length >= 3) {
+						const listNs = listParts[0];
+						const listVisIdx = parseInt(listParts[1]);
+						const listFieldKey = listParts[2];
+						const listActualIdx = visibleToActual[listNs]?.[listVisIdx] ?? listVisIdx;
+						activeTab = listNs;
+						mobileTab = 'edit';
+						if (sections[listNs]?.[listActualIdx] && !sections[listNs][listActualIdx].expanded) {
+							toggleItemExpand(listNs, listActualIdx);
+						}
+						// Cancel any stale card scroll already in flight, and flag the
+						// *incoming* focus-item to skip its card scroll.
+						if (focusItemTimer) { clearTimeout(focusItemTimer); focusItemTimer = null; }
+						suppressNextFocusItemScroll = true;
+						scrollRightPanelToField(`${listNs}-${listActualIdx}-${listFieldKey}`, 260);
+					}
 					break;
+				}
 				case 'add-item': {
 					const sec = d.section as string;
 					activeTab = sec;
@@ -1253,9 +1904,34 @@
 					}
 					break;
 				}
+				case 'focus-item': {
+					const sec = d.section as string;
+					const visIdx = d.index as number;
+					const actualIdx = visibleToActual[sec]?.[visIdx] ?? visIdx;
+					activeTab = sec;
+					mobileTab = 'edit';
+					if (sections[sec]?.[actualIdx] && !sections[sec][actualIdx].expanded) {
+						toggleItemExpand(sec, actualIdx);
+					}
+					// If field-focus or open-list-editor already scheduled a field-specific
+					// scroll for this same click, skip the coarser card-top scroll entirely.
+					// (open-list-editor fires before focus-item in EDITOR_JS, so it sets
+					// suppressNextFocusItemScroll before we reach here.)
+					if (suppressNextFocusItemScroll) {
+						suppressNextFocusItemScroll = false;
+						break;
+					}
+					if (focusItemTimer) clearTimeout(focusItemTimer);
+					focusItemTimer = setTimeout(() => {
+						focusItemTimer = null;
+						scrollRightPanelToItem(sec, actualIdx);
+					}, 80);
+					break;
+				}
 				case 'open-ai-panel': {
 					const sec = d.section as string;
-					const idx = d.index as number;
+					const visIdx = d.index as number;
+					const actualIdx = visibleToActual[sec]?.[visIdx] ?? visIdx;
 					activeTab = sec;
 					mobileTab = 'edit';
 					if (sec === 'skills') {
@@ -1263,27 +1939,32 @@
 						scrollRightPanelToBottom();
 					} else {
 						// Expand the item if it is collapsed
-						if (sections[sec]?.[idx] && !sections[sec][idx].expanded) {
-							toggleItemExpand(sec, idx);
+						if (sections[sec]?.[actualIdx] && !sections[sec][actualIdx].expanded) {
+							toggleItemExpand(sec, actualIdx);
 						}
 						setTimeout(() => {
 							// Only OPEN the panel — never close it from a preview click.
 							// toggleItemAiPanel is a toggle: calling it when already open
 							// would close the panel and leave the scroll pointing at the card top.
-							if (!sections[sec]?.[idx]?.showAiPanel) {
-								toggleItemAiPanel(sec, idx);
+							if (!sections[sec]?.[actualIdx]?.showAiPanel) {
+								toggleItemAiPanel(sec, actualIdx);
 							}
-							scrollRightPanelToItem(sec, idx);
+							scrollRightPanelToItem(sec, actualIdx);
 						}, 80);
 					}
 					break;
 				}
-				case 'delete-item':
-					promptDeleteItem(d.section, d.index);
+				case 'delete-item': {
+					const sec = d.section as string;
+					const visIdx = d.index as number;
+					const actualIdx = visibleToActual[sec]?.[visIdx] ?? visIdx;
+					promptDeleteItem(sec, actualIdx);
 					break;
+				}
 			}
 		}
 
+		_forcePaint = paint;
 		window.addEventListener('message', handleMessage);
 		paint(html);
 
@@ -1297,6 +1978,7 @@
 				if (timer) clearTimeout(timer);
 				window.removeEventListener('message', handleMessage);
 				iframeEl = null;
+				_forcePaint = null;
 			}
 		};
 	}
@@ -1343,8 +2025,8 @@
 
 	<div class="flex min-h-0 flex-1 overflow-hidden">
 
-		<aside class="{mobileTab === 'sections' ? 'flex' : 'hidden'} sm:flex w-full sm:w-52 flex-col flex-shrink-0 overflow-y-auto border-r border-slate-200 bg-slate-50">
-			<div class="p-3 space-y-0.5">
+		<aside class="{mobileTab === 'sections' ? 'flex' : 'hidden'} sm:flex w-full sm:w-80 flex-col flex-shrink-0 overflow-hidden border-r border-slate-200 bg-slate-50 sm:bg-slate-50 sm:p-0 sm:pt-3">
+			<div class="flex-shrink-0 p-3 space-y-0.5 sm:mx-3 sm:rounded-2xl sm:border sm:border-slate-200 sm:bg-white sm:shadow-md sm:p-3 sm:mb-2">
 				<button onclick={() => { activeTab = 'profile'; mobileTab = 'edit'; }} class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm font-medium transition-colors {activeTab === 'profile' ? 'bg-slate-900 text-white' : 'text-slate-700 hover:bg-slate-200'}">
 					Profile
 				</button>
@@ -1368,26 +2050,126 @@
 					</div>
 				{/if}
 			</div>
+
+			{#if !pageLoading}
+			<!-- AI Insights panel -->
+			<div class="flex-1 min-h-0 mx-3 mb-3 mt-2 rounded-2xl border border-slate-200 bg-white shadow-md overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+				<!-- Header -->
+				<div class="flex items-center gap-2 border-b border-slate-100 px-4 py-3">
+					<span class="text-sm font-bold text-slate-800">✦ AI Insights</span>
+					{#if llmSuggestionsLoading}
+						<span class="ml-auto flex items-center gap-1 text-xs text-slate-400"><Spinner size="sm" />Analyzing…</span>
+					{:else}
+						{#if visibleSuggestions.length > 0}
+							<span class="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-bold text-amber-700">{visibleSuggestions.length}</span>
+						{/if}
+						<button onclick={fetchLlmSuggestions} class="ml-auto flex items-center gap-1 rounded-lg px-2 py-1 text-xs text-slate-400 hover:bg-slate-100 hover:text-slate-600" title="Refresh suggestions">
+							<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="h-3.5 w-3.5"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" /></svg>
+							Refresh
+						</button>
+					{/if}
+				</div>
+
+				<!-- Completion bar -->
+				<div class="px-4 pt-3 pb-2">
+					<div class="mb-1 flex items-center justify-between">
+						<span class="text-xs font-bold text-slate-500">Profile complete</span>
+						<div class="flex items-center gap-1.5">
+							<span class="text-xs font-bold {completionScore >= 80 ? 'text-emerald-600' : completionScore >= 50 ? 'text-amber-600' : 'text-red-500'}">{completionScore}%</span>
+							{#if completionScore < 100}
+								<button onclick={() => showCompletionChecklist = !showCompletionChecklist} class="text-xs text-slate-400 hover:text-slate-600 underline underline-offset-2" title="What's missing?">
+									{showCompletionChecklist ? 'hide' : 'what\'s missing?'}
+								</button>
+							{/if}
+						</div>
+					</div>
+					<div class="h-2 w-full overflow-hidden rounded-full bg-slate-100">
+						<div class="h-full rounded-full transition-all duration-500 {completionScore >= 80 ? 'bg-emerald-500' : completionScore >= 50 ? 'bg-amber-400' : 'bg-red-400'}" style="width:{completionScore}%"></div>
+					</div>
+					{#if showCompletionChecklist}
+						<div class="mt-2 space-y-1">
+							{#each completionItems as item}
+								<div class="flex items-start gap-2">
+									{#if item.done}
+										<span class="mt-0.5 flex-shrink-0 text-emerald-500 text-xs">✓</span>
+										<span class="text-xs text-slate-400 line-through">{item.label}</span>
+									{:else}
+										<span class="mt-0.5 flex-shrink-0 text-slate-300 text-xs">○</span>
+										<span class="text-xs text-slate-600">{item.label} <span class="text-slate-400">(+{item.points}%)</span></span>
+									{/if}
+								</div>
+							{/each}
+						</div>
+					{/if}
+				</div>
+
+				<!-- Suggestions list -->
+				{#if llmSuggestionsError}
+					<div class="px-4 pb-3 pt-2 text-center">
+						<p class="text-xs text-red-500">{llmSuggestionsError}</p>
+					</div>
+				{:else if llmSuggestionsLoading}
+					<div class="px-4 pb-4 pt-2 text-center">
+						<p class="text-xs text-slate-400">Generating personalized suggestions…</p>
+					</div>
+				{:else if visibleSuggestions.length === 0}
+					<div class="px-4 pb-4 pt-1 text-center">
+						<p class="text-xs text-slate-400">{llmSuggestionsLoaded ? '✓ Your portfolio looks great! No suggestions right now.' : 'Looking good! No suggestions right now.'}</p>
+					</div>
+				{:else}
+					<div class="space-y-1.5 px-3 pb-3 pt-1">
+						{#each visibleSuggestions as s (s.id)}
+							<div class="group relative">
+								<button
+									type="button"
+									onclick={() => activateSuggestion(s)}
+									class="w-full rounded-xl border px-3 py-2.5 text-left transition-all hover:shadow-sm {s.priority === 'high' ? 'border-red-100 bg-red-50/60 hover:border-red-200 hover:bg-red-50' : s.priority === 'medium' ? 'border-amber-100 bg-amber-50/60 hover:border-amber-200 hover:bg-amber-50' : 'border-slate-100 bg-slate-50/60 hover:border-slate-200 hover:bg-slate-50'}"
+								>
+									<p class="pr-5 text-xs font-bold truncate {s.priority === 'high' ? 'text-red-700' : s.priority === 'medium' ? 'text-amber-700' : 'text-slate-600'}">{s.label}</p>
+									<p class="mt-0.5 pr-5 text-xs text-slate-500 truncate">{s.sublabel}</p>
+								</button>
+								<button
+									type="button"
+									aria-label="Dismiss suggestion"
+									onclick={() => { dismissedSuggestions = new Set([...dismissedSuggestions, s.id]); }}
+									class="absolute right-2 top-2 flex h-5 w-5 items-center justify-center rounded-full text-slate-300 opacity-0 transition-opacity hover:bg-slate-200 hover:text-slate-500 group-hover:opacity-100"
+								>×</button>
+							</div>
+						{/each}
+					</div>
+				{/if}
+
+				{#if dismissedSuggestions.size > 0}
+					<div class="border-t border-slate-100 px-4 py-2 text-center">
+						<button onclick={() => dismissedSuggestions = new Set()} class="text-xs font-medium text-slate-400 hover:text-slate-600">
+							Show dismissed ({dismissedSuggestions.size})
+						</button>
+					</div>
+				{/if}
+			</div>
+			{/if}
 		</aside>
 
-		<div class="{mobileTab === 'preview' ? 'flex' : 'hidden'} sm:flex flex-1 flex-col overflow-hidden border-r border-slate-200 bg-slate-100">
+		<div class="{mobileTab === 'preview' ? 'flex' : 'hidden'} sm:flex flex-1 flex-col overflow-hidden border-r border-slate-200 bg-gradient-to-b from-slate-100 to-slate-200/70">
 			<div class="flex flex-shrink-0 items-center justify-between border-b border-slate-200 bg-white px-4 py-2">
 				<span class="text-sm font-bold text-slate-600">Preview</span>
 				<span class="text-xs text-slate-400">Click any text to edit · select text for AI ✦</span>
 			</div>
-			<div class="relative flex-1 overflow-hidden">
+			<div class="relative flex-1 overflow-hidden p-4 sm:p-5">
 				{#if pageLoading}
 					<div class="flex h-full items-center justify-center">
 						<p class="text-sm text-slate-400">Loading preview…</p>
 					</div>
 				{:else}
-					<iframe use:iframeEditor={renderedHTML} title="Portfolio Preview" class="h-full w-full border-0" sandbox="allow-scripts allow-same-origin"></iframe>
+					<div class="absolute inset-4 sm:inset-5 overflow-hidden rounded-2xl shadow-2xl ring-1 ring-black/[0.07]">
+						<iframe use:iframeEditor={renderedHTML} title="Portfolio Preview" class="h-full w-full border-0" style="overflow-y:scroll;scrollbar-width:none;-ms-overflow-style:none;" sandbox="allow-scripts allow-same-origin"></iframe>
+					</div>
 				{/if}
 			</div>
 		</div>
 
-		<div bind:this={rightPanelEl} class="{mobileTab === 'edit' ? 'flex' : 'hidden'} sm:flex w-full sm:w-[460px] sm:flex-shrink-0 flex-col overflow-y-auto">
-			<div class="p-4 sm:p-6 space-y-4">
+		<div bind:this={rightPanelEl} class="{mobileTab === 'edit' ? 'flex' : 'hidden'} sm:flex w-full sm:w-[460px] sm:flex-shrink-0 flex-col overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+			<div class="flex-shrink-0 p-4 sm:p-6 space-y-4">
 
 			{#if pageLoading}
 				<LoadingState size="lg" message="Loading your portfolio content…" />
@@ -1399,13 +2181,6 @@
 				{/if}
 
 				{#if activeTab === 'profile'}
-					{#if isProfileDirty}
-						<div class="sticky top-0 z-10 flex flex-col sm:flex-row items-center justify-between gap-4 rounded-2xl bg-slate-900 px-6 py-4 shadow-xl">
-							<p class="text-sm font-bold text-white">You have unsaved changes.</p>
-							<button onclick={saveAllProfile} disabled={isProfileSavingAny} class="w-full sm:w-auto rounded-xl bg-white px-5 py-2 text-sm font-bold text-slate-900 disabled:opacity-50">{isProfileSavingAny ? 'Saving…' : 'Save All Changes'}</button>
-						</div>
-					{/if}
-
 					<div class="space-y-8">
 					<div class="rounded-[1.5rem] border border-slate-100 bg-white p-6 shadow-sm">
 						<div class="mb-5 flex items-start justify-between">
@@ -1416,7 +2191,7 @@
 							{#if rawProfileStatus === 'saved'}<span class="flex-shrink-0 rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-600 ring-1 ring-emerald-100">Saved ✓</span>
 							{:else if rawProfileStatus === 'error'}<span class="flex-shrink-0 rounded-full bg-red-50 px-3 py-1 text-xs font-bold text-red-600 ring-1 ring-red-100">Error</span>{/if}
 						</div>
-						<div class="space-y-4">
+						<div class="space-y-4" onfocusout={(e) => { if (!(e.currentTarget as HTMLElement).contains(e.relatedTarget as Node | null)) autoSaveRawProfile(); }}>
 							<div><label for="rp-full-name" class="mb-1 block text-xs font-bold uppercase tracking-widest text-slate-500">Full Name</label><input id="rp-full-name" type="text" value={rawProfile.full_name} oninput={(e) => { rawProfile.full_name = (e.target as HTMLInputElement).value; }} maxlength={200} class="w-full rounded-xl border border-slate-200 bg-slate-50/50 px-4 py-3 text-sm text-slate-900 outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-400/30" /></div>
 							<div><label for="rp-headline" class="mb-1 block text-xs font-bold uppercase tracking-widest text-slate-500">Professional Title</label><input id="rp-headline" type="text" value={rawProfile.headline} oninput={(e) => { rawProfile.headline = (e.target as HTMLInputElement).value; }} maxlength={200} class="w-full rounded-xl border border-slate-200 bg-slate-50/50 px-4 py-3 text-sm text-slate-900 outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-400/30" /></div>
 							<div class="grid grid-cols-2 gap-4">
@@ -1435,11 +2210,39 @@
 									<div class="flex items-center gap-3"><span class="w-20 flex-shrink-0 text-xs font-bold text-slate-500">Twitter / X</span><input type="url" value={rawProfile.social_twitter} oninput={(e) => { rawProfile.social_twitter = (e.target as HTMLInputElement).value; }} placeholder="https://twitter.com/..." maxlength={500} class="min-w-0 flex-1 rounded-xl border border-slate-200 bg-slate-50/50 px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-400/30" /></div>
 								</div>
 							</div>
+							<div>
+								<p class="mb-2 text-xs font-bold uppercase tracking-widest text-slate-500">Profile Photo</p>
+								<div class="flex items-center gap-4">
+									{#if rawProfile.profile_image}
+										<img src={rawProfile.profile_image} alt="Profile" class="h-16 w-16 rounded-full object-cover ring-2 ring-slate-200" />
+									{:else}
+										<div class="flex h-16 w-16 flex-shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-400">
+											<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="h-8 w-8"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" /></svg>
+										</div>
+									{/if}
+									<div class="flex-1">
+										<label class="flex cursor-pointer items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm font-bold text-slate-700 hover:border-slate-400 hover:bg-white transition-colors">
+											<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="h-4 w-4 flex-shrink-0"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5m-13.5-9L12 3m0 0 4.5 4.5M12 3v13.5" /></svg>
+											{imageUploadStatus === 'uploading' ? 'Uploading…' : imageUploadStatus === 'done' ? 'Photo saved ✓' : rawProfile.profile_image ? 'Replace photo' : 'Upload photo'}
+											<input
+												type="file"
+												accept="image/jpeg,image/png,image/webp,image/gif"
+												style="position:fixed;top:-100px;left:-100px;opacity:0;pointer-events:none"
+												disabled={imageUploadStatus === 'uploading'}
+												onchange={(e) => {
+													const f = (e.target as HTMLInputElement).files?.[0];
+													if (f) uploadProfileImage(f);
+													(e.target as HTMLInputElement).value = '';
+												}}
+											/>
+										</label>
+										{#if imageUploadError}<p class="mt-1 text-xs font-bold text-red-500">{imageUploadError}</p>{/if}
+										<p class="mt-1 text-xs text-slate-400">JPEG, PNG, WebP or GIF</p>
+									</div>
+								</div>
+							</div>
 						</div>
 						{#if rawProfileError}<p class="mt-3 text-xs font-bold text-red-500">{rawProfileError}</p>{/if}
-						<div class="mt-5 flex justify-end">
-							<button type="button" onclick={saveRawProfile} disabled={!isRawProfileDirty || rawProfileStatus === 'saving'} class="rounded-xl bg-slate-900 px-5 py-2 text-sm font-bold text-white hover:bg-slate-800 disabled:opacity-40">{rawProfileStatus === 'saving' ? 'Saving…' : 'Save Profile Info'}</button>
-						</div>
 					</div>
 
 					<div><p class="mb-4 text-xs font-bold uppercase tracking-widest text-slate-400">Portfolio Content <span class="font-normal normal-case ml-1">— AI-generated, edit freely</span></p></div>
@@ -1453,22 +2256,19 @@
 								{:else if f.status === 'error'}<span class="flex-shrink-0 rounded-full bg-red-50 px-3 py-1 text-xs font-bold text-red-600 ring-1 ring-red-100">Error</span>{/if}
 							</div>
 							{#if multiline}
-								<textarea value={f.value} oninput={(e) => { profileFields[key].value = (e.target as HTMLTextAreaElement).value; }} rows={5} maxlength={limit} disabled={f.status === 'saving'} class="w-full resize-none rounded-xl border border-slate-200 bg-slate-50/50 px-4 py-3 text-sm text-slate-900 outline-none transition-all focus:border-slate-400 focus:bg-white focus:ring-2 focus:ring-slate-400/30 disabled:opacity-60"></textarea>
+								<textarea id="pf-{key}" value={f.value} oninput={(e) => { profileFields[key].value = (e.target as HTMLTextAreaElement).value; }} onblur={() => autoSaveProfileField(key)} rows={5} maxlength={limit} disabled={f.status === 'saving'} class="w-full resize-none rounded-xl border border-slate-200 bg-slate-50/50 px-4 py-3 text-sm text-slate-900 outline-none transition-all focus:border-slate-400 focus:bg-white focus:ring-2 focus:ring-slate-400/30 disabled:opacity-60"></textarea>
 							{:else}
-								<input type="text" value={f.value} oninput={(e) => { profileFields[key].value = (e.target as HTMLInputElement).value; }} maxlength={limit} disabled={f.status === 'saving'} class="w-full rounded-xl border border-slate-200 bg-slate-50/50 px-4 py-3 text-sm text-slate-900 outline-none transition-all focus:border-slate-400 focus:bg-white focus:ring-2 focus:ring-slate-400/30 disabled:opacity-60" />
+								<input id="pf-{key}" type="text" value={f.value} oninput={(e) => { profileFields[key].value = (e.target as HTMLInputElement).value; }} onblur={() => autoSaveProfileField(key)} maxlength={limit} disabled={f.status === 'saving'} class="w-full rounded-xl border border-slate-200 bg-slate-50/50 px-4 py-3 text-sm text-slate-900 outline-none transition-all focus:border-slate-400 focus:bg-white focus:ring-2 focus:ring-slate-400/30 disabled:opacity-60" />
 							{/if}
 							{#if f.errorMsg}<p class="mt-2 text-xs font-bold text-red-500">{f.errorMsg}</p>{/if}
 							<div class="mt-4 flex items-center justify-between">
 								<p class="text-xs text-slate-400">{f.value.length}/{limit}</p>
-								<div class="flex gap-2">
-									<button type="button" onclick={() => { profileFields[key].showAiPanel = !f.showAiPanel; }} class="rounded-xl border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-bold text-amber-700 hover:bg-amber-100">✦ AI Enhance</button>
-									<button type="button" onclick={() => saveProfileField(key)} disabled={f.value === f.original || f.status === 'saving'} class="rounded-xl bg-slate-900 px-4 py-1.5 text-xs font-bold text-white hover:bg-slate-800 disabled:opacity-40">{f.status === 'saving' ? 'Saving…' : 'Save'}</button>
-								</div>
+								<button type="button" onclick={() => { profileFields[key].showAiPanel = !f.showAiPanel; }} class="rounded-xl border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-bold text-amber-700 hover:bg-amber-100">✦ AI Enhance</button>
 							</div>
 							{#if f.showAiPanel}
-								<div class="mt-4 rounded-xl border border-amber-100 bg-amber-50/50 p-4">
+								<div data-profile-ai-panel="{key}" class="mt-4 rounded-xl border border-amber-100 bg-amber-50/50 p-4">
 									<p class="mb-2 text-xs font-bold text-amber-700 uppercase tracking-widest">AI Enhancement</p>
-									<textarea value={f.aiInstruction} oninput={(e) => { profileFields[key].aiInstruction = (e.target as HTMLTextAreaElement).value; }} rows={2} placeholder="e.g. Make it more concise and impactful..." class="w-full resize-none rounded-lg border border-amber-200 bg-white px-3 py-2 text-sm outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-300"></textarea>
+									<textarea use:autoResize value={f.aiInstruction} oninput={(e) => { profileFields[key].aiInstruction = (e.target as HTMLTextAreaElement).value; }} placeholder="e.g. Make it more concise and impactful..." class="w-full rounded-lg border border-amber-200 bg-white px-3 py-2 text-sm outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-300 overflow-hidden min-h-[60px]"></textarea>
 									{#if f.aiError}<p class="mt-2 text-xs font-bold text-red-500">{f.aiError}</p>{/if}
 									{#if f.aiSuggestion}
 										<div class="mt-3 rounded-lg border border-emerald-100 bg-emerald-50/50 p-3">
@@ -1482,7 +2282,7 @@
 									{/if}
 									<div class="mt-3 flex gap-2">
 										<button onclick={() => enhanceProfileField(key)} disabled={!f.aiInstruction.trim() || f.aiLoading} class="rounded-lg bg-amber-500 px-4 py-1.5 text-xs font-bold text-white hover:bg-amber-600 disabled:opacity-50 flex items-center gap-1.5">{#if f.aiLoading}<Spinner size="sm" />{/if}Generate</button>
-										<button onclick={() => { profileFields[key].showAiPanel = false; profileFields[key].aiSuggestion = null; profileFields[key].aiError = ''; }} class="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-bold text-slate-600 hover:bg-slate-100">Close</button>
+										<button onclick={() => { profileFields[key].showAiPanel = false; profileFields[key].aiSuggestion = null; profileFields[key].aiError = ''; profileFields[key].aiInstruction = ''; }} class="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-bold text-slate-600 hover:bg-slate-100">Close</button>
 									</div>
 								</div>
 							{/if}
@@ -1492,29 +2292,27 @@
 
 				{:else if activeTab === 'skills'}
 					<div class="space-y-4">
-						{#if isSkillsDirty}
-							<div class="sticky top-0 z-10 flex flex-col sm:flex-row items-center justify-between gap-4 rounded-2xl bg-slate-900 px-6 py-4 shadow-xl">
-								<p class="text-sm font-bold text-white">Unsaved changes in Skills.</p>
-								<button onclick={saveSkills} disabled={skillsStatus === 'saving'} class="w-full sm:w-auto rounded-xl bg-white px-5 py-2 text-sm font-bold text-slate-900 disabled:opacity-50">{skillsStatus === 'saving' ? 'Saving…' : 'Save Skills'}</button>
-							</div>
-						{/if}
 						{#each skillGroups as group, gi}
-							<div data-item-card="skills-{gi}" class="rounded-[1.5rem] border border-slate-100 bg-white p-6 shadow-sm">
-								<div class="mb-3 flex items-center gap-3">
-									<input type="text" value={group.category} oninput={(e) => updateSkillGroupCategory(gi, (e.target as HTMLInputElement).value)} placeholder="Category (e.g. Frontend, Backend)" class="min-w-0 flex-1 rounded-xl border border-slate-200 bg-slate-50/50 px-4 py-2 text-sm font-bold text-slate-900 outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-400/30" />
-									<button onclick={() => removeSkillGroup(gi)} class="flex-shrink-0 rounded-xl border border-red-100 bg-red-50 px-3 py-2 text-xs font-bold text-red-500 hover:bg-red-100">Remove</button>
+							<div data-item-card="skills-{gi}" class="rounded-[1.5rem] border border-slate-100 bg-white p-4 shadow-sm">
+								<div class="mb-3 flex items-center gap-2">
+									<!-- Reorder buttons -->
+									<div class="flex flex-shrink-0 flex-col">
+										<button type="button" onclick={() => moveSkillGroupUp(gi)} disabled={gi === 0} title="Move up" class="rounded p-0.5 text-slate-300 transition-colors hover:text-slate-600 disabled:opacity-20"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="h-3.5 w-3.5"><path stroke-linecap="round" stroke-linejoin="round" d="m4.5 15.75 7.5-7.5 7.5 7.5" /></svg></button>
+										<button type="button" onclick={() => moveSkillGroupDown(gi)} disabled={gi === skillGroups.length - 1} title="Move down" class="rounded p-0.5 text-slate-300 transition-colors hover:text-slate-600 disabled:opacity-20"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="h-3.5 w-3.5"><path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" /></svg></button>
+									</div>
+									<input type="text" value={group.category} oninput={(e) => updateSkillGroupCategory(gi, (e.target as HTMLInputElement).value)} onblur={autoSaveSkills} placeholder="Category (e.g. Frontend, Backend)" class="min-w-0 flex-1 rounded-xl border border-slate-200 bg-slate-50/50 px-4 py-2 text-sm font-bold text-slate-900 outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-400/30" />
+									<button onclick={() => { removeSkillGroup(gi); autoSaveSkills(); }} class="flex-shrink-0 rounded-xl border border-red-100 bg-red-50 px-3 py-2 text-xs font-bold text-red-500 hover:bg-red-100">Remove</button>
 								</div>
-								<textarea value={group.skills.join('\n')} oninput={(e) => updateSkillGroupSkills(gi, (e.target as HTMLTextAreaElement).value)} rows={3} placeholder="One skill per line&#10;e.g. React&#10;TypeScript&#10;Node.js" class="w-full resize-none rounded-xl border border-slate-200 bg-slate-50/50 px-4 py-3 text-sm text-slate-900 outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-400/30"></textarea>
+								<textarea value={group.skills.join('\n')} oninput={(e) => updateSkillGroupSkills(gi, (e.target as HTMLTextAreaElement).value)} onblur={autoSaveSkills} rows={3} placeholder="One skill per line&#10;e.g. React&#10;TypeScript&#10;Node.js" class="w-full resize-none rounded-xl border border-slate-200 bg-slate-50/50 px-4 py-3 text-sm text-slate-900 outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-400/30"></textarea>
 							</div>
 						{/each}
 						<div class="flex flex-wrap gap-3">
-							<button onclick={addSkillGroup} class="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 hover:border-slate-400 hover:bg-slate-50">+ Add Group</button>
+							<button onclick={() => { addSkillGroup(); }} class="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 hover:border-slate-400 hover:bg-slate-50">+ Add Group</button>
 							<button onclick={() => (showSkillsAiPanel = !showSkillsAiPanel)} class="rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm font-bold text-amber-700 hover:bg-amber-100">✦ Enhance with AI</button>
-							<button onclick={saveSkills} disabled={!isSkillsDirty || skillsStatus === 'saving'} class="ml-auto rounded-xl bg-slate-900 px-5 py-2.5 text-sm font-bold text-white disabled:opacity-40 hover:bg-slate-800">{skillsStatus === 'saving' ? 'Saving…' : skillsStatus === 'saved' ? 'Saved ✓' : 'Save Skills'}</button>
 						</div>
 						{#if skillsSaveError}<p class="text-xs font-bold text-red-500">{skillsSaveError}</p>{/if}
 						{#if showSkillsAiPanel}
-							<div class="rounded-xl border border-amber-100 bg-amber-50/50 p-4">
+							<div data-skills-ai-panel class="rounded-xl border border-amber-100 bg-amber-50/50 p-4">
 								<p class="mb-1 text-xs font-bold text-amber-700 uppercase tracking-widest">AI Skills Enhancement</p>
 								<p class="mb-3 text-xs text-amber-700/80">AI uses all your experience, projects, and certifications as context.</p>
 								<textarea value={skillsAiInstruction} oninput={(e) => { skillsAiInstruction = (e.target as HTMLTextAreaElement).value; }} rows={2} placeholder="e.g. Add more specific technical skills from my experience..." class="w-full resize-none rounded-lg border border-amber-200 bg-white px-3 py-2 text-sm outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-300"></textarea>
@@ -1543,48 +2341,103 @@
 					{@const sKey = activeTab}
 					{@const cfg = SECTION_CONFIG[sKey]}
 					{@const items = sections[sKey] ?? []}
-					{@const hasDirtyItems = items.some(it => it.isDirty)}
-					{@const isSavingAny = items.some(it => it.isSaving)}
-					<div class="space-y-4">
-						{#if hasDirtyItems}
-							<div class="sticky top-0 z-10 flex flex-col sm:flex-row items-center justify-between gap-4 rounded-2xl bg-slate-900 px-6 py-4 shadow-xl">
-								<p class="text-sm font-bold text-white">Unsaved {cfg.label} changes.</p>
-								<button onclick={() => saveAllItems(sKey)} disabled={isSavingAny} class="w-full sm:w-auto rounded-xl bg-white px-5 py-2 text-sm font-bold text-slate-900 disabled:opacity-50">{isSavingAny ? 'Saving…' : `Save ${cfg.label}`}</button>
-							</div>
-						{/if}
+					<div class="space-y-3">
+						<div class="flex items-center gap-3 pb-1">
+							<h2 class="text-base font-bold text-slate-900">{cfg.label}</h2>
+							{#if items.length > 0}
+								<span class="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-bold tabular-nums text-slate-500">{items.length}</span>
+							{/if}
+						</div>
 						{#each items as item, idx}
-							<div data-item-card="{sKey}-{idx}" class="overflow-hidden rounded-[1.5rem] border border-slate-100 bg-white shadow-sm">
-								<div class="flex w-full items-center justify-between px-6 py-4">
-									<button type="button" onclick={() => toggleItemExpand(sKey, idx)} class="flex min-w-0 flex-1 items-center gap-3 text-left">
+							<div data-item-card="{sKey}-{idx}" class="overflow-hidden rounded-[1.5rem] border bg-white shadow-sm transition-all {item.hidden ? 'border-slate-200 opacity-60' : item.expanded ? 'border-slate-300 shadow-md' : 'border-slate-200 hover:shadow-md'}">
+								<div class="flex w-full items-center gap-2 px-4 py-3">
+									<!-- Expand/collapse + title -->
+									<button type="button" onclick={() => toggleItemExpand(sKey, idx)} class="flex min-w-0 flex-1 items-center gap-2 text-left">
 										<div class="min-w-0 flex-1">
-											<p class="text-sm font-bold text-slate-900">{cfg.itemTitle(item.data, idx)}</p>
-											{#if item.isDirty}<span class="mt-0.5 inline-block text-xs font-bold text-amber-600">Unsaved changes</span>
-											{:else if item.saveSuccess}<span class="mt-0.5 inline-block text-xs font-bold text-emerald-600">Saved ✓</span>{/if}
+											<p class="truncate text-sm font-bold text-slate-900 {item.hidden ? 'line-through text-slate-400' : ''}">{cfg.itemTitle(item.data, idx)}</p>
+											{#if item.hidden}<span class="mt-0.5 inline-block text-xs font-bold text-slate-400">Hidden</span>
+											{:else if item.isSaving}<span class="mt-0.5 inline-block text-xs font-bold text-slate-400">Saving…</span>
+											{:else if item.saveSuccess}<span class="mt-0.5 inline-block text-xs font-bold text-emerald-600">Saved ✓</span>
+											{:else if item.saveError}<span class="mt-0.5 inline-block text-xs font-bold text-red-500">Save failed</span>{/if}
 										</div>
 										<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="h-4 w-4 flex-shrink-0 text-slate-400 transition-transform {item.expanded ? 'rotate-180' : ''}"><path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" /></svg>
 									</button>
-									<button type="button" onclick={() => promptDeleteItem(sKey, idx)} class="ml-3 flex-shrink-0 rounded-lg border border-red-100 bg-red-50 px-2.5 py-1 text-xs font-bold text-red-500 hover:bg-red-100">Delete</button>
+									<!-- Reorder buttons -->
+									<div class="flex flex-shrink-0 flex-col">
+										<button type="button" onclick={() => moveItemUp(sKey, idx)} disabled={idx === 0} title="Move up" class="rounded p-0.5 text-slate-300 transition-colors hover:text-slate-600 disabled:opacity-20"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="h-3.5 w-3.5"><path stroke-linecap="round" stroke-linejoin="round" d="m4.5 15.75 7.5-7.5 7.5 7.5" /></svg></button>
+										<button type="button" onclick={() => moveItemDown(sKey, idx)} disabled={idx === items.length - 1} title="Move down" class="rounded p-0.5 text-slate-300 transition-colors hover:text-slate-600 disabled:opacity-20"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="h-3.5 w-3.5"><path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" /></svg></button>
+									</div>
+									<!-- Hide toggle -->
+									<button type="button" onclick={() => toggleItemHidden(sKey, idx)} title={item.hidden ? 'Show in portfolio' : 'Hide from portfolio'} class="flex-shrink-0 rounded-lg border p-1.5 transition-colors {item.hidden ? 'border-slate-200 bg-slate-100 text-slate-400 hover:bg-slate-200' : 'border-slate-200 text-slate-400 hover:bg-slate-100 hover:text-slate-600'}">
+										{#if item.hidden}
+											<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="h-3.5 w-3.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3.98 8.223A10.477 10.477 0 0 0 1.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.451 10.451 0 0 1 12 4.5c4.756 0 8.773 3.162 10.065 7.498a10.522 10.522 0 0 1-4.293 5.774M6.228 6.228 3 3m3.228 3.228 3.65 3.65m7.894 7.894L21 21m-3.228-3.228-3.65-3.65m0 0a3 3 0 1 0-4.243-4.243m4.242 4.242L9.88 9.88" /></svg>
+										{:else}
+											<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="h-3.5 w-3.5"><path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" /><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" /></svg>
+										{/if}
+									</button>
+									<!-- Delete -->
+									<button type="button" onclick={() => promptDeleteItem(sKey, idx)} class="flex-shrink-0 rounded-lg border border-red-100 bg-red-50 px-2 py-1 text-xs font-bold text-red-500 hover:bg-red-100">Delete</button>
 								</div>
 								{#if item.expanded}
-									<div class="space-y-4 border-t border-slate-100 px-6 pb-6 pt-4">
+									{@const enhanceable = cfg.fields.filter((f) => f.aiEnhanceable)}
+									<div class="space-y-4 border-t border-slate-100 bg-slate-50/40 px-6 pb-6 pt-4">
 										{#each cfg.fields as field}
 											<div>
-												<label class="mb-1 block text-xs font-bold uppercase tracking-widest text-slate-500">{field.label}</label>
-												{#if field.inputType === 'textarea' || field.inputType === 'list'}
-													<textarea value={getFieldValue(item.data, field.key, field.inputType)} oninput={(e) => setFieldValue(sKey, idx, field.key, field.inputType, (e.target as HTMLTextAreaElement).value)} rows={field.inputType === 'list' ? 3 : 4} maxlength={field.limit} placeholder={field.placeholder ?? (field.inputType === 'list' ? 'One item per line' : '')} class="w-full resize-none rounded-xl border border-slate-200 bg-slate-50/50 px-4 py-3 text-sm text-slate-900 outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-400/30"></textarea>
+												{#if field.inputType === 'images'}
+													{@const stateKey = `${sKey}-${idx}`}
+													{@const imgs = (item.data[field.key] as string[]) ?? []}
+													<p class="mb-2 text-xs font-bold uppercase tracking-widest text-slate-500">{field.label}</p>
+													{#if imgs.length > 0}
+														<div class="mb-3 grid grid-cols-3 gap-2">
+															{#each imgs as imgUrl, imgIdx}
+																<div class="relative">
+																	<img src={imgUrl} alt="Uploaded" class="h-20 w-full rounded-xl object-cover ring-1 ring-slate-200" />
+																	<button
+																		type="button"
+																		aria-label="Remove image"
+																		onclick={() => removeSectionImage(sKey, idx, imgIdx)}
+																		class="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-xs font-bold text-white hover:bg-red-600"
+																	>×</button>
+																</div>
+															{/each}
+														</div>
+													{/if}
+													{#if imgs.length < MAX_ITEM_IMAGES}
+														<label class="flex cursor-pointer items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm font-bold text-slate-700 hover:border-slate-400 hover:bg-white transition-colors">
+															<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="h-4 w-4 flex-shrink-0"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5m-13.5-9L12 3m0 0 4.5 4.5M12 3v13.5" /></svg>
+															{itemImageUploadStatus[stateKey] === 'uploading' ? 'Uploading…' : `Add image (${imgs.length}/${MAX_ITEM_IMAGES})`}
+															<input
+																type="file"
+																accept="image/jpeg,image/png,image/webp,image/gif"
+																style="position:fixed;top:-100px;left:-100px;opacity:0;pointer-events:none"
+																disabled={itemImageUploadStatus[stateKey] === 'uploading'}
+																onchange={(e) => {
+																	const f = (e.target as HTMLInputElement).files?.[0];
+																	if (f) uploadSectionImage(sKey, idx, f);
+																	(e.target as HTMLInputElement).value = '';
+																}}
+															/>
+														</label>
+													{:else}
+														<p class="text-xs text-slate-400">Maximum {MAX_ITEM_IMAGES} images reached</p>
+													{/if}
+													{#if itemImageUploadError[stateKey]}<p class="mt-1 text-xs font-bold text-red-500">{itemImageUploadError[stateKey]}</p>{/if}
 												{:else}
-													<input type={field.inputType === 'url' ? 'url' : 'text'} value={getFieldValue(item.data, field.key, field.inputType)} oninput={(e) => setFieldValue(sKey, idx, field.key, field.inputType, (e.target as HTMLInputElement).value)} maxlength={field.limit} placeholder={field.placeholder ?? ''} class="w-full rounded-xl border border-slate-200 bg-slate-50/50 px-4 py-3 text-sm text-slate-900 outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-400/30" />
+													<label for="{sKey}-{idx}-{field.key}" class="mb-1 block text-xs font-bold uppercase tracking-widest text-slate-500">{field.label}</label>
+													{#if field.inputType === 'textarea' || field.inputType === 'list'}
+														<textarea id="{sKey}-{idx}-{field.key}" value={getFieldValue(item.data, field.key, field.inputType)} oninput={(e) => setFieldValue(sKey, idx, field.key, field.inputType, (e.target as HTMLTextAreaElement).value)} onblur={() => autoSaveItem(sKey, idx)} rows={field.inputType === 'list' ? 3 : 4} maxlength={field.limit} placeholder={field.placeholder ?? (field.inputType === 'list' ? 'One item per line' : '')} class="w-full resize-none rounded-xl border border-slate-200 bg-slate-50/50 px-4 py-3 text-sm text-slate-900 outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-400/30"></textarea>
+													{:else}
+														<input id="{sKey}-{idx}-{field.key}" type={field.inputType === 'url' ? 'url' : 'text'} value={getFieldValue(item.data, field.key, field.inputType)} oninput={(e) => setFieldValue(sKey, idx, field.key, field.inputType, (e.target as HTMLInputElement).value)} onblur={() => autoSaveItem(sKey, idx)} maxlength={field.limit} placeholder={field.placeholder ?? ''} class="w-full rounded-xl border border-slate-200 bg-slate-50/50 px-4 py-3 text-sm text-slate-900 outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-400/30" />
+													{/if}
 												{/if}
 											</div>
 										{/each}
 										{#if item.saveError}<p class="text-xs font-bold text-red-500">{item.saveError}</p>{/if}
-										{@const enhanceable = cfg.fields.filter((f) => f.aiEnhanceable)}
-										<div class="flex items-center gap-2 pt-2">
-											<button onclick={() => saveItem(sKey, idx)} disabled={!item.isDirty || item.isSaving} class="rounded-xl bg-slate-900 px-4 py-2 text-sm font-bold text-white hover:bg-slate-800 disabled:opacity-40">{item.isSaving ? 'Saving…' : 'Save'}</button>
-											{#if enhanceable.length > 0}
+										{#if enhanceable.length > 0}
+										<div class="flex items-center pt-2">
 											<button onclick={() => toggleItemAiPanel(sKey, idx)} class="rounded-xl border border-amber-200 bg-amber-50 px-4 py-2 text-sm font-bold text-amber-700 hover:bg-amber-100">✦ AI Enhance</button>
-											{/if}
 										</div>
+										{/if}
 										{#if item.showAiPanel && enhanceable.length > 0}
 											<div data-ai-panel="{sKey}-{idx}" class="mt-2 rounded-xl border border-amber-100 bg-amber-50/50 p-4">
 												<p class="mb-3 text-xs font-bold uppercase tracking-widest text-amber-700">AI Enhancement</p>
@@ -1593,7 +2446,7 @@
 												{:else if enhanceable.length === 1}
 													<p class="mb-2 text-xs text-amber-700">Enhancing: <strong>{enhanceable[0].label}</strong></p>
 												{/if}
-												<textarea value={item.aiInstruction} oninput={(e) => setItemAiInstruction(sKey, idx, (e.target as HTMLTextAreaElement).value)} rows={2} placeholder="e.g. Make it more impactful with measurable results..." class="w-full resize-none rounded-lg border border-amber-200 bg-white px-3 py-2 text-sm outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-300"></textarea>
+												<textarea use:autoResize value={item.aiInstruction} oninput={(e) => setItemAiInstruction(sKey, idx, (e.target as HTMLTextAreaElement).value)} placeholder="e.g. Make it more impactful with measurable results..." class="w-full rounded-lg border border-amber-200 bg-white px-3 py-2 text-sm outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-300 overflow-hidden min-h-[60px]"></textarea>
 												{#if item.aiError}<p class="mt-2 text-xs font-bold text-red-500">{item.aiError}</p>{/if}
 												{#if item.aiSuggestion}
 													<div class="mt-3 rounded-lg border border-emerald-100 bg-emerald-50/50 p-3">
@@ -1616,7 +2469,10 @@
 								{/if}
 							</div>
 						{/each}
-						<button onclick={() => addItem(sKey)} class="flex w-full items-center justify-center gap-2 rounded-[1.5rem] border-2 border-dashed border-slate-200 bg-white py-5 text-sm font-bold text-slate-500 transition-all hover:border-slate-400 hover:text-slate-900">+ Add {cfg.label.replace(/s$/, '')}</button>
+						<button onclick={() => addItem(sKey)} class="flex w-full items-center justify-center gap-2 rounded-[1.5rem] border-2 border-dashed border-slate-200 bg-white py-4 text-sm font-bold text-slate-400 transition-all hover:border-slate-400 hover:bg-slate-50 hover:text-slate-700">
+							<span class="flex h-6 w-6 items-center justify-center rounded-full bg-slate-100 text-base font-bold leading-none transition-colors group-hover:bg-slate-200">+</span>
+							Add {cfg.label.replace(/s$/, '')}
+						</button>
 					</div>
 
 				{:else if SECTION_CONFIG[activeTab]?.type === 'string' || SECTION_CONFIG[activeTab]?.type === 'list'}
@@ -1626,13 +2482,11 @@
 					<div class="rounded-[1.5rem] border border-slate-100 bg-white p-6 shadow-sm">
 						<p class="mb-2 text-xs font-bold uppercase tracking-widest text-slate-400">{cfg.label}</p>
 						{#if cfg.type === 'list'}<p class="mb-3 text-xs text-slate-400">Enter one item per line.</p>{/if}
-						<textarea value={stringSections[sKey] ?? ''} oninput={(e) => { stringSections = { ...stringSections, [sKey]: (e.target as HTMLTextAreaElement).value }; }} rows={6} class="w-full resize-none rounded-xl border border-slate-200 bg-slate-50/50 px-4 py-3 text-sm text-slate-900 outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-400/30"></textarea>
-						<div class="mt-4 flex items-center justify-between">
-							<div>
-								{#if stringSectionStatus[sKey] === 'error'}<p class="text-xs font-bold text-red-500">Save failed. Please try again.</p>
-								{:else if stringSectionStatus[sKey] === 'saved'}<p class="text-xs font-bold text-emerald-600">Saved ✓</p>{/if}
-							</div>
-							<button onclick={() => saveStringSection(sKey)} disabled={!isDirtyStr || stringSectionStatus[sKey] === 'saving'} class="rounded-xl bg-slate-900 px-5 py-2 text-sm font-bold text-white hover:bg-slate-800 disabled:opacity-40">{stringSectionStatus[sKey] === 'saving' ? 'Saving…' : 'Save'}</button>
+						<textarea value={stringSections[sKey] ?? ''} oninput={(e) => { stringSections = { ...stringSections, [sKey]: (e.target as HTMLTextAreaElement).value }; }} onblur={() => autoSaveStringSection(sKey)} rows={6} class="w-full resize-none rounded-xl border border-slate-200 bg-slate-50/50 px-4 py-3 text-sm text-slate-900 outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-400/30"></textarea>
+						<div class="mt-3">
+							{#if stringSectionStatus[sKey] === 'error'}<p class="text-xs font-bold text-red-500">Save failed. Please try again.</p>
+							{:else if stringSectionStatus[sKey] === 'saving'}<p class="text-xs font-bold text-slate-400">Saving…</p>
+							{:else if stringSectionStatus[sKey] === 'saved'}<p class="text-xs font-bold text-emerald-600">Saved ✓</p>{/if}
 						</div>
 					</div>
 				{/if}
@@ -1697,7 +2551,7 @@
 						class="min-w-0 flex-1 bg-transparent py-1.5 text-sm text-slate-800 outline-none placeholder:text-slate-300"
 					/>
 					{#if listEditor.items.length > 1}
-						<button onclick={() => removeListItem(i)} class="flex-shrink-0 rounded p-0.5 text-slate-200 opacity-0 hover:text-red-400 group-hover:opacity-100">
+						<button onclick={() => removeListItem(i)} aria-label="Remove item" class="flex-shrink-0 rounded p-0.5 text-slate-200 opacity-0 hover:text-red-400 group-hover:opacity-100">
 							<svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" /></svg>
 						</button>
 					{/if}

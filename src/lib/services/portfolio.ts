@@ -216,6 +216,67 @@ export async function publishPortfolio(userId: string): Promise<ServiceResult> {
 	}
 }
 
+// Image upload
+
+/**
+ * Request a presigned PUT URL for uploading a portfolio image asset.
+ * Returns uploadUrl (PUT to S3 directly) and imageUrl (CloudFront URL to persist).
+ */
+export async function getImageUploadUrl(
+	userId: string,
+	contentType: string
+): Promise<ServiceResult<{ uploadUrl: string; imageUrl: string; expiresIn: number }>> {
+	try {
+		const res = await fetch(`/api/portfolio/${userId}/image-upload-url`, {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ contentType })
+		});
+		if (!res.ok) {
+			const err = await res.json().catch(() => ({}));
+			return { ok: false, error: (err as { error?: string }).error ?? 'Failed to get upload URL' };
+		}
+		return { ok: true, data: await res.json() };
+	} catch {
+		return { ok: false, error: 'Network error' };
+	}
+}
+
+// LLM portfolio suggestions
+
+export interface LlmSuggestion {
+	id: string;
+	section: string;
+	index?: number;
+	field?: string;
+	profileKey?: string;
+	label: string;
+	sublabel: string;
+	instruction: string;
+	priority: 'high' | 'medium' | 'low';
+}
+
+export async function getAiSuggestions(
+	userId: string,
+	currentState?: { parsedData: unknown; portfolioContent: unknown; category?: string }
+): Promise<ServiceResult<{ suggestions: LlmSuggestion[] }>> {
+	try {
+		const res = await fetch(`/api/portfolio/${userId}/ai-enhance`, {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({
+				action: 'analyze_and_suggest',
+				...(currentState ?? {})
+			})
+		});
+		if (!res.ok) return { ok: false, error: 'Failed to get suggestions' };
+		const json = await res.json();
+		return { ok: true, data: { suggestions: json.suggestions ?? [] } };
+	} catch {
+		return { ok: false, error: 'Network error' };
+	}
+}
+
 // URL helpers
 
 export function getPortfolioDraftUrl(userId: string, cloudFrontDomain: string): string {

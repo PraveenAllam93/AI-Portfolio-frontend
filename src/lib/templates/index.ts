@@ -10,30 +10,28 @@
 import { normalize } from './base';
 import type { ParsedData, PortfolioContent } from '$lib/types/portfolio';
 
-import { html as minimalHtml }   from './minimal';
-import { html as modernHtml }    from './modern';
-import { html as boldHtml }      from './bold';
-import { html as creativeHtml }  from './creative';
-import { html as auroraHtml }    from './aurora';
-import { html as executiveHtml } from './executive';
-import { html as luxuryHtml }    from './luxury';
 import { html as nebulaHtml }    from './nebula';
+import { html as galaxyHtml }   from './galaxy';
+import { html as codexHtml }    from './codex';
+import { html as neonHtml }     from './neon';
+import { html as circuitHtml }  from './circuit';
+import { html as navyGoldHtml } from './navy-gold';
+import { html as cosmosHtml }   from './cosmos';
 
 type TemplateRenderer = (v: ReturnType<typeof normalize>) => string;
 
 const TEMPLATES: Record<string, TemplateRenderer> = {
-	minimal:   minimalHtml,
-	modern:    modernHtml,
-	bold:      boldHtml,
-	creative:  creativeHtml,
-	aurora:    auroraHtml,
-	executive: executiveHtml,
-	luxury:    luxuryHtml,
-	nebula:    nebulaHtml,
+	nebula:      nebulaHtml,
+	galaxy:      galaxyHtml,
+	codex:       codexHtml,
+	neon:        neonHtml,
+	circuit:     circuitHtml,
+	'navy-gold': navyGoldHtml,
+	cosmos:      cosmosHtml,
 };
 
 /** Default template used when templateId is missing or unknown. */
-const DEFAULT_TEMPLATE = 'modern';
+const DEFAULT_TEMPLATE = 'neon';
 
 export function renderPortfolio(
 	templateId: string | undefined | null,

@@ -12,9 +12,15 @@ export const GET: RequestHandler = async ({ params, cookies }) => {
 	if (!apiBase) throw error(500, 'API_BASE_URL is not configured');
 
 	const idToken = cookies.get('id_token') ?? '';
-	const upstream = await fetch(`${apiBase}/portfolio/${params.userId}`, {
-		headers: { Authorization: `Bearer ${idToken}` }
-	});
+
+	let upstream: Response;
+	try {
+		upstream = await fetch(`${apiBase}/portfolio/${params.userId}`, {
+			headers: { Authorization: `Bearer ${idToken}` }
+		});
+	} catch {
+		throw error(503, 'Portfolio service unavailable');
+	}
 
 	if (!upstream.ok) throw error(upstream.status, 'Failed to fetch portfolio');
 	return json(await upstream.json());
