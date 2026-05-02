@@ -5,6 +5,8 @@
 @theme {
 	--font-serif: 'Playfair Display', serif;
 	--font-sans: 'Inter', system-ui, sans-serif;
+	--font-display: 'Space Grotesk', sans-serif;
+	--font-body-dm: 'DM Sans', sans-serif;
 
 	/* Brand */
 	--color-brand: #7c3aed;
@@ -26,6 +28,23 @@
 	--color-accent-amber: #f59e0b;
 	--color-accent-rose: #f43f5e;
 	--color-accent-cyan: #06b6d4;
+
+	/* Marketing warm palette */
+	--color-warm-ink: #1a1a1a;
+	--color-warm-muted: #6b6b7b;
+	--color-warm-dim: #9999aa;
+	--color-warm-cream: #f5f0ea;
+	--color-warm-cream2: #f0ebe3;
+	--color-warm-border: #e2ddd6;
+	--color-warm-border-dark: #c8c2b8;
+	--color-warm-coral: #ff5c3a;
+	--color-warm-amber: #f5a623;
+	--color-warm-mint: #00c896;
+	--color-warm-indigo: #5b3fd4;
+	--color-warm-peach: #fdf0ea;
+	--color-warm-mint-bg: #eaf7f2;
+	--color-warm-lav: #eeeaf8;
+	--color-warm-yellow: #fdf6e3;
 }
 
 html {
@@ -130,6 +149,24 @@ body {
 [data-pause]:hover .animate-marquee-slow,
 [data-pause]:hover .animate-marquee-reverse {
 	animation-play-state: paused;
+}
+
+/* ── Marketing bob animation ─────────────────────────── */
+@keyframes bob {
+	0%, 100% { transform: translateY(0); }
+	50% { transform: translateY(-7px); }
+}
+@keyframes fadeInUp {
+	from { opacity: 0; transform: translateY(8px); }
+	to { opacity: 1; transform: none; }
+}
+@keyframes pulse-dot {
+	0%, 100% { opacity: 1; }
+	50% { opacity: 0.3; }
+}
+@keyframes prog-fill {
+	from { width: 0; }
+	to { width: 88%; }
 }
 
 /* ── Reduced motion ──────────────────────────────────── */

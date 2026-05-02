@@ -1,34 +1,186 @@
-<script lang="ts">
-	import { reveal } from '$lib/actions/animate';
-</script>
-
-<section class="bg-surface-subtle py-24 md:py-32">
-	<div class="mx-auto max-w-5xl px-6">
-		<div class="relative overflow-hidden rounded-[3rem] bg-slate-900 px-8 py-20 text-center shadow-2xl md:px-20 md:py-24">
-			<!-- Subtle glow background within the card -->
-			<div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-[radial-gradient(circle,rgba(255,255,255,0.05)_0%,transparent_70%)] pointer-events-none"></div>
-			
-			<div class="relative z-10" use:reveal>
-				<h2 class="font-serif text-4xl leading-tight font-bold text-white md:text-6xl">
-					Ready to build your <br/> <span class="italic text-slate-400 text-3xl md:text-5xl">online presence?</span>
-				</h2>
-				<p class="mx-auto mt-8 max-w-xl text-lg text-slate-300">
-					Join professionals worldwide who have traded complex website builders for an instant, AI-crafted portfolio. 
-				</p>
-
-				<div class="mt-12 flex justify-center">
-					<a
-						href="/signup"
-						class="group flex items-center gap-2 rounded-full bg-white px-8 py-4 text-sm font-bold text-slate-900 shadow-xl transition-all hover:scale-105 hover:bg-slate-100 active:scale-95"
-					>
-						Create your portfolio
-						<svg class="h-4 w-4 transition-transform group-hover:translate-x-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3" />
-						</svg>
-					</a>
+<section id="upload-cta">
+	<div class="ucta-inner">
+		<div class="sec-lbl">
+			<span class="lbl-dot"></span>TRY IT FREE. NO ACCOUNT NEEDED
+		</div>
+		<h2 class="ucta-h">Upload your CV. Watch it become a portfolio.</h2>
+		<p class="ucta-sub">Under 30 seconds. Zero design decisions. Zero writing. Just upload.</p>
+		<div class="upload-box">
+			<div class="ub-ttl">Get started in seconds</div>
+			<div class="ub-sub">Drop your CV below. AI reads it and builds your full portfolio for free.</div>
+			<div class="drop">
+				<div class="drop-ico">📄</div>
+				<div class="drop-ttl">Drag &amp; drop your CV here</div>
+				<div class="drop-sub">or click to browse your files</div>
+				<div class="drop-tags">
+					<span class="dtag">PDF</span>
+					<span class="dtag">DOCX</span>
+					<span class="dtag">LinkedIn URL</span>
+					<span class="dtag">TXT</span>
 				</div>
-                <p class="mt-6 text-xs text-slate-400 font-medium">Free to start. No credit card required.</p>
 			</div>
+			<div class="ucta-btns">
+				<a href="/signup" class="btn-gen">✨ Build My Portfolio — Try Now</a>
+				<a href="/app/dashboard" class="btn-eg">👀 See an example portfolio</a>
+			</div>
+			<div class="upload-priv">🔒 Your resume is never stored, shared, or sold.</div>
 		</div>
 	</div>
 </section>
+
+<style>
+	section {
+		background: var(--color-warm-lav);
+		padding: 88px 48px;
+	}
+	.ucta-inner {
+		max-width: 580px;
+		margin: 0 auto;
+		text-align: center;
+	}
+	.sec-lbl {
+		display: inline-flex;
+		align-items: center;
+		gap: 7px;
+		font-size: 10px;
+		font-weight: 700;
+		letter-spacing: 0.14em;
+		text-transform: uppercase;
+		color: var(--color-warm-muted);
+		margin-bottom: 16px;
+	}
+	.lbl-dot {
+		width: 5px;
+		height: 5px;
+		background: var(--color-warm-coral);
+		border-radius: 50%;
+	}
+	.ucta-h {
+		font-family: var(--font-display);
+		font-size: clamp(26px, 4vw, 48px);
+		font-weight: 800;
+		letter-spacing: -0.03em;
+		line-height: 1.08;
+		margin-bottom: 10px;
+		color: var(--color-warm-ink);
+	}
+	.ucta-sub {
+		font-size: 15px;
+		color: var(--color-warm-muted);
+		margin-bottom: 32px;
+	}
+	.upload-box {
+		background: #fff;
+		border-radius: 16px;
+		padding: 32px;
+		box-shadow: 0 6px 32px rgba(0, 0, 0, 0.09);
+		border: 1px solid var(--color-warm-border);
+	}
+	.ub-ttl {
+		font-family: var(--font-display);
+		font-weight: 700;
+		font-size: 17px;
+		letter-spacing: -0.01em;
+		margin-bottom: 5px;
+		color: var(--color-warm-ink);
+	}
+	.ub-sub {
+		font-size: 13px;
+		color: var(--color-warm-muted);
+		margin-bottom: 20px;
+	}
+	.drop {
+		border: 1.5px dashed var(--color-warm-border-dark);
+		border-radius: 12px;
+		padding: 28px;
+		cursor: pointer;
+		transition: border-color 0.2s, background 0.2s;
+		margin-bottom: 14px;
+	}
+	.drop:hover {
+		border-color: var(--color-warm-indigo);
+		background: var(--color-warm-lav);
+	}
+	.drop-ico {
+		font-size: 28px;
+		margin-bottom: 7px;
+	}
+	.drop-ttl {
+		font-family: var(--font-display);
+		font-weight: 700;
+		font-size: 14px;
+		margin-bottom: 2px;
+		color: var(--color-warm-ink);
+	}
+	.drop-sub {
+		font-size: 12px;
+		color: var(--color-warm-muted);
+	}
+	.drop-tags {
+		display: flex;
+		gap: 6px;
+		justify-content: center;
+		margin-top: 10px;
+		flex-wrap: wrap;
+	}
+	.dtag {
+		font-size: 10px;
+		font-weight: 600;
+		background: var(--color-warm-cream);
+		border: 1px solid var(--color-warm-border);
+		border-radius: 100px;
+		padding: 3px 10px;
+		color: var(--color-warm-muted);
+	}
+	.ucta-btns {
+		display: flex;
+		gap: 8px;
+		margin-bottom: 8px;
+	}
+	.btn-gen {
+		flex: 1;
+		font-family: var(--font-body-dm);
+		font-size: 14px;
+		font-weight: 700;
+		color: #fff;
+		background: var(--color-warm-ink);
+		border: none;
+		cursor: pointer;
+		padding: 13px;
+		border-radius: 100px;
+		text-decoration: none;
+		text-align: center;
+		transition: transform 0.15s, box-shadow 0.15s;
+	}
+	.btn-gen:hover {
+		transform: translateY(-2px);
+		box-shadow: 0 10px 26px rgba(0, 0, 0, 0.2);
+	}
+	.btn-eg {
+		flex: 1;
+		font-family: var(--font-body-dm);
+		font-size: 14px;
+		font-weight: 600;
+		color: var(--color-warm-ink);
+		background: none;
+		border: 1.5px solid var(--color-warm-border-dark);
+		cursor: pointer;
+		padding: 13px;
+		border-radius: 100px;
+		text-decoration: none;
+		text-align: center;
+		transition: border-color 0.2s;
+	}
+	.btn-eg:hover {
+		border-color: var(--color-warm-ink);
+	}
+	.upload-priv {
+		font-size: 11px;
+		color: var(--color-warm-dim);
+	}
+
+	@media (max-width: 900px) {
+		section { padding: 56px 24px; }
+		.ucta-btns { flex-direction: column; }
+	}
+</style>
