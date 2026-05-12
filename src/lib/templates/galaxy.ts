@@ -7,7 +7,7 @@
  */
 
 import type { NormalizedData } from './base';
-import { DEFAULT_SECTION_ORDER, _editable, _listEditable, EDITOR_SCRIPT } from './base';
+import { DEFAULT_SECTION_ORDER, _editable, _listEditable, EDITOR_SCRIPT, makePublishHelpers } from './base';
 
 const FONTS_URL =
 	'https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap';
@@ -232,7 +232,9 @@ footer { display: none; }
 `;
 }
 
-export function html(v: NormalizedData): string {
+export function html(v: NormalizedData, publishMode = false): string {
+	// eslint-disable-next-line no-shadow
+	const { editable: _editable, listEditable: _listEditable, editorScript: EDITOR_SCRIPT, cspMeta, publishStyles } = makePublishHelpers(publishMode);
 	const order = v.section_order?.length ? v.section_order : DEFAULT_SECTION_ORDER;
 	const hidden = v.hidden_sections ?? new Set<string>();
 
@@ -481,6 +483,8 @@ ${socialHtml ? `<div class="social-links">${socialHtml}</div>` : ''}
 	return `<!DOCTYPE html>
 <html lang="en">
 <head>
+${cspMeta}
+${publishStyles}
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>${v.name} - Portfolio</title>

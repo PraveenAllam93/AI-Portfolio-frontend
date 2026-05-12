@@ -7,7 +7,7 @@
  */
 
 import type { NormalizedData } from './base';
-import { DEFAULT_SECTION_ORDER, _editable, _listEditable, EDITOR_SCRIPT } from './base';
+import { DEFAULT_SECTION_ORDER, _editable, _listEditable, EDITOR_SCRIPT, makePublishHelpers } from './base';
 
 const FONTS_URL =
 	'https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400&display=swap';
@@ -316,7 +316,9 @@ function projBannerGradient(p: NormalizedData['projects'][number]): string {
 	return 'linear-gradient(135deg,rgba(12,31,63,.85),rgba(200,169,110,.15))';
 }
 
-export function html(v: NormalizedData): string {
+export function html(v: NormalizedData, publishMode = false): string {
+	// eslint-disable-next-line no-shadow
+	const { editable: _editable, listEditable: _listEditable, editorScript: EDITOR_SCRIPT, cspMeta, publishStyles } = makePublishHelpers(publishMode);
 	const order = v.section_order?.length ? v.section_order : DEFAULT_SECTION_ORDER;
 	const hidden = v.hidden_sections ?? new Set<string>();
 
@@ -586,6 +588,8 @@ ${v.location ? `<div class="ct-item"><div class="ct-label">Location</div><div cl
 	return `<!DOCTYPE html>
 <html lang="en">
 <head>
+${cspMeta}
+${publishStyles}
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>${v.name} - Portfolio</title>

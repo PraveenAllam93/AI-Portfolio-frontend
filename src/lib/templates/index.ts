@@ -18,7 +18,7 @@ import { html as circuitHtml }  from './circuit';
 import { html as navyGoldHtml } from './navy-gold';
 import { html as cosmosHtml }   from './cosmos';
 
-type TemplateRenderer = (v: ReturnType<typeof normalize>) => string;
+type TemplateRenderer = (v: ReturnType<typeof normalize>, publishMode?: boolean) => string;
 
 const TEMPLATES: Record<string, TemplateRenderer> = {
 	nebula:      nebulaHtml,
@@ -39,10 +39,11 @@ export function renderPortfolio(
 	portfolioContent: PortfolioContent,
 	category: string,
 	sectionOrder?: string[],
-	hiddenSections?: string[]
+	hiddenSections?: string[],
+	publishMode = false
 ): string {
 	const id = (templateId ?? '').toLowerCase().trim();
 	const renderer = TEMPLATES[id] ?? TEMPLATES[DEFAULT_TEMPLATE];
 	const v = normalize(parsedData, portfolioContent, category, sectionOrder, hiddenSections);
-	return renderer(v);
+	return renderer(v, publishMode);
 }

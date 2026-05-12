@@ -8,7 +8,7 @@
  */
 
 import type { NormalizedData } from './base';
-import { DEFAULT_SECTION_ORDER, _editable, _listEditable, EDITOR_SCRIPT } from './base';
+import { DEFAULT_SECTION_ORDER, _editable, _listEditable, EDITOR_SCRIPT, makePublishHelpers } from './base';
 
 const FONTS_URL =
 	'https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,300&family=JetBrains+Mono:wght@400;500&display=swap';
@@ -439,7 +439,9 @@ const CIRCUIT_SVG = `<div class="circuit-bg" aria-hidden="true">
 </svg>
 </div>`;
 
-export function html(v: NormalizedData): string {
+export function html(v: NormalizedData, publishMode = false): string {
+	// eslint-disable-next-line no-shadow
+	const { editable: _editable, listEditable: _listEditable, editorScript: EDITOR_SCRIPT, cspMeta, publishStyles } = makePublishHelpers(publishMode);
 	const order = v.section_order?.length ? v.section_order : DEFAULT_SECTION_ORDER;
 	const hidden = v.hidden_sections ?? new Set<string>();
 
@@ -835,6 +837,8 @@ ${p.performance_return ? `<div class="inv-ret">Return: ${p.performance_return}</
 	return `<!DOCTYPE html>
 <html lang="en" data-theme="dark">
 <head>
+${cspMeta}
+${publishStyles}
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>${v.name} — Portfolio</title>

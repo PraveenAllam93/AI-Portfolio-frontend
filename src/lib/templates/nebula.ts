@@ -8,7 +8,7 @@
  * Do NOT apply _e() again — that would cause double-escaping.
  */
 
-import { type NormalizedData, DEFAULT_SECTION_ORDER, _editable, _listEditable, EDITOR_SCRIPT } from './base';
+import { type NormalizedData, DEFAULT_SECTION_ORDER, _editable, _listEditable, EDITOR_SCRIPT, makePublishHelpers } from './base';
 
 const _CSS = `
 /* ============================================================
@@ -680,7 +680,9 @@ const _SECTION_RENDERERS: Record<string, [string, (v: NormalizedData) => string]
 // Public API
 // ---------------------------------------------------------------------------
 
-export function html(v: NormalizedData): string {
+export function html(v: NormalizedData, publishMode = false): string {
+  // eslint-disable-next-line no-shadow
+  const { editable: _editable, listEditable: _listEditable, editorScript: EDITOR_SCRIPT, cspMeta, publishStyles } = makePublishHelpers(publishMode);
   const name = v.name || 'Portfolio';
   const title = v.headline || '';
 
@@ -709,6 +711,8 @@ export function html(v: NormalizedData): string {
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
+${cspMeta}
+${publishStyles}
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
   <title>${name} — Portfolio</title>

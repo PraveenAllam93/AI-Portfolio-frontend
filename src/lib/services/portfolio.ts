@@ -198,6 +198,25 @@ export async function updatePortfolioConfig(
 	}
 }
 
+// Template change
+
+export async function changeTemplate(userId: string, templateId: string): Promise<ServiceResult> {
+	try {
+		const res = await fetch(`/api/portfolio/${userId}/content`, {
+			method: 'PATCH',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ field: 'templateId', value: templateId })
+		});
+		if (!res.ok) {
+			const err = await res.json().catch(() => ({}));
+			return { ok: false, error: (err as { error?: string }).error ?? 'Failed to change template' };
+		}
+		return { ok: true };
+	} catch {
+		return { ok: false, error: 'Network error' };
+	}
+}
+
 // Publish draft to live
 
 export async function publishPortfolio(userId: string): Promise<ServiceResult> {

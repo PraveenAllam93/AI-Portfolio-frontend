@@ -17,6 +17,7 @@
 		publishPortfolio,
 		getImageUploadUrl,
 		getAiSuggestions,
+		changeTemplate,
 		type LlmSuggestion
 	} from '$lib/services/portfolio';
 	import { dndzone } from 'svelte-dnd-action';
@@ -351,6 +352,28 @@
 
 	// ── Template ───────────────────────────────────────────────────────────────
 	let templateId = $state('neon');
+
+	const TEMPLATE_CATALOG: Record<string, { name: string; accent: string; bg: string }> = {
+		neon:        { name: 'Neon',       accent: '#00f0ff', bg: '#0a0f1a' },
+		'navy-gold': { name: 'Navy Gold',  accent: '#c9a84c', bg: '#0d1b2a' },
+		cosmos:      { name: 'Cosmos',     accent: '#7c3aed', bg: '#06040f' },
+		circuit:     { name: 'Circuit',    accent: '#22c55e', bg: '#070f0a' },
+		codex:       { name: 'Codex',      accent: '#f59e0b', bg: '#0c0a00' },
+		galaxy:      { name: 'Galaxy',     accent: '#818cf8', bg: '#05060f' },
+		nebula:      { name: 'Nebula',     accent: '#ec4899', bg: '#0f0610' },
+	};
+
+	let templatePickerOpen = $state(false);
+	let templateChanging = $state(false);
+
+	async function handleTemplateChange(id: string) {
+		if (id === templateId || templateChanging) return;
+		templateId = id;
+		templatePickerOpen = false;
+		templateChanging = true;
+		await changeTemplate(userId, id);
+		templateChanging = false;
+	}
 
 	// ── Live preview (client-side rendering) ───────────────────────────────────
 	// Reconstruct ParsedData from in-memory editor state so the preview re-renders
@@ -1408,10 +1431,46 @@
 	}
 
 	// ── Publish ──────────────────────────────────────────────────────────────────
+
+	// Flushes any debounced saves so DynamoDB is up-to-date before publish reads it.
+	async function _flushPendingSaves(): Promise<void> {
+		const ps: Promise<unknown>[] = [];
+
+		// Inline edits: 1500ms debounce
+		for (const path of Object.keys(_saveTimers)) {
+			clearTimeout(_saveTimers[path]);
+			delete _saveTimers[path];
+			ps.push(performSaveFromPath(path));
+		}
+
+		// Form auto-saves: 800ms debounce
+		for (const key of Object.keys(_formSaveTimers)) {
+			clearTimeout(_formSaveTimers[key]);
+			delete _formSaveTimers[key];
+			if (key === 'skills') {
+				if (isSkillsDirty) ps.push(saveSkills());
+			} else if (key === 'rawProfile') {
+				if (isRawProfileDirty) ps.push(saveRawProfile());
+			} else if (key.startsWith('pf-')) {
+				const pk = key.slice(3) as EditableField;
+				if (profileFields[pk]?.value !== profileFields[pk]?.original) ps.push(saveProfileField(pk));
+			} else if (key.startsWith('item-')) {
+				const rest = key.slice(5);
+				const lastDash = rest.lastIndexOf('-');
+				const sk = rest.slice(0, lastDash);
+				const idx = parseInt(rest.slice(lastDash + 1));
+				if (sections[sk]?.[idx]?.isDirty) ps.push(saveItem(sk, idx));
+			}
+		}
+
+		await Promise.all(ps);
+	}
+
 	async function handlePublish() {
 		if (publishStatus === 'publishing') return;
 		publishStatus = 'publishing';
 		publishToast = '';
+		await _flushPendingSaves();
 		const result = await publishPortfolio(userId);
 		if (result.ok) {
 			publishStatus = 'done';
@@ -2151,9 +2210,57 @@
 		</aside>
 
 		<div class="{mobileTab === 'preview' ? 'flex' : 'hidden'} sm:flex flex-1 flex-col overflow-hidden border-r border-slate-200 bg-gradient-to-b from-slate-100 to-slate-200/70">
-			<div class="flex flex-shrink-0 items-center justify-between border-b border-slate-200 bg-white px-4 py-2">
+			<div class="relative flex flex-shrink-0 items-center justify-between border-b border-slate-200 bg-white px-4 py-2">
 				<span class="text-sm font-bold text-slate-600">Preview</span>
-				<span class="text-xs text-slate-400">Click any text to edit · select text for AI ✦</span>
+				<div class="flex items-center gap-3">
+					<span class="hidden text-xs text-slate-400 sm:block">Click any text to edit · select text for AI ✦</span>
+					<!-- Template picker button -->
+					<button
+						onclick={() => { templatePickerOpen = !templatePickerOpen; }}
+						class="flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-700 transition hover:bg-slate-100"
+					>
+						<span
+							class="inline-block h-2.5 w-2.5 rounded-full"
+							style="background:{TEMPLATE_CATALOG[templateId]?.accent ?? '#888'}"
+						></span>
+						{TEMPLATE_CATALOG[templateId]?.name ?? templateId}
+						<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" class="h-3 w-3 text-slate-400"><path fill-rule="evenodd" d="M4.22 6.22a.75.75 0 0 1 1.06 0L8 8.94l2.72-2.72a.75.75 0 1 1 1.06 1.06l-3.25 3.25a.75.75 0 0 1-1.06 0L4.22 7.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd" /></svg>
+					</button>
+				</div>
+
+				<!-- Template dropdown -->
+				{#if templatePickerOpen}
+					<!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
+					<div
+						class="fixed inset-0 z-30"
+						onclick={() => { templatePickerOpen = false; }}
+					></div>
+					<div class="absolute right-4 top-full z-40 mt-1 w-64 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl">
+						<p class="border-b border-slate-100 px-4 py-2.5 text-xs font-bold uppercase tracking-widest text-slate-400">Choose Template</p>
+						<div class="max-h-80 overflow-y-auto py-1.5">
+							{#each Object.entries(TEMPLATE_CATALOG) as [id, meta]}
+								{@const isActive = id === templateId}
+								<button
+									onclick={() => handleTemplateChange(id)}
+									disabled={templateChanging}
+									class="flex w-full items-center gap-3 px-4 py-2.5 text-left transition-colors hover:bg-slate-50 disabled:opacity-60 disabled:cursor-wait"
+								>
+									<!-- Color swatch -->
+									<div
+										class="flex h-8 w-12 shrink-0 items-end rounded-md p-1.5"
+										style="background:{meta.bg}"
+									>
+										<div class="h-1 w-full rounded-full opacity-80" style="background:{meta.accent}"></div>
+									</div>
+									<span class="flex-1 text-sm font-medium text-slate-800">{meta.name}</span>
+									{#if isActive}
+										<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="h-4 w-4 shrink-0 text-slate-900"><path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 0 1 .143 1.052l-8 10.5a.75.75 0 0 1-1.127.075l-4.5-4.5a.75.75 0 0 1 1.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 0 1 1.05-.143Z" clip-rule="evenodd" /></svg>
+									{/if}
+								</button>
+							{/each}
+						</div>
+					</div>
+				{/if}
 			</div>
 			<div class="relative flex-1 overflow-hidden p-4 sm:p-5">
 				{#if pageLoading}

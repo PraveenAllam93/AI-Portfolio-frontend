@@ -216,6 +216,40 @@ export const EDITOR_JS = `(function(){
  */
 export const EDITOR_SCRIPT = `<script>${EDITOR_JS}<\/script>`;
 
+/**
+ * CSP meta tag injected into the <head> of published (static) portfolios.
+ * unsafe-inline is required for the template animation scripts (stars, cursor, etc.).
+ * All user data is HTML-escaped by normalize(), so inline script injection is not possible.
+ */
+export const PUBLISH_CSP_META = `<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src * data: blob:; connect-src 'none'">`;
+
+/**
+ * Returns helpers scoped to publishMode.
+ * Use inside each template's html() to shadow the module-level imports:
+ *
+ *   const { editable: _editable, listEditable: _listEditable,
+ *           editorScript: EDITOR_SCRIPT, cspMeta, publishStyles } = makePublishHelpers(publishMode);
+ */
+export function makePublishHelpers(publishMode: boolean) {
+	// Hides editor UI buttons whose CSS is normally injected by EDITOR_JS.
+	// Template animation scripts (stars, IntersectionObserver, etc.) are kept as-is.
+	const publishStyles = publishMode
+		? `<style>
+.ce-del-btn,.ce-add-btn,.ce-ai-btn,.del-btn,.add-btn{display:none!important}
+</style>`
+		: '';
+
+	return {
+		editable: (path: string, multiline = false) =>
+			publishMode ? '' : _editable(path, multiline),
+		listEditable: (path: string) =>
+			publishMode ? '' : _listEditable(path),
+		editorScript: publishMode ? '' : EDITOR_SCRIPT,
+		cspMeta: publishMode ? PUBLISH_CSP_META : '',
+		publishStyles,
+	};
+}
+
 export interface NormalizedData {
 	// Profile
 	name: string;
