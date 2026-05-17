@@ -2,43 +2,43 @@
 	const features = [
 		{
 			icon: '✦',
-			iconBg: 'rgba(91,63,212,.3)',
-			iconBorder: 'rgba(91,63,212,.5)',
+			iconBg: 'rgba(124,58,237,.3)',
+			iconBorder: 'rgba(124,58,237,.5)',
 			title: 'AI Work Story Engine',
 			body: 'Bullet points become impact-driven work stories. Upload a project, campaign, or design. AI writes the summary, caption, and portfolio entry automatically.'
 		},
 		{
 			icon: '📊',
-			iconBg: 'rgba(0,200,150,.2)',
-			iconBorder: 'rgba(0,200,150,.4)',
+			iconBg: 'rgba(16,185,129,.2)',
+			iconBorder: 'rgba(16,185,129,.4)',
 			title: 'Portfolio Score & Guidance',
 			body: 'A live quality score as you build. AI tells you exactly what to add, what\'s missing, and why it matters, with one-click fixes for every gap.'
 		},
 		{
 			icon: '📸',
-			iconBg: 'rgba(245,166,35,.2)',
-			iconBorder: 'rgba(245,166,35,.4)',
+			iconBg: 'rgba(245,158,11,.2)',
+			iconBorder: 'rgba(245,158,11,.4)',
 			title: 'Media Upload + AI Summary',
 			body: 'Upload photos, videos, or documents. AI generates professional descriptions instantly. No caption writing needed.'
 		},
 		{
 			icon: '🎯',
-			iconBg: 'rgba(255,92,58,.2)',
-			iconBorder: 'rgba(255,92,58,.4)',
+			iconBg: 'rgba(124,58,237,.2)',
+			iconBorder: 'rgba(124,58,237,.4)',
 			title: 'Job Description Matching',
 			body: 'Paste a job description. AI adapts your portfolio to match the exact keywords and story that specific role expects. One portfolio, infinitely targeted.'
 		},
 		{
 			icon: '👁',
-			iconBg: 'rgba(91,63,212,.25)',
-			iconBorder: 'rgba(91,63,212,.45)',
+			iconBg: 'rgba(124,58,237,.25)',
+			iconBorder: 'rgba(124,58,237,.45)',
 			title: 'Recruiter View Mode',
 			body: 'See exactly what a recruiter sees in 6 seconds, with a heatmap showing which sections get attention. Fix it before you share.'
 		},
 		{
 			icon: '✨',
-			iconBg: 'rgba(0,200,150,.15)',
-			iconBorder: 'rgba(0,200,150,.35)',
+			iconBg: 'rgba(16,185,129,.15)',
+			iconBorder: 'rgba(16,185,129,.35)',
 			title: 'Contextual AI Suggestions',
 			body: 'As you build, AI watches and suggests in real time. "This bullet needs a metric." "Add an image here." "This section is too long." Like a designer beside you.'
 		}
@@ -103,7 +103,7 @@
 
 <style>
 	section {
-		background: #0f0f1a;
+		background: var(--color-warm-cream2);
 		padding: 88px 48px;
 	}
 	.wrap {
@@ -123,7 +123,7 @@
 		display: inline-flex;
 		align-items: center;
 		gap: 7px;
-		background: rgba(255, 92, 58, 0.15);
+		background: rgba(124, 58, 237, 0.15);
 		color: var(--color-warm-coral);
 		font-size: 11px;
 		font-weight: 700;
@@ -131,7 +131,7 @@
 		padding: 6px 13px;
 		border-radius: 100px;
 		margin-bottom: 20px;
-		border: 1px solid rgba(255, 92, 58, 0.25);
+		border: 1px solid rgba(124, 58, 237, 0.3);
 	}
 	.sec-h {
 		font-family: var(--font-display);
@@ -139,42 +139,42 @@
 		font-weight: 800;
 		line-height: 1.06;
 		letter-spacing: -0.03em;
-		color: #ffffff;
+		color: var(--color-warm-ink);
 		margin-bottom: 20px;
 	}
 	.sec-sub {
 		font-size: 15px;
-		color: rgba(255, 255, 255, 0.55);
+		color: var(--color-warm-muted);
 		line-height: 1.72;
 		max-width: 380px;
 	}
 
 	/* Comparison table */
 	.compare-table {
-		background: #1a1a2e;
+		background: #ffffff;
 		border-radius: 16px;
 		overflow: hidden;
-		border: 1px solid rgba(255, 255, 255, 0.08);
+		border: 1px solid var(--color-warm-border);
 	}
 	.ct-header {
 		display: grid;
 		grid-template-columns: 1fr 80px 110px;
 		padding: 14px 20px;
-		border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+		border-bottom: 1px solid var(--color-warm-border);
 	}
 	.ct-feat-col {
 		font-size: 10px;
 		font-weight: 700;
 		letter-spacing: 0.1em;
 		text-transform: uppercase;
-		color: rgba(255, 255, 255, 0.35);
+		color: var(--color-warm-dim);
 	}
 	.ct-others {
 		font-size: 10px;
 		font-weight: 700;
 		letter-spacing: 0.08em;
 		text-transform: uppercase;
-		color: rgba(255, 255, 255, 0.35);
+		color: var(--color-warm-dim);
 		text-align: center;
 	}
 	.ct-us {
@@ -189,7 +189,7 @@
 		display: grid;
 		grid-template-columns: 1fr 80px 110px;
 		padding: 13px 20px;
-		border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+		border-bottom: 1px solid var(--color-warm-border);
 		align-items: center;
 	}
 	.ct-row:last-child {
@@ -197,12 +197,12 @@
 	}
 	.ct-lbl {
 		font-size: 13px;
-		color: rgba(255, 255, 255, 0.75);
+		color: var(--color-warm-muted);
 	}
 	.ct-no {
 		text-align: center;
 		font-size: 14px;
-		color: rgba(255, 255, 255, 0.25);
+		color: var(--color-warm-dim);
 	}
 	.ct-yes {
 		text-align: center;
@@ -217,14 +217,14 @@
 		gap: 16px;
 	}
 	.feat-card {
-		background: #1a1a2e;
+		background: #ffffff;
 		border-radius: 16px;
 		padding: 28px;
-		border: 1px solid rgba(255, 255, 255, 0.07);
+		border: 1px solid var(--color-warm-border);
 		transition: border-color 0.2s;
 	}
 	.feat-card:hover {
-		border-color: rgba(255, 255, 255, 0.18);
+		border-color: rgba(124, 58, 237, 0.25);
 	}
 	.feat-icon {
 		width: 44px;
@@ -239,13 +239,13 @@
 	.feat-title {
 		font-weight: 700;
 		font-size: 16px;
-		color: #ffffff;
+		color: var(--color-warm-ink);
 		margin-bottom: 10px;
 		letter-spacing: -0.01em;
 	}
 	.feat-body {
 		font-size: 13px;
-		color: rgba(255, 255, 255, 0.5);
+		color: var(--color-warm-muted);
 		line-height: 1.7;
 	}
 

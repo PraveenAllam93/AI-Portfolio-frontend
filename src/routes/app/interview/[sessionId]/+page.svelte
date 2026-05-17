@@ -113,29 +113,29 @@
 </script>
 
 <svelte:head>
-	<title>Interview — AIfolio</title>
+	<title>Interview — Portfolio.ai</title>
 </svelte:head>
 
-<div class="flex min-h-screen flex-col bg-white">
+<div class="flex min-h-screen flex-col bg-surface-subtle">
 	<!-- Top bar — always visible -->
-	<header class="sticky top-0 z-20 flex items-center justify-between border-b border-slate-100 bg-white/90 px-6 py-4 backdrop-blur">
+	<header class="sticky top-0 z-20 flex items-center justify-between border-b border-surface-muted bg-white/90 px-6 py-4 backdrop-blur">
 		<div class="flex items-center gap-4">
-			<span class="text-sm font-bold text-slate-900">{questionNumber} / {totalQuestions}</span>
-			<div class="h-1.5 w-32 overflow-hidden rounded-full bg-slate-100">
+			<span class="text-sm font-bold text-ink">{questionNumber} / {totalQuestions}</span>
+			<div class="h-1.5 w-32 overflow-hidden rounded-full bg-surface-muted">
 				<div
-					class="h-full rounded-full bg-slate-900 transition-all duration-500"
+					class="h-full rounded-full bg-brand transition-all duration-500"
 					style="width: {progress}%"
 				></div>
 			</div>
 			{#if currentTopic}
-				<span class="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-600">{currentTopic}</span>
+				<span class="rounded-full bg-surface-muted px-3 py-1 text-xs font-bold text-ink-soft">{currentTopic}</span>
 			{/if}
 		</div>
 
 		<button
 			onclick={handleExit}
 			disabled={isExiting || isSubmitting}
-			class="rounded-xl border border-slate-200 px-4 py-2 text-sm font-bold text-slate-500 transition-all hover:border-red-200 hover:text-red-600 disabled:opacity-40"
+			class="rounded-xl border border-surface-muted px-4 py-2 text-sm font-bold text-ink-soft transition-all hover:border-red-200 hover:text-red-600 disabled:opacity-40"
 		>
 			{#if isExiting}
 				<Spinner size="sm" />
@@ -158,16 +158,16 @@
 		{/if}
 
 		<!-- Question card -->
-		<div class="mb-8 rounded-[2rem] border border-slate-100 bg-white p-8 shadow-xl">
-			<p class="text-xs font-bold tracking-widest text-slate-400 uppercase mb-4">Question {questionNumber}</p>
-			<p class="text-xl font-semibold leading-relaxed text-slate-900">{question}</p>
+		<div class="mb-8 rounded-[2rem] border border-surface-muted bg-white p-8 shadow-xl">
+			<p class="text-xs font-bold tracking-widest text-ink-muted uppercase mb-4">Question {questionNumber}</p>
+			<p class="text-xl font-semibold leading-relaxed text-ink">{question}</p>
 		</div>
 
 		{#if !showFeedback}
 			<!-- Answer form -->
 			<form onsubmit={handleSubmit} class="space-y-4">
 				<div class="space-y-2">
-					<label for="answer" class="text-xs font-bold tracking-widest text-slate-500 uppercase">Your Answer</label>
+					<label for="answer" class="text-xs font-bold tracking-widest text-ink-soft uppercase">Your Answer</label>
 					<textarea
 						id="answer"
 						bind:value={answer}
@@ -175,16 +175,16 @@
 						rows={6}
 						maxlength={2000}
 						placeholder="Type your answer here..."
-						class="w-full resize-none rounded-2xl border border-slate-200 bg-slate-50/50 px-6 py-4 text-base text-slate-900 outline-none transition-all placeholder:text-slate-400 focus:border-slate-400 focus:bg-white focus:ring-2 focus:ring-slate-400/50 disabled:opacity-60"
+						class="w-full resize-none rounded-2xl border border-surface-muted bg-surface-subtle/50 px-6 py-4 text-base text-ink outline-none transition-all placeholder:text-ink-muted focus:border-brand/60 focus:bg-white focus:ring-2 focus:ring-brand/15 disabled:opacity-60"
 					></textarea>
-					<p class="text-right text-xs text-slate-400">{answer.length}/2000</p>
+					<p class="text-right text-xs text-ink-muted">{answer.length}/2000</p>
 				</div>
 
 				<button
 					type="submit"
 					disabled={isSubmitting}
 					aria-busy={isSubmitting}
-					class="flex w-full items-center justify-center rounded-2xl bg-slate-900 py-5 text-base font-bold text-white shadow-xl transition-all hover:bg-slate-800 active:scale-95 disabled:opacity-50"
+					class="flex w-full items-center justify-center rounded-2xl bg-brand py-5 text-base font-bold text-white shadow-xl transition-all hover:bg-brand-dark active:scale-95 disabled:opacity-50"
 				>
 					{#if isSubmitting}
 						<Spinner size="sm" />
@@ -199,20 +199,20 @@
 			<div class="space-y-4">
 
 				<!-- Score hero -->
-				<div class="rounded-[1.5rem] bg-slate-900 p-6 text-white">
+				<div class="rounded-[1.5rem] bg-brand p-6 text-white">
 					<div class="flex items-center justify-between">
 						<div>
-							<p class="text-xs font-bold tracking-widest uppercase text-slate-400">Your Score</p>
+							<p class="text-xs font-bold tracking-widest uppercase text-ink-muted">Your Score</p>
 							<div class="mt-1 flex items-end gap-2">
 								<span class="text-6xl font-black leading-none">{feedback.score}</span>
-								<span class="mb-1 text-xl font-bold text-slate-400">/10</span>
+								<span class="mb-1 text-xl font-bold text-ink-muted">/10</span>
 							</div>
 						</div>
-						<div class="flex h-16 w-16 flex-shrink-0 items-center justify-center rounded-2xl border border-slate-700 bg-slate-800">
+						<div class="flex h-16 w-16 flex-shrink-0 items-center justify-center rounded-2xl border border-brand/30 bg-brand/10">
 							<span class="text-2xl">{feedback.score >= 8 ? '★' : feedback.score >= 5 ? '◎' : '△'}</span>
 						</div>
 					</div>
-					<div class="mt-4 h-1 w-full overflow-hidden rounded-full bg-slate-700">
+					<div class="mt-4 h-1 w-full overflow-hidden rounded-full bg-surface-muted">
 						<div
 							class="h-full rounded-full bg-white transition-all duration-700"
 							style="width: {(feedback.score / 10) * 100}%"
@@ -224,26 +224,26 @@
 				{#if feedback.strengths.length > 0 || feedback.weaknesses.length > 0}
 					<div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
 						{#if feedback.strengths.length > 0}
-							<div class="rounded-2xl border border-slate-100 bg-white p-5">
-								<p class="mb-3 flex items-center gap-2 text-xs font-bold tracking-widest text-slate-400 uppercase"><span class="inline-flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-md bg-emerald-50 text-[9px] font-black text-emerald-600 ring-1 ring-emerald-100">✓</span>What you got right</p>
+							<div class="rounded-2xl border border-surface-muted bg-white p-5">
+								<p class="mb-3 flex items-center gap-2 text-xs font-bold tracking-widest text-ink-muted uppercase"><span class="inline-flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-md bg-emerald-50 text-[9px] font-black text-emerald-600 ring-1 ring-emerald-100">✓</span>What you got right</p>
 								<ul class="space-y-2.5">
 									{#each feedback.strengths as s, i}
 										<li class="flex items-start gap-2.5">
-											<span class="mt-0.5 text-xs font-black text-slate-300 tabular-nums">{(i + 1).toString().padStart(2, '0')}</span>
-											<span class="text-sm leading-relaxed text-slate-700">{s}</span>
+											<span class="mt-0.5 text-xs font-black text-ink-muted tabular-nums">{(i + 1).toString().padStart(2, '0')}</span>
+											<span class="text-sm leading-relaxed text-ink-soft">{s}</span>
 										</li>
 									{/each}
 								</ul>
 							</div>
 						{/if}
 						{#if feedback.weaknesses.length > 0}
-							<div class="rounded-2xl border border-slate-100 bg-white p-5">
-								<p class="mb-3 flex items-center gap-2 text-xs font-bold tracking-widest text-slate-400 uppercase"><span class="inline-flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-md bg-amber-50 text-[9px] font-black text-amber-600 ring-1 ring-amber-100">→</span>Could be stronger</p>
+							<div class="rounded-2xl border border-surface-muted bg-white p-5">
+								<p class="mb-3 flex items-center gap-2 text-xs font-bold tracking-widest text-ink-muted uppercase"><span class="inline-flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-md bg-amber-50 text-[9px] font-black text-amber-600 ring-1 ring-amber-100">→</span>Could be stronger</p>
 								<ul class="space-y-2.5">
 									{#each feedback.weaknesses as w, i}
 										<li class="flex items-start gap-2.5">
-											<span class="mt-0.5 text-xs font-black text-slate-300 tabular-nums">{(i + 1).toString().padStart(2, '0')}</span>
-											<span class="text-sm leading-relaxed text-slate-700">{w}</span>
+											<span class="mt-0.5 text-xs font-black text-ink-muted tabular-nums">{(i + 1).toString().padStart(2, '0')}</span>
+											<span class="text-sm leading-relaxed text-ink-soft">{w}</span>
 										</li>
 									{/each}
 								</ul>
@@ -253,18 +253,18 @@
 				{/if}
 
 				<!-- Ideal answer -->
-				<div class="rounded-2xl border-l-4 border-slate-900 bg-white p-5 shadow-sm">
-					<p class="mb-2 text-xs font-bold tracking-widest text-slate-400 uppercase">Model Answer</p>
-					<p class="text-sm leading-relaxed text-slate-700">{feedback.idealAnswer}</p>
+				<div class="rounded-2xl border-l-4 border-brand bg-white p-5 shadow-sm">
+					<p class="mb-2 text-xs font-bold tracking-widest text-ink-muted uppercase">Model Answer</p>
+					<p class="text-sm leading-relaxed text-ink-soft">{feedback.idealAnswer}</p>
 				</div>
 
 				<!-- Next button -->
 				{#if _nextQuestion}
 					<button
 						onclick={handleNext}
-						class="flex w-full items-center justify-center gap-2 rounded-2xl bg-slate-900 py-5 text-base font-bold text-white shadow-xl transition-all hover:bg-slate-800 active:scale-95"
+						class="flex w-full items-center justify-center gap-2 rounded-2xl bg-brand py-5 text-base font-bold text-white shadow-xl transition-all hover:bg-brand-dark active:scale-95"
 					>
-						Next Question <span class="text-slate-400">→</span>
+						Next Question <span class="text-ink-muted">→</span>
 					</button>
 				{/if}
 			</div>

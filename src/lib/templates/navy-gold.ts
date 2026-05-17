@@ -328,9 +328,16 @@ export function html(v: NormalizedData): string {
 	};
 	const navAnchors: [string, string][] = [];
 	for (const key of order) {
-		if (!hidden.has(key) && key in NAV_LABELS) {
+		if (hidden.has(key)) continue;
+		if (key === 'custom_sections') {
+			for (const cs of v.custom_sections ?? []) {
+				if (cs.items?.length) navAnchors.push([cs.section_id, cs.title]);
+			}
+			continue;
+		}
+		if (key in NAV_LABELS) {
 			const dk = key === 'skills' ? 'skill_groups' : key;
-			const d = (v as Record<string, unknown>)[dk];
+			const d = (v as unknown as Record<string, unknown>)[dk];
 			if (d && (Array.isArray(d) ? d.length > 0 : Boolean(d))) navAnchors.push([key, NAV_LABELS[key]]);
 		}
 	}
@@ -570,11 +577,33 @@ ${v.location ? `<div class="ct-item"><div class="ct-label">Location</div><div cl
 </div>
 </section>` : '';
 
+	const customSectionsHtml = !hidden.has('custom_sections') && (v.custom_sections?.length ?? 0) > 0
+		? (v.custom_sections ?? []).map((cs, csIdx) => {
+			if (!cs.items?.length) return '';
+			const items = cs.items.map((item, i) => `<div class="proj-card" data-item-wrap>
+<button class="ce-del-btn" data-del-section="custom_sections" data-del-index="${i}">&#x2715;</button>
+${item.label ? `<h3 class="proj-name">${item.label}</h3>` : ''}
+${item.subtitle ? `<p class="proj-meta">${item.subtitle}</p>` : ''}
+${item.value ? `<p class="proj-desc">${item.value}</p>` : ''}
+${item.tags?.length ? `<div class="proj-tags">${item.tags.map((t) => `<span class="tag">${t}</span>`).join('')}</div>` : ''}
+${item.url ? `<a href="${item.url}" class="proj-link" target="_blank" rel="noopener noreferrer">View &#8599;</a>` : ''}
+</div>`).join('\n');
+			const grid = cs.display_type === 'cards'
+				? `<div class="projects-grid">${items}</div>`
+				: `<div class="exp-list">${items}</div>`;
+			return `<section id="${cs.section_id}">
+<div class="section-header"><h2 class="section-title">${cs.title}</h2></div>
+${grid}
+<button class="ce-add-btn" data-add-section="custom_sections.${csIdx}.items">+ Add Item</button>
+</section>`;
+		}).filter(Boolean).join('\n')
+		: '';
+
 	const sectionMap: Record<string, string> = {
 		experience: expHtml, skills: skillsHtml, projects: projectsHtml,
 		education: educationHtml, certifications: certsHtml, achievements: achievementsHtml,
 		awards: awardsHtml, campaigns: campaignsHtml, financial_modeling: finHtml,
-		investment_portfolios: invHtml,
+		investment_portfolios: invHtml, custom_sections: customSectionsHtml,
 	};
 
 	const orderedSections = order

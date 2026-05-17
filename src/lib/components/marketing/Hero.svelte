@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { reveal } from '$lib/actions/animate';
 
 	const names = [
 		{ n: 'Sarah Jenkins', i: 'SJ', s: 'sarah-jenkins' },
@@ -51,10 +52,7 @@
 		<!-- Left: copy -->
 		<div class="hero-left">
 			<div class="hero-badge">✦ No coding needed. No design skills.</div>
-			<h1 class="hero-h1">
-				Your resume gets you <em>read.</em><br />
-				A portfolio gets you the interview.
-			</h1>
+			<h1 class="hero-h1">Your resume gets you <em>read.</em><br>A portfolio gets you the interview.</h1>
 			<p class="hero-sub">
 				Upload your CV. AI reads it, writes your story, and builds a stunning portfolio in under 30
 				seconds. No design skills needed.
@@ -93,7 +91,7 @@
 		</div>
 
 		<!-- Right: hero card mockup -->
-		<div class="hero-right">
+		<div class="hero-right" use:reveal={{ y: 24, delay: 160 }}>
 			<div class="hero-card-wrap">
 				<div class="score-pill">Portfolio Score: 87/100</div>
 				<div class="hero-card">
@@ -118,7 +116,7 @@
 						</div>
 						<div class="hc-kpis">
 							<div class="hc-kpi">
-								<div class="hc-kv" style="color:var(--color-warm-coral)">+230%</div>
+								<div class="hc-kv" style="color:#ff5c3a">+230%</div>
 								<div class="hc-kl">ROAS</div>
 							</div>
 							<div class="hc-kpi">
@@ -126,7 +124,7 @@
 								<div class="hc-kl">Reach</div>
 							</div>
 							<div class="hc-kpi">
-								<div class="hc-kv" style="color:var(--color-warm-mint)">$1.8M</div>
+								<div class="hc-kv" style="color:#00c896">$1.8M</div>
 								<div class="hc-kl">Budget</div>
 							</div>
 						</div>
@@ -195,8 +193,9 @@
 		display: inline-flex;
 		align-items: center;
 		gap: 8px;
-		background: var(--color-warm-ink);
-		color: #fff;
+		background: transparent;
+		color: var(--color-warm-ink);
+		border: 1.5px solid var(--color-warm-ink);
 		font-size: 11px;
 		font-weight: 700;
 		letter-spacing: 0.06em;
@@ -213,10 +212,7 @@
 		margin-bottom: 16px;
 		color: var(--color-warm-ink);
 	}
-	.hero-h1 em {
-		font-style: italic;
-		color: var(--color-warm-coral);
-	}
+	.hero-h1 em{font-style:italic;color:#ff5c3a}
 	.hero-sub {
 		font-size: 16px;
 		color: var(--color-warm-muted);
@@ -311,6 +307,7 @@
 		position: relative;
 		max-width: 440px;
 		width: 100%;
+		margin: 0 auto;
 	}
 	.score-pill {
 		position: absolute;
@@ -362,7 +359,7 @@
 		flex: 1;
 	}
 	.hc-header {
-		background: linear-gradient(135deg, var(--color-warm-coral), var(--color-warm-amber));
+		background: linear-gradient(135deg, #ff5c3a, #f5a623);
 		padding: 16px 18px;
 		color: #fff;
 		display: flex;
@@ -451,10 +448,10 @@
 		aspect-ratio: 16 / 9;
 	}
 	.hc-img-1 {
-		background: linear-gradient(135deg, var(--color-warm-coral), var(--color-warm-amber));
+		background: linear-gradient(135deg, #ff5c3a, #f5a623);
 	}
 	.hc-img-2 {
-		background: linear-gradient(135deg, var(--color-warm-indigo), #8b73ff);
+		background: linear-gradient(135deg, #f5a623, #10b981);
 	}
 	.hc-img span {
 		font-size: 14px;
@@ -493,8 +490,8 @@
 		color: var(--color-warm-muted);
 		line-height: 1.4;
 	}
-	.hc-p-peach { background: var(--color-warm-peach); }
-	.hc-p-lav { background: var(--color-warm-lav); }
+	.hc-p-peach { background: #fff5f2; }
+	.hc-p-lav { background: #fffbf0; }
 
 	/* Floating cards */
 	.fc {

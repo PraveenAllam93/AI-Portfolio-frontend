@@ -397,8 +397,10 @@ function _section(title: string, content: string, counter: { n: number }): strin
 // ---------------------------------------------------------------------------
 
 function _about(v: NormalizedData): string {
+  const em = v.edit_mode;
+  const ed = (p: string, ml = false) => em ? _editable(p, ml) : '';
   const parts: string[] = [];
-  if (v.bio)      parts.push(`<p class="about-text" ${_editable('portfolio.bio', true)}>${v.bio}</p>`);
+  if (v.bio)      parts.push(`<p class="about-text" ${ed('portfolio.bio', true)}>${v.bio}</p>`);
   if (v.headline) parts.push(`<p class="tagline">${v.headline}</p>`);
   const meta = [v.location, v.email, v.phone].filter(Boolean).join(' &bull; ');
   if (meta) parts.push(`<p class="about-meta">${meta}</p>`);
@@ -406,28 +408,40 @@ function _about(v: NormalizedData): string {
 }
 
 function _skills(v: NormalizedData): string {
+  const em = v.edit_mode;
+  const ed = (p: string, ml = false) => em ? _editable(p, ml) : '';
+  const led = (p: string) => em ? _listEditable(p) : '';
+  const delBtn = (sec: string, idx: number) => em ? `<button class="ce-del-btn" data-del-section="${sec}" data-del-index="${idx}">×</button>` : '';
+  const addBtn = (sec: string, label: string) => em ? `<button class="ce-add-btn" data-add-section="${sec}">+ Add ${label}</button>` : '';
+  const iw = em ? ' data-item-wrap' : '';
   const groups = v.skill_groups || [];
-  if (!groups.length) return '';
+  if (!groups.length && !em) return '';
   let out = '<div class="skill-grid">';
   for (let i = 0; i < groups.length; i++) {
     const g = groups[i];
     const skills = g.skills || [];
     if (!skills.length && !g.category) continue;
     const tags = skills.map((t: string) => `<span class="tag">${t}</span>`).join('');
-    out += `<div class="skill-group" data-item-wrap>` +
-      `<button class="ce-del-btn" data-del-section="skills" data-del-index="${i}">×</button>` +
-      (g.category ? `<span class="skill-label" ${_editable(`skills.${i}.category`)}>${g.category}</span>` : '') +
-      (tags ? `<div class="tag-row" ${_listEditable(`skills.${i}.skills`)}>${tags}</div>` : '') +
+    out += `<div class="skill-group"${iw}>` +
+      delBtn('skills', i) +
+      (g.category ? `<span class="skill-label" ${ed(`skills.${i}.category`)}>${g.category}</span>` : '') +
+      (tags ? `<div class="tag-row" ${led(`skills.${i}.skills`)}>${tags}</div>` : '') +
       `</div>`;
   }
   out += '</div>';
-  out += `<button class="ce-add-btn" data-add-section="skills">+ Add Skill Group</button>`;
+  out += addBtn('skills', 'Skill Group');
   return out;
 }
 
 function _experience(v: NormalizedData): string {
+  const em = v.edit_mode;
+  const ed = (p: string, ml = false) => em ? _editable(p, ml) : '';
+  const led = (p: string) => em ? _listEditable(p) : '';
+  const delBtn = (sec: string, idx: number) => em ? `<button class="ce-del-btn" data-del-section="${sec}" data-del-index="${idx}">×</button>` : '';
+  const addBtn = (sec: string, label: string) => em ? `<button class="ce-add-btn" data-add-section="${sec}">+ Add ${label}</button>` : '';
+  const iw = em ? ' data-item-wrap' : '';
   const items = v.experience || [];
-  if (!items.length) return '';
+  if (!items.length && !em) return '';
   let out = '<div class="exp-list">';
   for (let i = 0; i < items.length; i++) {
     const exp = items[i];
@@ -435,27 +449,32 @@ function _experience(v: NormalizedData): string {
     const meta = metaParts.join(' &bull; ');
     const pts = exp.key_points || [];
     const ptsHtml = pts.length
-      ? `<ul class="card-list" ${_listEditable(`experience.${i}.key_points`)}>${pts.map((p: string) => `<li>${p}</li>`).join('')}</ul>`
+      ? `<ul class="card-list" ${led(`experience.${i}.key_points`)}>${pts.map((p: string) => `<li>${p}</li>`).join('')}</ul>`
       : '';
-    out += `<div class="card exp-card" data-item-wrap>` +
-      `<button class="ce-del-btn" data-del-section="experience" data-del-index="${i}">×</button>` +
+    out += `<div class="card exp-card"${iw}>` +
+      delBtn('experience', i) +
       `<div class="exp-header">` +
-      `<span class="exp-role" ${_editable(`experience.${i}.role`)}>${exp.role || ''}</span>` +
-      `<span class="exp-company" ${_editable(`experience.${i}.company`)}>${exp.company || ''}</span>` +
+      `<span class="exp-role" ${ed(`experience.${i}.role`)}>${exp.role || ''}</span>` +
+      `<span class="exp-company" ${ed(`experience.${i}.company`)}>${exp.company || ''}</span>` +
       `</div>` +
       (meta ? `<p class="exp-meta">${meta}</p>` : '') +
-      (exp.description ? `<p class="exp-desc" ${_editable(`experience.${i}.description`, true)}>${exp.description}</p>` : '') +
+      (exp.description ? `<p class="exp-desc" ${ed(`experience.${i}.description`, true)}>${exp.description}</p>` : '') +
       ptsHtml +
       `</div>`;
   }
   out += '</div>';
-  out += `<button class="ce-add-btn" data-add-section="experience">+ Add Experience</button>`;
+  out += addBtn('experience', 'Experience');
   return out;
 }
 
 function _education(v: NormalizedData): string {
+  const em = v.edit_mode;
+  const ed = (p: string, ml = false) => em ? _editable(p, ml) : '';
+  const delBtn = (sec: string, idx: number) => em ? `<button class="ce-del-btn" data-del-section="${sec}" data-del-index="${idx}">×</button>` : '';
+  const addBtn = (sec: string, label: string) => em ? `<button class="ce-add-btn" data-add-section="${sec}">+ Add ${label}</button>` : '';
+  const iw = em ? ' data-item-wrap' : '';
   const items = v.education || [];
-  if (!items.length) return '';
+  if (!items.length && !em) return '';
   let out = '<div class="edu-list">';
   for (let i = 0; i < items.length; i++) {
     const edu = items[i];
@@ -469,21 +488,27 @@ function _education(v: NormalizedData): string {
     const title = titleParts.length ? titleParts.join(', ') : inst;
     const metaParts = [titleParts.length ? inst : '', loc, yr].filter(Boolean);
     const meta = metaParts.join(' &bull; ');
-    out += `<div class="card" data-item-wrap>` +
-      `<button class="ce-del-btn" data-del-section="education" data-del-index="${i}">×</button>` +
-      `<div class="card-title" ${_editable(`education.${i}.degree`)}>${title}</div>` +
+    out += `<div class="card"${iw}>` +
+      delBtn('education', i) +
+      `<div class="card-title" ${ed(`education.${i}.degree`)}>${title}</div>` +
       (meta ? `<div class="card-sub">${meta}</div>` : '') +
       (grade ? `<div class="card-grade">${grade}</div>` : '') +
       `</div>`;
   }
   out += '</div>';
-  out += `<button class="ce-add-btn" data-add-section="education">+ Add Education</button>`;
+  out += addBtn('education', 'Education');
   return out;
 }
 
 function _projects(v: NormalizedData): string {
+  const em = v.edit_mode;
+  const ed = (p: string, ml = false) => em ? _editable(p, ml) : '';
+  const led = (p: string) => em ? _listEditable(p) : '';
+  const delBtn = (sec: string, idx: number) => em ? `<button class="ce-del-btn" data-del-section="${sec}" data-del-index="${idx}">×</button>` : '';
+  const addBtn = (sec: string, label: string) => em ? `<button class="ce-add-btn" data-add-section="${sec}">+ Add ${label}</button>` : '';
+  const iw = em ? ' data-item-wrap' : '';
   const items = v.projects || [];
-  if (!items.length) return '';
+  if (!items.length && !em) return '';
   let out = '<div class="project-grid">';
   for (let i = 0; i < items.length; i++) {
     const proj = items[i];
@@ -494,35 +519,40 @@ function _projects(v: NormalizedData): string {
     const outcomes = proj.measurable_outcomes || [];
 
     const tags = stack.map((t: string) => `<span class="tag">${t}</span>`).join('');
-    const tagRow = tags ? `<div class="tag-row" ${_listEditable(`projects.${i}.tech_stack`)}>${tags}</div>` : '';
+    const tagRow = tags ? `<div class="tag-row" ${led(`projects.${i}.tech_stack`)}>${tags}</div>` : '';
 
     let links = '';
     if (gh)  links += `<a class="proj-link" href="${gh}" target="_blank" rel="noopener">GitHub</a>`;
     if (url) links += `<a class="proj-link" href="${url}" target="_blank" rel="noopener">Live</a>`;
 
-    const respHtml = resp.length ? `<ul class="card-list" ${_listEditable(`projects.${i}.responsibilities`)}>${resp.map((r: string) => `<li>${r}</li>`).join('')}</ul>` : '';
-    const outHtml  = outcomes.length ? `<ul class="card-list" ${_listEditable(`projects.${i}.measurable_outcomes`)}>${outcomes.map((o: string) => `<li>${o}</li>`).join('')}</ul>` : '';
+    const respHtml = resp.length ? `<ul class="card-list" ${led(`projects.${i}.responsibilities`)}>${resp.map((r: string) => `<li>${r}</li>`).join('')}</ul>` : '';
+    const outHtml  = outcomes.length ? `<ul class="card-list" ${led(`projects.${i}.measurable_outcomes`)}>${outcomes.map((o: string) => `<li>${o}</li>`).join('')}</ul>` : '';
 
-    out += `<div class="card proj-card" data-item-wrap>` +
-      `<button class="ce-del-btn" data-del-section="projects" data-del-index="${i}">×</button>` +
+    out += `<div class="card proj-card"${iw}>` +
+      delBtn('projects', i) +
       `<div class="proj-header">` +
-      `<span class="card-title" ${_editable(`projects.${i}.title`)}>${proj.title || ''}</span>` +
+      `<span class="card-title" ${ed(`projects.${i}.title`)}>${proj.title || ''}</span>` +
       (links ? `<div class="proj-links">${links}</div>` : '') +
       `</div>` +
-      (proj.description ? `<p class="card-body" ${_editable(`projects.${i}.description`, true)}>${proj.description}</p>` : '') +
+      (proj.description ? `<p class="card-body" ${ed(`projects.${i}.description`, true)}>${proj.description}</p>` : '') +
       tagRow +
       respHtml +
       outHtml +
       `</div>`;
   }
   out += '</div>';
-  out += `<button class="ce-add-btn" data-add-section="projects">+ Add Project</button>`;
+  out += addBtn('projects', 'Project');
   return out;
 }
 
 function _certifications(v: NormalizedData): string {
+  const em = v.edit_mode;
+  const ed = (p: string, ml = false) => em ? _editable(p, ml) : '';
+  const delBtn = (sec: string, idx: number) => em ? `<button class="ce-del-btn" data-del-section="${sec}" data-del-index="${idx}">×</button>` : '';
+  const addBtn = (sec: string, label: string) => em ? `<button class="ce-add-btn" data-add-section="${sec}">+ Add ${label}</button>` : '';
+  const iw = em ? ' data-item-wrap' : '';
   const items = v.certifications || [];
-  if (!items.length) return '';
+  if (!items.length && !em) return '';
   let out = '<div class="cert-list">';
   for (let i = 0; i < items.length; i++) {
     const cert = items[i];
@@ -530,39 +560,49 @@ function _certifications(v: NormalizedData): string {
     const certUrl = cert.url || '';
     const label = certUrl
       ? `<a class="cert-link" href="${certUrl}" target="_blank" rel="noopener">${cert.name || ''}</a>`
-      : `<span class="cert-name" ${_editable(`certifications.${i}.name`)}>${cert.name || ''}</span>`;
-    out += `<div class="card cert-row" data-item-wrap>` +
-      `<button class="ce-del-btn" data-del-section="certifications" data-del-index="${i}">×</button>` +
+      : `<span class="cert-name" ${ed(`certifications.${i}.name`)}>${cert.name || ''}</span>`;
+    out += `<div class="card cert-row"${iw}>` +
+      delBtn('certifications', i) +
       label +
       (meta ? `<span class="cert-meta">${meta}</span>` : '') +
       `</div>`;
   }
   out += '</div>';
-  out += `<button class="ce-add-btn" data-add-section="certifications">+ Add Certification</button>`;
+  out += addBtn('certifications', 'Certification');
   return out;
 }
 
 function _achievements(v: NormalizedData): string {
+  const em = v.edit_mode;
+  const ed = (p: string, ml = false) => em ? _editable(p, ml) : '';
+  const delBtn = (sec: string, idx: number) => em ? `<button class="ce-del-btn" data-del-section="${sec}" data-del-index="${idx}">×</button>` : '';
+  const addBtn = (sec: string, label: string) => em ? `<button class="ce-add-btn" data-add-section="${sec}">+ Add ${label}</button>` : '';
+  const iw = em ? ' data-item-wrap' : '';
   const items = v.achievements || [];
-  if (!items.length) return '';
+  if (!items.length && !em) return '';
   let out = '<div class="ach-list">';
   for (let i = 0; i < items.length; i++) {
     const ach = items[i];
     const year = ach.year ? String(ach.year) : '';
-    out += `<div class="card" data-item-wrap>` +
-      `<button class="ce-del-btn" data-del-section="achievements" data-del-index="${i}">×</button>` +
-      `<div class="card-title"><span ${_editable(`achievements.${i}.title`)}>${ach.title || ''}</span>${year ? `&nbsp;<span class="yr">${year}</span>` : ''}</div>` +
-      (ach.description ? `<p class="card-body" ${_editable(`achievements.${i}.description`, true)}>${ach.description}</p>` : '') +
+    out += `<div class="card"${iw}>` +
+      delBtn('achievements', i) +
+      `<div class="card-title"><span ${ed(`achievements.${i}.title`)}>${ach.title || ''}</span>${year ? `&nbsp;<span class="yr">${year}</span>` : ''}</div>` +
+      (ach.description ? `<p class="card-body" ${ed(`achievements.${i}.description`, true)}>${ach.description}</p>` : '') +
       `</div>`;
   }
   out += '</div>';
-  out += `<button class="ce-add-btn" data-add-section="achievements">+ Add Achievement</button>`;
+  out += addBtn('achievements', 'Achievement');
   return out;
 }
 
 function _awards(v: NormalizedData): string {
+  const em = v.edit_mode;
+  const ed = (p: string, ml = false) => em ? _editable(p, ml) : '';
+  const delBtn = (sec: string, idx: number) => em ? `<button class="ce-del-btn" data-del-section="${sec}" data-del-index="${idx}">×</button>` : '';
+  const addBtn = (sec: string, label: string) => em ? `<button class="ce-add-btn" data-add-section="${sec}">+ Add ${label}</button>` : '';
+  const iw = em ? ' data-item-wrap' : '';
   const items = v.awards || [];
-  if (!items.length) return '';
+  if (!items.length && !em) return '';
   let out = '<div class="award-list">';
   for (let i = 0; i < items.length; i++) {
     const aw = items[i];
@@ -570,21 +610,23 @@ function _awards(v: NormalizedData): string {
     const awUrl = aw.url || '';
     const label = awUrl
       ? `<a class="cert-link" href="${awUrl}" target="_blank" rel="noopener">${aw.title || ''}</a>`
-      : `<span class="card-title" ${_editable(`awards.${i}.title`)}>${aw.title || ''}</span>`;
-    out += `<div class="card" data-item-wrap>` +
-      `<button class="ce-del-btn" data-del-section="awards" data-del-index="${i}">×</button>` +
+      : `<span class="card-title" ${ed(`awards.${i}.title`)}>${aw.title || ''}</span>`;
+    out += `<div class="card"${iw}>` +
+      delBtn('awards', i) +
       label +
       (meta ? `<span class="cert-meta">${meta}</span>` : '') +
       `</div>`;
   }
   out += '</div>';
-  out += `<button class="ce-add-btn" data-add-section="awards">+ Add Award</button>`;
+  out += addBtn('awards', 'Award');
   return out;
 }
 
 function _design_philosophy(v: NormalizedData): string {
+  const em = v.edit_mode;
+  const ed = (p: string, ml = false) => em ? _editable(p, ml) : '';
   const dp = v.design_philosophy || '';
-  return dp ? `<div class="card philosophy-card"><p ${_editable('design_philosophy', true)}>${dp}</p></div>` : '';
+  return dp ? `<div class="card philosophy-card"><p ${ed('design_philosophy', true)}>${dp}</p></div>` : '';
 }
 
 function _software_proficiency(v: NormalizedData): string {
@@ -595,8 +637,14 @@ function _software_proficiency(v: NormalizedData): string {
 }
 
 function _campaigns(v: NormalizedData): string {
+  const em = v.edit_mode;
+  const ed = (p: string, ml = false) => em ? _editable(p, ml) : '';
+  const led = (p: string) => em ? _listEditable(p) : '';
+  const delBtn = (sec: string, idx: number) => em ? `<button class="ce-del-btn" data-del-section="${sec}" data-del-index="${idx}">×</button>` : '';
+  const addBtn = (sec: string, label: string) => em ? `<button class="ce-add-btn" data-add-section="${sec}">+ Add ${label}</button>` : '';
+  const iw = em ? ' data-item-wrap' : '';
   const items = v.campaigns || [];
-  if (!items.length) return '';
+  if (!items.length && !em) return '';
   let out = '<div class="camp-list">';
   for (let i = 0; i < items.length; i++) {
     const c = items[i];
@@ -606,50 +654,61 @@ function _campaigns(v: NormalizedData): string {
     const metrics = c.performance_metrics || [];
     const chTags = channels.map((ch: string) => `<span class="tag">${ch}</span>`).join('');
     const mItems = metrics.map((m: string) => `<li>${m}</li>`).join('');
-    out += `<div class="card" data-item-wrap>` +
-      `<button class="ce-del-btn" data-del-section="campaigns" data-del-index="${i}">×</button>` +
-      `<div class="card-title" ${_editable(`campaigns.${i}.campaign_name`)}>${c.campaign_name || ''}${ctype ? `&nbsp;<span class="cert-meta">${ctype}</span>` : ''}</div>` +
+    out += `<div class="card"${iw}>` +
+      delBtn('campaigns', i) +
+      `<div class="card-title" ${ed(`campaigns.${i}.campaign_name`)}>${c.campaign_name || ''}${ctype ? `&nbsp;<span class="cert-meta">${ctype}</span>` : ''}</div>` +
       (chTags ? `<div class="tag-row">${chTags}</div>` : '') +
       (budget ? `<p class="card-body">Budget: ${budget}</p>` : '') +
-      (mItems ? `<ul class="card-list" ${_listEditable(`campaigns.${i}.performance_metrics`)}>${mItems}</ul>` : '') +
+      (mItems ? `<ul class="card-list" ${led(`campaigns.${i}.performance_metrics`)}>${mItems}</ul>` : '') +
       `</div>`;
   }
   out += '</div>';
-  out += `<button class="ce-add-btn" data-add-section="campaigns">+ Add Campaign</button>`;
+  out += addBtn('campaigns', 'Campaign');
   return out;
 }
 
 function _financial_modeling(v: NormalizedData): string {
+  const em = v.edit_mode;
+  const ed = (p: string, ml = false) => em ? _editable(p, ml) : '';
+  const led = (p: string) => em ? _listEditable(p) : '';
+  const delBtn = (sec: string, idx: number) => em ? `<button class="ce-del-btn" data-del-section="${sec}" data-del-index="${idx}">×</button>` : '';
+  const addBtn = (sec: string, label: string) => em ? `<button class="ce-add-btn" data-add-section="${sec}">+ Add ${label}</button>` : '';
+  const iw = em ? ' data-item-wrap' : '';
   const items = v.financial_modeling || [];
-  if (!items.length) return '';
+  if (!items.length && !em) return '';
   let out = '<div class="fm-list">';
   for (let i = 0; i < items.length; i++) {
     const fm = items[i];
     const tools = fm.tools_used || [];
     const toolTags = tools.map((t: string) => `<span class="tag">${t}</span>`).join('');
-    out += `<div class="card" data-item-wrap>` +
-      `<button class="ce-del-btn" data-del-section="financial_modeling" data-del-index="${i}">×</button>` +
-      `<div class="card-title" ${_editable(`financial_modeling.${i}.model_type`)}>${fm.model_type || ''}</div>` +
-      (toolTags ? `<div class="tag-row" ${_listEditable(`financial_modeling.${i}.tools_used`)}>${toolTags}</div>` : '') +
-      (fm.outcome ? `<p class="card-body" ${_editable(`financial_modeling.${i}.outcome`, true)}>${fm.outcome}</p>` : '') +
+    out += `<div class="card"${iw}>` +
+      delBtn('financial_modeling', i) +
+      `<div class="card-title" ${ed(`financial_modeling.${i}.model_type`)}>${fm.model_type || ''}</div>` +
+      (toolTags ? `<div class="tag-row" ${led(`financial_modeling.${i}.tools_used`)}>${toolTags}</div>` : '') +
+      (fm.outcome ? `<p class="card-body" ${ed(`financial_modeling.${i}.outcome`, true)}>${fm.outcome}</p>` : '') +
       `</div>`;
   }
   out += '</div>';
-  out += `<button class="ce-add-btn" data-add-section="financial_modeling">+ Add Model</button>`;
+  out += addBtn('financial_modeling', 'Model');
   return out;
 }
 
 function _investment_portfolios(v: NormalizedData): string {
+  const em = v.edit_mode;
+  const ed = (p: string, ml = false) => em ? _editable(p, ml) : '';
+  const delBtn = (sec: string, idx: number) => em ? `<button class="ce-del-btn" data-del-section="${sec}" data-del-index="${idx}">×</button>` : '';
+  const addBtn = (sec: string, label: string) => em ? `<button class="ce-add-btn" data-add-section="${sec}">+ Add ${label}</button>` : '';
+  const iw = em ? ' data-item-wrap' : '';
   const items = v.investment_portfolios || [];
-  if (!items.length) return '';
+  if (!items.length && !em) return '';
   let out = '<div class="ip-list">';
   for (let i = 0; i < items.length; i++) {
     const ip = items[i];
     const aum = ip.assets_under_management || '';
     const ret = ip.performance_return || '';
-    out += `<div class="card" data-item-wrap>` +
-      `<button class="ce-del-btn" data-del-section="investment_portfolios" data-del-index="${i}">×</button>` +
-      `<div class="card-title" ${_editable(`investment_portfolios.${i}.portfolio_type`)}>${ip.portfolio_type || ''}</div>` +
+    out += `<div class="card"${iw}>` +
+      delBtn('investment_portfolios', i) +
+      `<div class="card-title" ${ed(`investment_portfolios.${i}.portfolio_type`)}>${ip.portfolio_type || ''}</div>` +
       `<div class="ip-stats">` +
       (aum ? `<span><label>AUM</label>${aum}</span>` : '') +
       (ret ? `<span><label>Return</label>${ret}</span>` : '') +
@@ -657,7 +716,7 @@ function _investment_portfolios(v: NormalizedData): string {
       `</div>`;
   }
   out += '</div>';
-  out += `<button class="ce-add-btn" data-add-section="investment_portfolios">+ Add Portfolio</button>`;
+  out += addBtn('investment_portfolios', 'Portfolio');
   return out;
 }
 
@@ -690,16 +749,44 @@ export function html(v: NormalizedData): string {
   if (v.portfolio_url) liHtml += `<a class="hero-link" href="${v.portfolio_url}" target="_blank" rel="noopener">Portfolio</a>`;
   if (v.twitter_url)   liHtml += `<a class="hero-link" href="${v.twitter_url}" target="_blank" rel="noopener">Twitter</a>`;
 
+  const em = v.edit_mode;
+  const ed = (p: string, ml = false) => em ? _editable(p, ml) : '';
+  const edScript = em ? EDITOR_SCRIPT : '';
+
   const order = v.section_order || DEFAULT_SECTION_ORDER;
   const hidden = new Set(v.hidden_sections || []);
   const counter = { n: 0 };
 
   const aboutSec = _section('About', _about(v), counter);
   const contentSections = order
-    .filter(key => !hidden.has(key) && key in _SECTION_RENDERERS)
-    .map(key => {
-      const [label, renderer] = _SECTION_RENDERERS[key];
-      return _section(label, renderer(v), counter);
+    .flatMap(key => {
+      if (hidden.has(key)) return [];
+      if (key === 'custom_sections') {
+        return (v.custom_sections ?? [])
+          .filter(cs => cs.items?.length || em)
+          .map((cs, csIdx) => {
+            const itemsHtml = (cs.items ?? []).map((item, i) => {
+              const del = em ? `<button class="ce-del-btn" data-del-section="custom_sections" data-del-index="${i}">&#x2715;</button>` : '';
+              return `<div class="card" style="position:relative">${del}
+${item.label ? `<p class="card-title">${item.label}</p>` : ''}
+${item.subtitle ? `<p style="opacity:.65;font-size:.85rem;margin-top:4px">${item.subtitle}</p>` : ''}
+${item.value ? `<p style="margin-top:8px;line-height:1.6">${item.value}</p>` : ''}
+${item.tags?.length ? `<div class="tag-row" style="margin-top:10px">${item.tags.map((t) => `<span class="tag">${t}</span>`).join('')}</div>` : ''}
+${item.url ? `<a href="${item.url}" style="font-size:.82rem;margin-top:8px;display:inline-block;color:var(--cyan)" target="_blank" rel="noopener noreferrer">View &#8599;</a>` : ''}
+</div>`;
+            }).join('\n');
+            const add = em ? `<button class="ce-add-btn" data-add-section="custom_sections.${csIdx}.items">+ Add Item</button>` : '';
+            const inner = cs.display_type === 'cards'
+              ? `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:1rem">${itemsHtml}</div>${add}`
+              : `<div style="display:flex;flex-direction:column;gap:.75rem">${itemsHtml}</div>${add}`;
+            return _section(cs.title, inner, counter);
+          });
+      }
+      if (key in _SECTION_RENDERERS) {
+        const [label, renderer] = _SECTION_RENDERERS[key];
+        return [_section(label, renderer(v), counter)];
+      }
+      return [];
     })
     .filter(Boolean)
     .join('\n');
@@ -726,9 +813,9 @@ export function html(v: NormalizedData): string {
   <header class="hero">
     <div class="hero-inner">
       <p class="eyebrow"><span class="eyebrow-dot"></span>Portfolio</p>
-      <h1 class="hero-name" ${_editable('profile.full_name')}>${name}</h1>
-      ${title ? `<p class="hero-title" ${_editable('profile.headline')}>${title}</p>` : ''}
-      ${v.location || v.phone ? `<p class="hero-title" style="font-size:.9rem;margin-top:-16px;margin-bottom:24px"><span ${_editable('profile.location')}>${v.location || ''}</span>${v.phone ? ` &bull; <span ${_editable('profile.phone')}>${v.phone}</span>` : ''}</p>` : ''}
+      <h1 class="hero-name" ${ed('profile.full_name')}>${name}</h1>
+      ${title ? `<p class="hero-title" ${ed('profile.headline')}>${title}</p>` : ''}
+      ${v.location || v.phone ? `<p class="hero-title" style="font-size:.9rem;margin-top:-16px;margin-bottom:24px"><span ${ed('profile.location')}>${v.location || ''}</span>${v.phone ? ` &bull; <span ${ed('profile.phone')}>${v.phone}</span>` : ''}</p>` : ''}
       ${liHtml ? `<div class="hero-links">${liHtml}</div>` : ''}
     </div>
     <div class="hero-shimmer" aria-hidden="true"></div>
@@ -741,7 +828,7 @@ export function html(v: NormalizedData): string {
   <footer class="footer">
     <span>Built with AI &bull; Nebula Theme</span>
   </footer>
-${EDITOR_SCRIPT}
+${edScript}
 </body>
 </html>`;
 }

@@ -19,7 +19,8 @@ export const DEFAULT_SECTION_ORDER: string[] = [
 	'financial_modeling',
 	'investment_portfolios',
 	'design_philosophy',
-	'software_proficiency'
+	'software_proficiency',
+	'custom_sections'
 ];
 
 const _ALLOWED_URL_RE = /^https?:\/\//i;
@@ -214,7 +215,7 @@ export const EDITOR_JS = `(function(){
  * Inline editor script tag — included in every template's html() output
  * so the editing UI also works when portfolios are served as static pages.
  */
-export const EDITOR_SCRIPT = `<script>${EDITOR_JS}<\/script>`;
+export const EDITOR_SCRIPT = `<script data-editor>${EDITOR_JS}<\/script>`;
 
 export interface NormalizedData {
 	// Profile
@@ -284,10 +285,24 @@ export interface NormalizedData {
 		assets_under_management: string;
 		performance_return: string;
 	}>;
+	// Custom sections (all categories)
+	custom_sections: Array<{
+		section_id: string;
+		title: string;
+		display_type: 'cards' | 'list' | 'timeline';
+		items: Array<{
+			label: string;
+			value: string;
+			subtitle: string;
+			tags: string[];
+			url: string;
+		}>;
+	}>;
 	// Metadata
 	category: string;
 	section_order: string[];
 	hidden_sections: Set<string>;
+	edit_mode: boolean;
 }
 
 export function normalize(
@@ -295,7 +310,8 @@ export function normalize(
 	portfolioContent: PortfolioContent,
 	category: string,
 	sectionOrder?: string[],
-	hiddenSections?: string[] | Set<string>
+	hiddenSections?: string[] | Set<string>,
+	editMode = true
 ): NormalizedData {
 	const profile = parsedData.profile ?? {};
 	const social = profile.social_links ?? {};
@@ -421,6 +437,21 @@ export function normalize(
 			performance_return: _e(ip.performance_return)
 		}));
 
+	const custom_sections = (parsedData.custom_sections ?? [])
+		.filter((cs) => cs.section_id && cs.title)
+		.map((cs) => ({
+			section_id: _e(cs.section_id),
+			title: _e(cs.title),
+			display_type: cs.display_type,
+			items: (cs.items ?? []).map((item) => ({
+				label: _e(item.label),
+				value: _e(item.value),
+				subtitle: _e(item.subtitle),
+				tags: (Array.isArray(item.tags) ? item.tags : []).filter(Boolean).map(_e),
+				url: _safeUrl(item.url)
+			}))
+		}));
+
 	const hidden =
 		hiddenSections instanceof Set
 			? hiddenSections
@@ -450,8 +481,10 @@ export function normalize(
 		campaigns,
 		financial_modeling,
 		investment_portfolios,
+		custom_sections,
 		category,
 		section_order: sectionOrder ?? DEFAULT_SECTION_ORDER,
-		hidden_sections: hidden
+		hidden_sections: hidden,
+		edit_mode: editMode
 	};
 }

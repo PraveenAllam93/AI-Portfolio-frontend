@@ -16,7 +16,9 @@
 		updatePortfolioConfig,
 		publishPortfolio,
 		getImageUploadUrl,
+		generateProjectImage,
 		getAiSuggestions,
+		addCustomSection as addCustomSectionApi,
 		type LlmSuggestion
 	} from '$lib/services/portfolio';
 	import { dndzone } from 'svelte-dnd-action';
@@ -25,7 +27,9 @@
 		EditableField,
 		ParsedData,
 		PortfolioContent,
-		SkillGroup
+		SkillGroup,
+		CustomSection,
+		CustomSectionItem
 	} from '$lib/types/portfolio';
 	import { DEFAULT_SECTION_ORDER } from '$lib/types/portfolio';
 	import { renderPortfolio } from '$lib/templates';
@@ -335,6 +339,21 @@
 	let skillsAiError: string = $state('');
 	let showSkillsAiPanel: boolean = $state(false);
 
+	// ── Custom sections ─────────────────────────────────────────────────────────
+
+	let customSections = $state<CustomSection[]>([]);
+	let csExpanded = $state<Record<number, boolean>>({});
+	let csSaveStatus = $state<'idle' | 'saving' | 'saved' | 'error'>('idle');
+	let csSaveError = $state('');
+	let customSectionInput = $state('');
+	let customSectionTitleHint = $state('');
+	let customSectionAiStatus = $state<'idle' | 'loading' | 'done' | 'error'>('idle');
+	type CsAiResult =
+		| { action: 'merge'; targetSection: string; item: Record<string, unknown> }
+		| { action: 'new_section'; section: CustomSection };
+	let customSectionAiResult = $state<CsAiResult | null>(null);
+	let customSectionAiError = $state('');
+
 	// ── Page state ──────────────────────────────────────────────────────────────
 
 	let pageLoading = $state(true);
@@ -393,6 +412,8 @@
 		investment_portfolios:(sections.investment_portfolios?? []).filter(it => !it.hidden).map(it => it.data as any),
 		design_philosophy:    stringSections.design_philosophy ?? '',
 		software_proficiency: (stringSections.software_proficiency ?? '').split('\n').map(s => s.trim()).filter(Boolean),
+		// eslint-disable-next-line @typescript-eslint/no-explicit-any
+		custom_sections:      customSections as any,
 	});
 
 	const livePortfolioContent = $derived<PortfolioContent>({
@@ -788,6 +809,9 @@
 		stringSectionOriginals = { design_philosophy: dp, software_proficiency: sp };
 		stringSectionStatus = { design_philosophy: 'idle', software_proficiency: 'idle' };
 
+		// Custom sections
+		customSections = JSON.parse(JSON.stringify(parsedData.custom_sections ?? []));
+
 		// Template + section order + visibility from API
 		if (result.data?.templateId) templateId = result.data.templateId;
 		if (result.data?.sectionOrder) sectionOrder = result.data.sectionOrder;
@@ -801,6 +825,7 @@
 			})
 			.map(([key]) => key);
 		if (!visibleKeys.includes('skills')) visibleKeys.push('skills');
+		if (!visibleKeys.includes('custom_sections')) visibleKeys.push('custom_sections');
 		const sortedVisible = sectionOrder
 			.filter(k => visibleKeys.includes(k))
 			.concat(visibleKeys.filter(k => !sectionOrder.includes(k)));
@@ -996,6 +1021,57 @@
 		items[idx] = { ...items[idx], data: { ...items[idx].data, images: currentImages }, isDirty: true };
 		sections = { ...sections, [sKey]: items };
 		autoSaveItem(sKey, idx);
+	}
+
+	// AI image generation state: stateKey = `${sKey}-${idx}`
+	let aiImageGenerating: Record<string, boolean> = $state({});
+	let aiImageError: Record<string, string> = $state({});
+	// Pending generated image awaiting user accept/discard: stateKey → imageUrl
+	let aiImagePending: Record<string, string> = $state({});
+
+	async function generateAiImage(sKey: string, idx: number) {
+		const stateKey = `${sKey}-${idx}`;
+		if (aiImageGenerating[stateKey]) return;
+
+		const currentImages = (sections[sKey]?.[idx]?.data?.images as string[]) ?? [];
+		if (currentImages.length >= MAX_ITEM_IMAGES) {
+			aiImageError = { ...aiImageError, [stateKey]: `Maximum ${MAX_ITEM_IMAGES} images already added` };
+			return;
+		}
+
+		aiImageGenerating = { ...aiImageGenerating, [stateKey]: true };
+		aiImageError = { ...aiImageError, [stateKey]: '' };
+		aiImagePending = { ...aiImagePending, [stateKey]: '' };
+
+		const result = await generateProjectImage(userId, sKey, idx);
+
+		aiImageGenerating = { ...aiImageGenerating, [stateKey]: false };
+
+		if (!result.ok || !result.data) {
+			aiImageError = { ...aiImageError, [stateKey]: result.error ?? 'Generation failed. Please try again.' };
+			return;
+		}
+
+		aiImagePending = { ...aiImagePending, [stateKey]: result.data.imageUrl };
+	}
+
+	function acceptAiImage(sKey: string, idx: number) {
+		const stateKey = `${sKey}-${idx}`;
+		const imageUrl = aiImagePending[stateKey];
+		if (!imageUrl) return;
+
+		const currentImages = (sections[sKey]?.[idx]?.data?.images as string[]) ?? [];
+		const updatedImages = [...currentImages, imageUrl];
+		const items = [...sections[sKey]];
+		items[idx] = { ...items[idx], data: { ...items[idx].data, images: updatedImages }, isDirty: true };
+		sections = { ...sections, [sKey]: items };
+		aiImagePending = { ...aiImagePending, [stateKey]: '' };
+		saveItem(sKey, idx);
+	}
+
+	function discardAiImage(sKey: string, idx: number) {
+		const stateKey = `${sKey}-${idx}`;
+		aiImagePending = { ...aiImagePending, [stateKey]: '' };
 	}
 
 	async function enhanceProfileField(key: EditableField) {
@@ -1376,7 +1452,144 @@
 
 	function sectionLabel(key: string): string {
 		if (key === 'skills') return 'Skills';
+		if (key === 'custom_sections') return 'Custom Sections';
 		return SECTION_CONFIG[key]?.label ?? key;
+	}
+
+	// ── Custom sections ──────────────────────────────────────────────────────────
+
+	async function saveCustomSections() {
+		csSaveStatus = 'saving';
+		csSaveError = '';
+		const result = await savePortfolioSection(userId, 'custom_sections', customSections);
+		if (result.ok) {
+			csSaveStatus = 'saved';
+			queuePreviewRefresh();
+			// Ensure custom_sections is in the section order so the portfolio generator renders it.
+			// This handles users whose stored sectionOrder predates the custom_sections feature.
+			if (!sectionOrder.includes('custom_sections')) {
+				sectionOrder = [...sectionOrder, 'custom_sections'];
+				if (!dndItems.find(i => i.id === 'custom_sections')) {
+					dndItems = [...dndItems, { id: 'custom_sections' }];
+				}
+				await updatePortfolioConfig(userId, { sectionOrder });
+			}
+			setTimeout(() => { csSaveStatus = 'idle'; }, 2500);
+		} else {
+			csSaveStatus = 'error';
+			csSaveError = result.error ?? 'Save failed';
+		}
+	}
+
+	function autoSaveCustomSections() {
+		if (_formSaveTimers['custom_sections']) clearTimeout(_formSaveTimers['custom_sections']);
+		_formSaveTimers['custom_sections'] = setTimeout(saveCustomSections, 800);
+	}
+
+	function updateCsItem(csIdx: number, itemIdx: number, field: keyof CustomSectionItem, val: string) {
+		const updated = [...customSections];
+		const items = [...updated[csIdx].items];
+		if (field === 'tags') {
+			items[itemIdx] = { ...items[itemIdx], tags: val.split('\n').map(s => s.trim()).filter(Boolean) };
+		} else {
+			items[itemIdx] = { ...items[itemIdx], [field]: val };
+		}
+		updated[csIdx] = { ...updated[csIdx], items };
+		customSections = updated;
+	}
+
+	function addCsItem(csIdx: number) {
+		const updated = [...customSections];
+		updated[csIdx] = { ...updated[csIdx], items: [...updated[csIdx].items, { label: '', value: '', subtitle: '', tags: [], url: '' }] };
+		customSections = updated;
+		autoSaveCustomSections();
+	}
+
+	function removeCsItem(csIdx: number, itemIdx: number) {
+		const updated = [...customSections];
+		updated[csIdx] = { ...updated[csIdx], items: updated[csIdx].items.filter((_, i) => i !== itemIdx) };
+		customSections = updated;
+		autoSaveCustomSections();
+	}
+
+	function moveCsItemUp(csIdx: number, itemIdx: number) {
+		if (itemIdx === 0) return;
+		const updated = [...customSections];
+		const items = [...updated[csIdx].items];
+		[items[itemIdx - 1], items[itemIdx]] = [items[itemIdx], items[itemIdx - 1]];
+		updated[csIdx] = { ...updated[csIdx], items };
+		customSections = updated;
+		autoSaveCustomSections();
+	}
+
+	function moveCsItemDown(csIdx: number, itemIdx: number) {
+		const items = customSections[csIdx]?.items ?? [];
+		if (itemIdx >= items.length - 1) return;
+		const updated = [...customSections];
+		const newItems = [...updated[csIdx].items];
+		[newItems[itemIdx], newItems[itemIdx + 1]] = [newItems[itemIdx + 1], newItems[itemIdx]];
+		updated[csIdx] = { ...updated[csIdx], items: newItems };
+		customSections = updated;
+		autoSaveCustomSections();
+	}
+
+	function deleteCustomSection(csIdx: number) {
+		customSections = customSections.filter((_, i) => i !== csIdx);
+		const newExpanded: Record<number, boolean> = {};
+		for (const [k, v] of Object.entries(csExpanded)) {
+			const ki = parseInt(k);
+			if (ki < csIdx) newExpanded[ki] = v as boolean;
+			else if (ki > csIdx) newExpanded[ki - 1] = v as boolean;
+		}
+		csExpanded = newExpanded;
+		autoSaveCustomSections();
+	}
+
+	function moveCustomSectionUp(csIdx: number) {
+		if (csIdx === 0) return;
+		const updated = [...customSections];
+		[updated[csIdx - 1], updated[csIdx]] = [updated[csIdx], updated[csIdx - 1]];
+		customSections = updated;
+		// Swap expanded state
+		const exp = { ...csExpanded };
+		[exp[csIdx - 1], exp[csIdx]] = [exp[csIdx], exp[csIdx - 1]];
+		csExpanded = exp;
+		autoSaveCustomSections();
+	}
+
+	function moveCustomSectionDown(csIdx: number) {
+		if (csIdx >= customSections.length - 1) return;
+		const updated = [...customSections];
+		[updated[csIdx], updated[csIdx + 1]] = [updated[csIdx + 1], updated[csIdx]];
+		customSections = updated;
+		const exp = { ...csExpanded };
+		[exp[csIdx], exp[csIdx + 1]] = [exp[csIdx + 1], exp[csIdx]];
+		csExpanded = exp;
+		autoSaveCustomSections();
+	}
+
+	async function classifyCustomSection() {
+		const text = customSectionInput.trim();
+		if (!text || customSectionAiStatus === 'loading') return;
+		customSectionAiStatus = 'loading';
+		customSectionAiResult = null;
+		customSectionAiError = '';
+		const result = await addCustomSectionApi(userId, text, customSectionTitleHint.trim() || undefined);
+		customSectionAiStatus = result.ok ? 'done' : 'error';
+		if (result.ok && result.data) {
+			customSectionAiResult = result.data as CsAiResult;
+		} else {
+			customSectionAiError = result.error ?? 'Classification failed. Please try again.';
+		}
+	}
+
+	function acceptNewCustomSection(section: CustomSection) {
+		customSections = [...customSections, section];
+		autoSaveCustomSections();
+		customSectionInput = '';
+		customSectionTitleHint = '';
+		customSectionAiResult = null;
+		customSectionAiStatus = 'idle';
 	}
 
 	// ── Preview refresh ──────────────────────────────────────────────────────────
@@ -1893,12 +2106,20 @@
 				}
 				case 'add-item': {
 					const sec = d.section as string;
-					activeTab = sec;
 					mobileTab = 'edit';
-					if (sec === 'skills') {
+					if (sec.startsWith('custom_sections.')) {
+						// "custom_sections.0.items" → csIdx = 0
+						const csIdx = parseInt(sec.split('.')[1]);
+						activeTab = 'custom_sections';
+						csExpanded = { ...csExpanded, [csIdx]: true };
+						addCsItem(csIdx);
+						setTimeout(() => scrollRightPanelToBottom(), 50);
+					} else if (sec === 'skills') {
+						activeTab = sec;
 						addSkillGroup();
 						scrollRightPanelToBottom();
 					} else {
+						activeTab = sec;
 						const newIdx = addItem(sec);
 						scrollRightPanelToItem(sec, newIdx);
 					}
@@ -1985,11 +2206,11 @@
 </script>
 
 <svelte:head>
-	<title>Edit Portfolio — AIfolio</title>
+	<title>Edit Portfolio — Portfolio.ai</title>
 </svelte:head>
 
 {#if publishToast}
-	<div class="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-2xl px-5 py-3 text-sm font-bold shadow-xl ring-1 {publishStatus === 'error' ? 'bg-red-600 text-white ring-red-500' : 'bg-slate-900 text-white ring-slate-700'}">
+	<div class="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-2xl px-5 py-3 text-sm font-bold shadow-xl ring-1 {publishStatus === 'error' ? 'bg-red-600 text-white ring-red-500' : 'bg-brand text-white ring-brand-dark'}">
 		{publishToast}
 	</div>
 {/if}
@@ -1997,12 +2218,12 @@
 <div class="flex h-screen flex-col bg-surface-subtle">
 	<AppHeader />
 
-	<div use:reveal class="flex flex-shrink-0 items-center justify-between gap-4 border-b border-slate-200 bg-white px-4 py-3 sm:px-6">
+	<div use:reveal class="flex flex-shrink-0 items-center justify-between gap-4 border-b border-surface-muted bg-white px-4 py-3 sm:px-6">
 		<div class="flex min-w-0 items-center gap-3">
-			<a href="/app/dashboard" class="flex-shrink-0 rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700" title="Back">
+			<a href="/app/dashboard" class="flex-shrink-0 rounded-lg p-1.5 text-ink-muted transition-colors hover:bg-surface-muted hover:text-ink-soft" title="Back">
 				<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="h-5 w-5"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" /></svg>
 			</a>
-			<h1 class="truncate text-lg font-bold text-slate-900">Edit Portfolio</h1>
+			<h1 class="truncate text-lg font-bold text-ink">Edit Portfolio</h1>
 			{#if hasUnpublishedChanges}
 				<span class="hidden flex-shrink-0 rounded-full bg-amber-50 px-2.5 py-0.5 text-xs font-bold text-amber-600 ring-1 ring-amber-200 sm:inline">Draft</span>
 			{/if}
@@ -2011,36 +2232,36 @@
 			{#if publishStatus === 'done'}
 				<span class="hidden rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-600 ring-1 ring-emerald-200 sm:inline">Published ✓</span>
 			{/if}
-			<button onclick={handlePublish} disabled={publishStatus === 'publishing'} class="rounded-xl bg-slate-900 px-4 py-2 text-sm font-bold text-white transition-all hover:bg-slate-800 active:scale-95 disabled:opacity-50">
+			<button onclick={handlePublish} disabled={publishStatus === 'publishing'} class="rounded-xl bg-brand px-4 py-2 text-sm font-bold text-white transition-all hover:bg-brand-dark active:scale-95 disabled:opacity-50">
 				{publishStatus === 'publishing' ? 'Publishing…' : 'Publish'}
 			</button>
 		</div>
 	</div>
 
-	<div class="flex flex-shrink-0 border-b border-slate-200 bg-white sm:hidden">
+	<div class="flex flex-shrink-0 border-b border-surface-muted bg-white sm:hidden">
 		{#each [['sections', 'Sections'], ['preview', 'Preview'], ['edit', 'Edit']] as [tab, label] (tab)}
-			<button onclick={() => (mobileTab = tab as typeof mobileTab)} class="flex-1 py-2.5 text-sm font-bold transition-colors {mobileTab === tab ? 'border-b-2 border-slate-900 text-slate-900' : 'text-slate-500'}">{label}</button>
+			<button onclick={() => (mobileTab = tab as typeof mobileTab)} class="flex-1 py-2.5 text-sm font-bold transition-colors {mobileTab === tab ? 'border-b-2 border-brand text-ink' : 'text-ink-soft'}">{label}</button>
 		{/each}
 	</div>
 
 	<div class="flex min-h-0 flex-1 overflow-hidden">
 
-		<aside class="{mobileTab === 'sections' ? 'flex' : 'hidden'} sm:flex w-full sm:w-80 flex-col flex-shrink-0 overflow-hidden border-r border-slate-200 bg-slate-50 sm:bg-slate-50 sm:p-0 sm:pt-3">
-			<div class="flex-shrink-0 p-3 space-y-0.5 sm:mx-3 sm:rounded-2xl sm:border sm:border-slate-200 sm:bg-white sm:shadow-md sm:p-3 sm:mb-2">
-				<button onclick={() => { activeTab = 'profile'; mobileTab = 'edit'; }} class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm font-medium transition-colors {activeTab === 'profile' ? 'bg-slate-900 text-white' : 'text-slate-700 hover:bg-slate-200'}">
+		<aside class="{mobileTab === 'sections' ? 'flex' : 'hidden'} sm:flex w-full sm:w-80 flex-col flex-shrink-0 overflow-hidden border-r border-surface-muted bg-surface-subtle sm:bg-surface-subtle sm:p-0 sm:pt-3">
+			<div class="flex-shrink-0 p-3 space-y-0.5 sm:mx-3 sm:rounded-2xl sm:border sm:border-surface-muted sm:bg-white sm:shadow-md sm:p-3 sm:mb-2">
+				<button onclick={() => { activeTab = 'profile'; mobileTab = 'edit'; }} class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm font-medium transition-colors {activeTab === 'profile' ? 'bg-brand text-white' : 'text-ink-soft hover:bg-surface-muted'}">
 					Profile
 				</button>
 				{#if !pageLoading}
 					<div use:dndzone={{ items: dndItems, flipDurationMs: 150 }} onconsider={handleDndConsider} onfinalize={handleDndFinalize} class="flex flex-col space-y-0.5">
 						{#each dndItems as item (item.id)}
-							<div class="flex items-center rounded-lg transition-colors {activeTab === item.id ? 'bg-slate-900 text-white' : 'text-slate-700 hover:bg-slate-100'}">
+							<div class="flex items-center rounded-lg transition-colors {activeTab === item.id ? 'bg-brand text-white' : 'text-ink-soft hover:bg-surface-muted'}">
 								<div class="flex-shrink-0 cursor-grab px-2 py-2 opacity-40 active:cursor-grabbing">
 									<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="h-4 w-4"><path d="M7 2a2 2 0 1 0 .001 4.001A2 2 0 0 0 7 2zm0 6a2 2 0 1 0 .001 4.001A2 2 0 0 0 7 8zm0 6a2 2 0 1 0 .001 4.001A2 2 0 0 0 7 14zm6-8a2 2 0 1 0-.001-4.001A2 2 0 0 0 13 6zm0 2a2 2 0 1 0 .001 4.001A2 2 0 0 0 13 8zm0 6a2 2 0 1 0 .001 4.001A2 2 0 0 0 13 14z"/></svg>
 								</div>
 								<button class="flex-1 py-2 text-left text-sm font-medium" onclick={() => { activeTab = item.id; mobileTab = 'edit'; }}>{sectionLabel(item.id)}</button>
 								<button onclick={(e) => { e.stopPropagation(); toggleSectionVisibility(item.id); }} class="flex-shrink-0 rounded p-1.5 opacity-60 transition-opacity hover:opacity-100" title={hiddenSections.has(item.id) ? 'Show section' : 'Hide section'}>
 									{#if hiddenSections.has(item.id)}
-										<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="h-4 w-4 text-slate-400"><path stroke-linecap="round" stroke-linejoin="round" d="M3.98 8.223A10.477 10.477 0 0 0 1.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.451 10.451 0 0 1 12 4.5c4.756 0 8.773 3.162 10.065 7.498a10.522 10.522 0 0 1-4.293 5.774M6.228 6.228 3 3m3.228 3.228 3.65 3.65m7.894 7.894L21 21m-3.228-3.228-3.65-3.65m0 0a3 3 0 1 0-4.243-4.243m4.242 4.242L9.88 9.88" /></svg>
+										<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="h-4 w-4 text-ink-muted"><path stroke-linecap="round" stroke-linejoin="round" d="M3.98 8.223A10.477 10.477 0 0 0 1.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.451 10.451 0 0 1 12 4.5c4.756 0 8.773 3.162 10.065 7.498a10.522 10.522 0 0 1-4.293 5.774M6.228 6.228 3 3m3.228 3.228 3.65 3.65m7.894 7.894L21 21m-3.228-3.228-3.65-3.65m0 0a3 3 0 1 0-4.243-4.243m4.242 4.242L9.88 9.88" /></svg>
 									{:else}
 										<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="h-4 w-4"><path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" /><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" /></svg>
 									{/if}
@@ -2053,17 +2274,17 @@
 
 			{#if !pageLoading}
 			<!-- AI Insights panel -->
-			<div class="flex-1 min-h-0 mx-3 mb-3 mt-2 rounded-2xl border border-slate-200 bg-white shadow-md overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+			<div class="flex-1 min-h-0 mx-3 mb-3 mt-2 rounded-2xl border border-surface-muted bg-white shadow-md overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
 				<!-- Header -->
-				<div class="flex items-center gap-2 border-b border-slate-100 px-4 py-3">
-					<span class="text-sm font-bold text-slate-800">✦ AI Insights</span>
+				<div class="flex items-center gap-2 border-b border-surface-muted px-4 py-3">
+					<span class="text-sm font-bold text-ink">✦ AI Insights</span>
 					{#if llmSuggestionsLoading}
-						<span class="ml-auto flex items-center gap-1 text-xs text-slate-400"><Spinner size="sm" />Analyzing…</span>
+						<span class="ml-auto flex items-center gap-1 text-xs text-ink-muted"><Spinner size="sm" />Analyzing…</span>
 					{:else}
 						{#if visibleSuggestions.length > 0}
 							<span class="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-bold text-amber-700">{visibleSuggestions.length}</span>
 						{/if}
-						<button onclick={fetchLlmSuggestions} class="ml-auto flex items-center gap-1 rounded-lg px-2 py-1 text-xs text-slate-400 hover:bg-slate-100 hover:text-slate-600" title="Refresh suggestions">
+						<button onclick={fetchLlmSuggestions} class="ml-auto flex items-center gap-1 rounded-lg px-2 py-1 text-xs text-ink-muted hover:bg-surface-muted hover:text-ink-soft" title="Refresh suggestions">
 							<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="h-3.5 w-3.5"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" /></svg>
 							Refresh
 						</button>
@@ -2073,17 +2294,17 @@
 				<!-- Completion bar -->
 				<div class="px-4 pt-3 pb-2">
 					<div class="mb-1 flex items-center justify-between">
-						<span class="text-xs font-bold text-slate-500">Profile complete</span>
+						<span class="text-xs font-bold text-ink-soft">Profile complete</span>
 						<div class="flex items-center gap-1.5">
 							<span class="text-xs font-bold {completionScore >= 80 ? 'text-emerald-600' : completionScore >= 50 ? 'text-amber-600' : 'text-red-500'}">{completionScore}%</span>
 							{#if completionScore < 100}
-								<button onclick={() => showCompletionChecklist = !showCompletionChecklist} class="text-xs text-slate-400 hover:text-slate-600 underline underline-offset-2" title="What's missing?">
+								<button onclick={() => showCompletionChecklist = !showCompletionChecklist} class="text-xs text-ink-muted hover:text-ink-soft underline underline-offset-2" title="What's missing?">
 									{showCompletionChecklist ? 'hide' : 'what\'s missing?'}
 								</button>
 							{/if}
 						</div>
 					</div>
-					<div class="h-2 w-full overflow-hidden rounded-full bg-slate-100">
+					<div class="h-2 w-full overflow-hidden rounded-full bg-surface-muted">
 						<div class="h-full rounded-full transition-all duration-500 {completionScore >= 80 ? 'bg-emerald-500' : completionScore >= 50 ? 'bg-amber-400' : 'bg-red-400'}" style="width:{completionScore}%"></div>
 					</div>
 					{#if showCompletionChecklist}
@@ -2092,10 +2313,10 @@
 								<div class="flex items-start gap-2">
 									{#if item.done}
 										<span class="mt-0.5 flex-shrink-0 text-emerald-500 text-xs">✓</span>
-										<span class="text-xs text-slate-400 line-through">{item.label}</span>
+										<span class="text-xs text-ink-muted line-through">{item.label}</span>
 									{:else}
-										<span class="mt-0.5 flex-shrink-0 text-slate-300 text-xs">○</span>
-										<span class="text-xs text-slate-600">{item.label} <span class="text-slate-400">(+{item.points}%)</span></span>
+										<span class="mt-0.5 flex-shrink-0 text-ink-muted text-xs">○</span>
+										<span class="text-xs text-ink-soft">{item.label} <span class="text-ink-muted">(+{item.points}%)</span></span>
 									{/if}
 								</div>
 							{/each}
@@ -2110,11 +2331,11 @@
 					</div>
 				{:else if llmSuggestionsLoading}
 					<div class="px-4 pb-4 pt-2 text-center">
-						<p class="text-xs text-slate-400">Generating personalized suggestions…</p>
+						<p class="text-xs text-ink-muted">Generating personalized suggestions…</p>
 					</div>
 				{:else if visibleSuggestions.length === 0}
 					<div class="px-4 pb-4 pt-1 text-center">
-						<p class="text-xs text-slate-400">{llmSuggestionsLoaded ? '✓ Your portfolio looks great! No suggestions right now.' : 'Looking good! No suggestions right now.'}</p>
+						<p class="text-xs text-ink-muted">{llmSuggestionsLoaded ? '✓ Your portfolio looks great! No suggestions right now.' : 'Looking good! No suggestions right now.'}</p>
 					</div>
 				{:else}
 					<div class="space-y-1.5 px-3 pb-3 pt-1">
@@ -2123,16 +2344,16 @@
 								<button
 									type="button"
 									onclick={() => activateSuggestion(s)}
-									class="w-full rounded-xl border px-3 py-2.5 text-left transition-all hover:shadow-sm {s.priority === 'high' ? 'border-red-100 bg-red-50/60 hover:border-red-200 hover:bg-red-50' : s.priority === 'medium' ? 'border-amber-100 bg-amber-50/60 hover:border-amber-200 hover:bg-amber-50' : 'border-slate-100 bg-slate-50/60 hover:border-slate-200 hover:bg-slate-50'}"
+									class="w-full rounded-xl border px-3 py-2.5 text-left transition-all hover:shadow-sm {s.priority === 'high' ? 'border-red-100 bg-red-50/60 hover:border-red-200 hover:bg-red-50' : s.priority === 'medium' ? 'border-amber-100 bg-amber-50/60 hover:border-amber-200 hover:bg-amber-50' : 'border-surface-muted bg-surface-subtle/60 hover:border-surface-muted hover:bg-surface-subtle'}"
 								>
-									<p class="pr-5 text-xs font-bold truncate {s.priority === 'high' ? 'text-red-700' : s.priority === 'medium' ? 'text-amber-700' : 'text-slate-600'}">{s.label}</p>
-									<p class="mt-0.5 pr-5 text-xs text-slate-500 truncate">{s.sublabel}</p>
+									<p class="pr-5 text-xs font-bold truncate {s.priority === 'high' ? 'text-red-700' : s.priority === 'medium' ? 'text-amber-700' : 'text-ink-soft'}">{s.label}</p>
+									<p class="mt-0.5 pr-5 text-xs text-ink-soft truncate">{s.sublabel}</p>
 								</button>
 								<button
 									type="button"
 									aria-label="Dismiss suggestion"
 									onclick={() => { dismissedSuggestions = new Set([...dismissedSuggestions, s.id]); }}
-									class="absolute right-2 top-2 flex h-5 w-5 items-center justify-center rounded-full text-slate-300 opacity-0 transition-opacity hover:bg-slate-200 hover:text-slate-500 group-hover:opacity-100"
+									class="absolute right-2 top-2 flex h-5 w-5 items-center justify-center rounded-full text-ink-muted opacity-0 transition-opacity hover:bg-surface-muted hover:text-ink-soft group-hover:opacity-100"
 								>×</button>
 							</div>
 						{/each}
@@ -2140,8 +2361,8 @@
 				{/if}
 
 				{#if dismissedSuggestions.size > 0}
-					<div class="border-t border-slate-100 px-4 py-2 text-center">
-						<button onclick={() => dismissedSuggestions = new Set()} class="text-xs font-medium text-slate-400 hover:text-slate-600">
+					<div class="border-t border-surface-muted px-4 py-2 text-center">
+						<button onclick={() => dismissedSuggestions = new Set()} class="text-xs font-medium text-ink-muted hover:text-ink-soft">
 							Show dismissed ({dismissedSuggestions.size})
 						</button>
 					</div>
@@ -2150,15 +2371,15 @@
 			{/if}
 		</aside>
 
-		<div class="{mobileTab === 'preview' ? 'flex' : 'hidden'} sm:flex flex-1 flex-col overflow-hidden border-r border-slate-200 bg-gradient-to-b from-slate-100 to-slate-200/70">
-			<div class="flex flex-shrink-0 items-center justify-between border-b border-slate-200 bg-white px-4 py-2">
-				<span class="text-sm font-bold text-slate-600">Preview</span>
-				<span class="text-xs text-slate-400">Click any text to edit · select text for AI ✦</span>
+		<div class="{mobileTab === 'preview' ? 'flex' : 'hidden'} sm:flex flex-1 flex-col overflow-hidden border-r border-surface-muted bg-gradient-to-b from-surface-muted to-surface-muted/70">
+			<div class="flex flex-shrink-0 items-center justify-between border-b border-surface-muted bg-white px-4 py-2">
+				<span class="text-sm font-bold text-ink-soft">Preview</span>
+				<span class="text-xs text-ink-muted">Click any text to edit · select text for AI ✦</span>
 			</div>
 			<div class="relative flex-1 overflow-hidden p-4 sm:p-5">
 				{#if pageLoading}
 					<div class="flex h-full items-center justify-center">
-						<p class="text-sm text-slate-400">Loading preview…</p>
+						<p class="text-sm text-ink-muted">Loading preview…</p>
 					</div>
 				{:else}
 					<div class="absolute inset-4 sm:inset-5 overflow-hidden rounded-2xl shadow-2xl ring-1 ring-black/[0.07]">
@@ -2182,46 +2403,46 @@
 
 				{#if activeTab === 'profile'}
 					<div class="space-y-8">
-					<div class="rounded-[1.5rem] border border-slate-100 bg-white p-6 shadow-sm">
+					<div class="rounded-[1.5rem] border border-surface-muted bg-white p-6 shadow-sm">
 						<div class="mb-5 flex items-start justify-between">
 							<div>
-								<p class="text-xs font-bold uppercase tracking-widest text-slate-400">Profile Info</p>
-								<p class="mt-0.5 text-xs text-slate-400">Contact details and social links.</p>
+								<p class="text-xs font-bold uppercase tracking-widest text-ink-muted">Profile Info</p>
+								<p class="mt-0.5 text-xs text-ink-muted">Contact details and social links.</p>
 							</div>
 							{#if rawProfileStatus === 'saved'}<span class="flex-shrink-0 rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-600 ring-1 ring-emerald-100">Saved ✓</span>
 							{:else if rawProfileStatus === 'error'}<span class="flex-shrink-0 rounded-full bg-red-50 px-3 py-1 text-xs font-bold text-red-600 ring-1 ring-red-100">Error</span>{/if}
 						</div>
 						<div class="space-y-4" onfocusout={(e) => { if (!(e.currentTarget as HTMLElement).contains(e.relatedTarget as Node | null)) autoSaveRawProfile(); }}>
-							<div><label for="rp-full-name" class="mb-1 block text-xs font-bold uppercase tracking-widest text-slate-500">Full Name</label><input id="rp-full-name" type="text" value={rawProfile.full_name} oninput={(e) => { rawProfile.full_name = (e.target as HTMLInputElement).value; }} maxlength={200} class="w-full rounded-xl border border-slate-200 bg-slate-50/50 px-4 py-3 text-sm text-slate-900 outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-400/30" /></div>
-							<div><label for="rp-headline" class="mb-1 block text-xs font-bold uppercase tracking-widest text-slate-500">Professional Title</label><input id="rp-headline" type="text" value={rawProfile.headline} oninput={(e) => { rawProfile.headline = (e.target as HTMLInputElement).value; }} maxlength={200} class="w-full rounded-xl border border-slate-200 bg-slate-50/50 px-4 py-3 text-sm text-slate-900 outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-400/30" /></div>
+							<div><label for="rp-full-name" class="mb-1 block text-xs font-bold uppercase tracking-widest text-ink-soft">Full Name</label><input id="rp-full-name" type="text" value={rawProfile.full_name} oninput={(e) => { rawProfile.full_name = (e.target as HTMLInputElement).value; }} maxlength={200} class="w-full rounded-xl border border-surface-muted bg-surface-subtle/50 px-4 py-3 text-sm text-ink outline-none focus:border-brand/60 focus:ring-2 focus:ring-brand/15" /></div>
+							<div><label for="rp-headline" class="mb-1 block text-xs font-bold uppercase tracking-widest text-ink-soft">Professional Title</label><input id="rp-headline" type="text" value={rawProfile.headline} oninput={(e) => { rawProfile.headline = (e.target as HTMLInputElement).value; }} maxlength={200} class="w-full rounded-xl border border-surface-muted bg-surface-subtle/50 px-4 py-3 text-sm text-ink outline-none focus:border-brand/60 focus:ring-2 focus:ring-brand/15" /></div>
 							<div class="grid grid-cols-2 gap-4">
-								<div><label for="rp-email" class="mb-1 block text-xs font-bold uppercase tracking-widest text-slate-500">Email</label><input id="rp-email" type="email" value={rawProfile.email} oninput={(e) => { rawProfile.email = (e.target as HTMLInputElement).value; }} maxlength={200} class="w-full rounded-xl border border-slate-200 bg-slate-50/50 px-4 py-3 text-sm text-slate-900 outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-400/30" /></div>
-								<div><label for="rp-phone" class="mb-1 block text-xs font-bold uppercase tracking-widest text-slate-500">Phone</label><input id="rp-phone" type="text" value={rawProfile.phone} oninput={(e) => { rawProfile.phone = (e.target as HTMLInputElement).value; }} maxlength={50} class="w-full rounded-xl border border-slate-200 bg-slate-50/50 px-4 py-3 text-sm text-slate-900 outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-400/30" /></div>
+								<div><label for="rp-email" class="mb-1 block text-xs font-bold uppercase tracking-widest text-ink-soft">Email</label><input id="rp-email" type="email" value={rawProfile.email} oninput={(e) => { rawProfile.email = (e.target as HTMLInputElement).value; }} maxlength={200} class="w-full rounded-xl border border-surface-muted bg-surface-subtle/50 px-4 py-3 text-sm text-ink outline-none focus:border-brand/60 focus:ring-2 focus:ring-brand/15" /></div>
+								<div><label for="rp-phone" class="mb-1 block text-xs font-bold uppercase tracking-widest text-ink-soft">Phone</label><input id="rp-phone" type="text" value={rawProfile.phone} oninput={(e) => { rawProfile.phone = (e.target as HTMLInputElement).value; }} maxlength={50} class="w-full rounded-xl border border-surface-muted bg-surface-subtle/50 px-4 py-3 text-sm text-ink outline-none focus:border-brand/60 focus:ring-2 focus:ring-brand/15" /></div>
 							</div>
-							<div><label for="rp-location" class="mb-1 block text-xs font-bold uppercase tracking-widest text-slate-500">Location</label><input id="rp-location" type="text" value={rawProfile.location} oninput={(e) => { rawProfile.location = (e.target as HTMLInputElement).value; }} maxlength={200} placeholder="e.g. Hyderabad, India" class="w-full rounded-xl border border-slate-200 bg-slate-50/50 px-4 py-3 text-sm text-slate-900 outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-400/30" /></div>
-							<div><label for="rp-summary" class="mb-1 block text-xs font-bold uppercase tracking-widest text-slate-500">Summary</label><textarea id="rp-summary" value={rawProfile.summary} oninput={(e) => { rawProfile.summary = (e.target as HTMLTextAreaElement).value; }} rows={3} maxlength={2000} class="w-full resize-none rounded-xl border border-slate-200 bg-slate-50/50 px-4 py-3 text-sm text-slate-900 outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-400/30"></textarea></div>
+							<div><label for="rp-location" class="mb-1 block text-xs font-bold uppercase tracking-widest text-ink-soft">Location</label><input id="rp-location" type="text" value={rawProfile.location} oninput={(e) => { rawProfile.location = (e.target as HTMLInputElement).value; }} maxlength={200} placeholder="e.g. Hyderabad, India" class="w-full rounded-xl border border-surface-muted bg-surface-subtle/50 px-4 py-3 text-sm text-ink outline-none focus:border-brand/60 focus:ring-2 focus:ring-brand/15" /></div>
+							<div><label for="rp-summary" class="mb-1 block text-xs font-bold uppercase tracking-widest text-ink-soft">Summary</label><textarea id="rp-summary" value={rawProfile.summary} oninput={(e) => { rawProfile.summary = (e.target as HTMLTextAreaElement).value; }} rows={3} maxlength={2000} class="w-full resize-none rounded-xl border border-surface-muted bg-surface-subtle/50 px-4 py-3 text-sm text-ink outline-none focus:border-brand/60 focus:ring-2 focus:ring-brand/15"></textarea></div>
 							<div>
-								<p class="mb-2 text-xs font-bold uppercase tracking-widest text-slate-500">Social Links</p>
+								<p class="mb-2 text-xs font-bold uppercase tracking-widest text-ink-soft">Social Links</p>
 								<div class="space-y-2">
-									<div class="flex items-center gap-3"><span class="w-20 flex-shrink-0 text-xs font-bold text-slate-500">LinkedIn</span><input type="url" value={rawProfile.social_linkedin} oninput={(e) => { rawProfile.social_linkedin = (e.target as HTMLInputElement).value; }} placeholder="https://linkedin.com/in/..." maxlength={500} class="min-w-0 flex-1 rounded-xl border border-slate-200 bg-slate-50/50 px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-400/30" /></div>
-									<div class="flex items-center gap-3"><span class="w-20 flex-shrink-0 text-xs font-bold text-slate-500">GitHub</span><input type="url" value={rawProfile.social_github} oninput={(e) => { rawProfile.social_github = (e.target as HTMLInputElement).value; }} placeholder="https://github.com/..." maxlength={500} class="min-w-0 flex-1 rounded-xl border border-slate-200 bg-slate-50/50 px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-400/30" /></div>
-									<div class="flex items-center gap-3"><span class="w-20 flex-shrink-0 text-xs font-bold text-slate-500">GitLab</span><input type="url" value={rawProfile.social_gitlab} oninput={(e) => { rawProfile.social_gitlab = (e.target as HTMLInputElement).value; }} placeholder="https://gitlab.com/..." maxlength={500} class="min-w-0 flex-1 rounded-xl border border-slate-200 bg-slate-50/50 px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-400/30" /></div>
-									<div class="flex items-center gap-3"><span class="w-20 flex-shrink-0 text-xs font-bold text-slate-500">Portfolio</span><input type="url" value={rawProfile.social_portfolio} oninput={(e) => { rawProfile.social_portfolio = (e.target as HTMLInputElement).value; }} placeholder="https://..." maxlength={500} class="min-w-0 flex-1 rounded-xl border border-slate-200 bg-slate-50/50 px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-400/30" /></div>
-									<div class="flex items-center gap-3"><span class="w-20 flex-shrink-0 text-xs font-bold text-slate-500">Twitter / X</span><input type="url" value={rawProfile.social_twitter} oninput={(e) => { rawProfile.social_twitter = (e.target as HTMLInputElement).value; }} placeholder="https://twitter.com/..." maxlength={500} class="min-w-0 flex-1 rounded-xl border border-slate-200 bg-slate-50/50 px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-400/30" /></div>
+									<div class="flex items-center gap-3"><span class="w-20 flex-shrink-0 text-xs font-bold text-ink-soft">LinkedIn</span><input type="url" value={rawProfile.social_linkedin} oninput={(e) => { rawProfile.social_linkedin = (e.target as HTMLInputElement).value; }} placeholder="https://linkedin.com/in/..." maxlength={500} class="min-w-0 flex-1 rounded-xl border border-surface-muted bg-surface-subtle/50 px-3 py-2 text-sm text-ink outline-none focus:border-brand/60 focus:ring-1 focus:ring-brand/15" /></div>
+									<div class="flex items-center gap-3"><span class="w-20 flex-shrink-0 text-xs font-bold text-ink-soft">GitHub</span><input type="url" value={rawProfile.social_github} oninput={(e) => { rawProfile.social_github = (e.target as HTMLInputElement).value; }} placeholder="https://github.com/..." maxlength={500} class="min-w-0 flex-1 rounded-xl border border-surface-muted bg-surface-subtle/50 px-3 py-2 text-sm text-ink outline-none focus:border-brand/60 focus:ring-1 focus:ring-brand/15" /></div>
+									<div class="flex items-center gap-3"><span class="w-20 flex-shrink-0 text-xs font-bold text-ink-soft">GitLab</span><input type="url" value={rawProfile.social_gitlab} oninput={(e) => { rawProfile.social_gitlab = (e.target as HTMLInputElement).value; }} placeholder="https://gitlab.com/..." maxlength={500} class="min-w-0 flex-1 rounded-xl border border-surface-muted bg-surface-subtle/50 px-3 py-2 text-sm text-ink outline-none focus:border-brand/60 focus:ring-1 focus:ring-brand/15" /></div>
+									<div class="flex items-center gap-3"><span class="w-20 flex-shrink-0 text-xs font-bold text-ink-soft">Portfolio</span><input type="url" value={rawProfile.social_portfolio} oninput={(e) => { rawProfile.social_portfolio = (e.target as HTMLInputElement).value; }} placeholder="https://..." maxlength={500} class="min-w-0 flex-1 rounded-xl border border-surface-muted bg-surface-subtle/50 px-3 py-2 text-sm text-ink outline-none focus:border-brand/60 focus:ring-1 focus:ring-brand/15" /></div>
+									<div class="flex items-center gap-3"><span class="w-20 flex-shrink-0 text-xs font-bold text-ink-soft">Twitter / X</span><input type="url" value={rawProfile.social_twitter} oninput={(e) => { rawProfile.social_twitter = (e.target as HTMLInputElement).value; }} placeholder="https://twitter.com/..." maxlength={500} class="min-w-0 flex-1 rounded-xl border border-surface-muted bg-surface-subtle/50 px-3 py-2 text-sm text-ink outline-none focus:border-brand/60 focus:ring-1 focus:ring-brand/15" /></div>
 								</div>
 							</div>
 							<div>
-								<p class="mb-2 text-xs font-bold uppercase tracking-widest text-slate-500">Profile Photo</p>
+								<p class="mb-2 text-xs font-bold uppercase tracking-widest text-ink-soft">Profile Photo</p>
 								<div class="flex items-center gap-4">
 									{#if rawProfile.profile_image}
-										<img src={rawProfile.profile_image} alt="Profile" class="h-16 w-16 rounded-full object-cover ring-2 ring-slate-200" />
+										<img src={rawProfile.profile_image} alt="Profile" class="h-16 w-16 rounded-full object-cover ring-2 ring-surface-muted" />
 									{:else}
-										<div class="flex h-16 w-16 flex-shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-400">
+										<div class="flex h-16 w-16 flex-shrink-0 items-center justify-center rounded-full bg-surface-muted text-ink-muted">
 											<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="h-8 w-8"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" /></svg>
 										</div>
 									{/if}
 									<div class="flex-1">
-										<label class="flex cursor-pointer items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm font-bold text-slate-700 hover:border-slate-400 hover:bg-white transition-colors">
+										<label class="flex cursor-pointer items-center gap-2 rounded-xl border border-surface-muted bg-surface-subtle px-4 py-2.5 text-sm font-bold text-ink-soft hover:border-brand/40 hover:bg-white transition-colors">
 											<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="h-4 w-4 flex-shrink-0"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5m-13.5-9L12 3m0 0 4.5 4.5M12 3v13.5" /></svg>
 											{imageUploadStatus === 'uploading' ? 'Uploading…' : imageUploadStatus === 'done' ? 'Photo saved ✓' : rawProfile.profile_image ? 'Replace photo' : 'Upload photo'}
 											<input
@@ -2237,7 +2458,7 @@
 											/>
 										</label>
 										{#if imageUploadError}<p class="mt-1 text-xs font-bold text-red-500">{imageUploadError}</p>{/if}
-										<p class="mt-1 text-xs text-slate-400">JPEG, PNG, WebP or GIF</p>
+										<p class="mt-1 text-xs text-ink-muted">JPEG, PNG, WebP or GIF</p>
 									</div>
 								</div>
 							</div>
@@ -2245,24 +2466,24 @@
 						{#if rawProfileError}<p class="mt-3 text-xs font-bold text-red-500">{rawProfileError}</p>{/if}
 					</div>
 
-					<div><p class="mb-4 text-xs font-bold uppercase tracking-widest text-slate-400">Portfolio Content <span class="font-normal normal-case ml-1">— AI-generated, edit freely</span></p></div>
+					<div><p class="mb-4 text-xs font-bold uppercase tracking-widest text-ink-muted">Portfolio Content <span class="font-normal normal-case ml-1">— AI-generated, edit freely</span></p></div>
 
 					{#each PROFILE_FIELDS as { key, label, hint, limit, multiline }}
 						{@const f = profileFields[key]}
-						<div class="rounded-[1.5rem] border border-slate-100 bg-white p-6 shadow-sm">
+						<div class="rounded-[1.5rem] border border-surface-muted bg-white p-6 shadow-sm">
 							<div class="mb-4 flex items-start justify-between">
-								<div><p class="text-xs font-bold tracking-widest text-slate-400 uppercase">{label}</p><p class="mt-0.5 text-xs text-slate-400">{hint}</p></div>
+								<div><p class="text-xs font-bold tracking-widest text-ink-muted uppercase">{label}</p><p class="mt-0.5 text-xs text-ink-muted">{hint}</p></div>
 								{#if f.status === 'saved'}<span class="flex-shrink-0 rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-600 ring-1 ring-emerald-100">Saved ✓</span>
 								{:else if f.status === 'error'}<span class="flex-shrink-0 rounded-full bg-red-50 px-3 py-1 text-xs font-bold text-red-600 ring-1 ring-red-100">Error</span>{/if}
 							</div>
 							{#if multiline}
-								<textarea id="pf-{key}" value={f.value} oninput={(e) => { profileFields[key].value = (e.target as HTMLTextAreaElement).value; }} onblur={() => autoSaveProfileField(key)} rows={5} maxlength={limit} disabled={f.status === 'saving'} class="w-full resize-none rounded-xl border border-slate-200 bg-slate-50/50 px-4 py-3 text-sm text-slate-900 outline-none transition-all focus:border-slate-400 focus:bg-white focus:ring-2 focus:ring-slate-400/30 disabled:opacity-60"></textarea>
+								<textarea id="pf-{key}" value={f.value} oninput={(e) => { profileFields[key].value = (e.target as HTMLTextAreaElement).value; }} onblur={() => autoSaveProfileField(key)} rows={5} maxlength={limit} disabled={f.status === 'saving'} class="w-full resize-none rounded-xl border border-surface-muted bg-surface-subtle/50 px-4 py-3 text-sm text-ink outline-none transition-all focus:border-brand/60 focus:bg-white focus:ring-2 focus:ring-brand/15 disabled:opacity-60"></textarea>
 							{:else}
-								<input id="pf-{key}" type="text" value={f.value} oninput={(e) => { profileFields[key].value = (e.target as HTMLInputElement).value; }} onblur={() => autoSaveProfileField(key)} maxlength={limit} disabled={f.status === 'saving'} class="w-full rounded-xl border border-slate-200 bg-slate-50/50 px-4 py-3 text-sm text-slate-900 outline-none transition-all focus:border-slate-400 focus:bg-white focus:ring-2 focus:ring-slate-400/30 disabled:opacity-60" />
+								<input id="pf-{key}" type="text" value={f.value} oninput={(e) => { profileFields[key].value = (e.target as HTMLInputElement).value; }} onblur={() => autoSaveProfileField(key)} maxlength={limit} disabled={f.status === 'saving'} class="w-full rounded-xl border border-surface-muted bg-surface-subtle/50 px-4 py-3 text-sm text-ink outline-none transition-all focus:border-brand/60 focus:bg-white focus:ring-2 focus:ring-brand/15 disabled:opacity-60" />
 							{/if}
 							{#if f.errorMsg}<p class="mt-2 text-xs font-bold text-red-500">{f.errorMsg}</p>{/if}
 							<div class="mt-4 flex items-center justify-between">
-								<p class="text-xs text-slate-400">{f.value.length}/{limit}</p>
+								<p class="text-xs text-ink-muted">{f.value.length}/{limit}</p>
 								<button type="button" onclick={() => { profileFields[key].showAiPanel = !f.showAiPanel; }} class="rounded-xl border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-bold text-amber-700 hover:bg-amber-100">✦ AI Enhance</button>
 							</div>
 							{#if f.showAiPanel}
@@ -2273,16 +2494,16 @@
 									{#if f.aiSuggestion}
 										<div class="mt-3 rounded-lg border border-emerald-100 bg-emerald-50/50 p-3">
 											<p class="mb-1 text-xs font-bold text-emerald-700">Suggestion</p>
-											<p class="text-sm text-slate-700">{f.aiSuggestion}</p>
+											<p class="text-sm text-ink-soft">{f.aiSuggestion}</p>
 											<div class="mt-3 flex gap-2">
 												<button onclick={() => acceptProfileSuggestion(key)} class="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-emerald-700">Accept</button>
-												<button onclick={() => { profileFields[key].aiSuggestion = null; }} class="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-bold text-slate-600 hover:bg-slate-100">Dismiss</button>
+												<button onclick={() => { profileFields[key].aiSuggestion = null; }} class="rounded-lg border border-surface-muted px-3 py-1.5 text-xs font-bold text-ink-soft hover:bg-surface-muted">Dismiss</button>
 											</div>
 										</div>
 									{/if}
 									<div class="mt-3 flex gap-2">
 										<button onclick={() => enhanceProfileField(key)} disabled={!f.aiInstruction.trim() || f.aiLoading} class="rounded-lg bg-amber-500 px-4 py-1.5 text-xs font-bold text-white hover:bg-amber-600 disabled:opacity-50 flex items-center gap-1.5">{#if f.aiLoading}<Spinner size="sm" />{/if}Generate</button>
-										<button onclick={() => { profileFields[key].showAiPanel = false; profileFields[key].aiSuggestion = null; profileFields[key].aiError = ''; profileFields[key].aiInstruction = ''; }} class="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-bold text-slate-600 hover:bg-slate-100">Close</button>
+										<button onclick={() => { profileFields[key].showAiPanel = false; profileFields[key].aiSuggestion = null; profileFields[key].aiError = ''; profileFields[key].aiInstruction = ''; }} class="rounded-lg border border-surface-muted px-3 py-1.5 text-xs font-bold text-ink-soft hover:bg-surface-muted">Close</button>
 									</div>
 								</div>
 							{/if}
@@ -2293,21 +2514,21 @@
 				{:else if activeTab === 'skills'}
 					<div class="space-y-4">
 						{#each skillGroups as group, gi}
-							<div data-item-card="skills-{gi}" class="rounded-[1.5rem] border border-slate-100 bg-white p-4 shadow-sm">
+							<div data-item-card="skills-{gi}" class="rounded-[1.5rem] border border-surface-muted bg-white p-4 shadow-sm">
 								<div class="mb-3 flex items-center gap-2">
 									<!-- Reorder buttons -->
 									<div class="flex flex-shrink-0 flex-col">
-										<button type="button" onclick={() => moveSkillGroupUp(gi)} disabled={gi === 0} title="Move up" class="rounded p-0.5 text-slate-300 transition-colors hover:text-slate-600 disabled:opacity-20"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="h-3.5 w-3.5"><path stroke-linecap="round" stroke-linejoin="round" d="m4.5 15.75 7.5-7.5 7.5 7.5" /></svg></button>
-										<button type="button" onclick={() => moveSkillGroupDown(gi)} disabled={gi === skillGroups.length - 1} title="Move down" class="rounded p-0.5 text-slate-300 transition-colors hover:text-slate-600 disabled:opacity-20"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="h-3.5 w-3.5"><path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" /></svg></button>
+										<button type="button" onclick={() => moveSkillGroupUp(gi)} disabled={gi === 0} title="Move up" class="rounded p-0.5 text-ink-muted transition-colors hover:text-ink-soft disabled:opacity-20"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="h-3.5 w-3.5"><path stroke-linecap="round" stroke-linejoin="round" d="m4.5 15.75 7.5-7.5 7.5 7.5" /></svg></button>
+										<button type="button" onclick={() => moveSkillGroupDown(gi)} disabled={gi === skillGroups.length - 1} title="Move down" class="rounded p-0.5 text-ink-muted transition-colors hover:text-ink-soft disabled:opacity-20"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="h-3.5 w-3.5"><path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" /></svg></button>
 									</div>
-									<input type="text" value={group.category} oninput={(e) => updateSkillGroupCategory(gi, (e.target as HTMLInputElement).value)} onblur={autoSaveSkills} placeholder="Category (e.g. Frontend, Backend)" class="min-w-0 flex-1 rounded-xl border border-slate-200 bg-slate-50/50 px-4 py-2 text-sm font-bold text-slate-900 outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-400/30" />
+									<input type="text" value={group.category} oninput={(e) => updateSkillGroupCategory(gi, (e.target as HTMLInputElement).value)} onblur={autoSaveSkills} placeholder="Category (e.g. Frontend, Backend)" class="min-w-0 flex-1 rounded-xl border border-surface-muted bg-surface-subtle/50 px-4 py-2 text-sm font-bold text-ink outline-none focus:border-brand/60 focus:ring-2 focus:ring-brand/15" />
 									<button onclick={() => { removeSkillGroup(gi); autoSaveSkills(); }} class="flex-shrink-0 rounded-xl border border-red-100 bg-red-50 px-3 py-2 text-xs font-bold text-red-500 hover:bg-red-100">Remove</button>
 								</div>
-								<textarea value={group.skills.join('\n')} oninput={(e) => updateSkillGroupSkills(gi, (e.target as HTMLTextAreaElement).value)} onblur={autoSaveSkills} rows={3} placeholder="One skill per line&#10;e.g. React&#10;TypeScript&#10;Node.js" class="w-full resize-none rounded-xl border border-slate-200 bg-slate-50/50 px-4 py-3 text-sm text-slate-900 outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-400/30"></textarea>
+								<textarea value={group.skills.join('\n')} oninput={(e) => updateSkillGroupSkills(gi, (e.target as HTMLTextAreaElement).value)} onblur={autoSaveSkills} rows={3} placeholder="One skill per line&#10;e.g. React&#10;TypeScript&#10;Node.js" class="w-full resize-none rounded-xl border border-surface-muted bg-surface-subtle/50 px-4 py-3 text-sm text-ink outline-none focus:border-brand/60 focus:ring-2 focus:ring-brand/15"></textarea>
 							</div>
 						{/each}
 						<div class="flex flex-wrap gap-3">
-							<button onclick={() => { addSkillGroup(); }} class="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 hover:border-slate-400 hover:bg-slate-50">+ Add Group</button>
+							<button onclick={() => { addSkillGroup(); }} class="rounded-xl border border-surface-muted bg-white px-4 py-2.5 text-sm font-bold text-ink-soft hover:border-brand/40 hover:bg-surface-subtle">+ Add Group</button>
 							<button onclick={() => (showSkillsAiPanel = !showSkillsAiPanel)} class="rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm font-bold text-amber-700 hover:bg-amber-100">✦ Enhance with AI</button>
 						</div>
 						{#if skillsSaveError}<p class="text-xs font-bold text-red-500">{skillsSaveError}</p>{/if}
@@ -2321,17 +2542,17 @@
 									<div class="mt-3 rounded-lg border border-emerald-100 bg-emerald-50/50 p-3">
 										<p class="mb-2 text-xs font-bold text-emerald-700">Suggested Skills</p>
 										{#each skillsAiSuggestion as grp}
-											<div class="mb-2"><p class="text-xs font-bold text-slate-600">{grp.category}</p><div class="mt-1 flex flex-wrap gap-1">{#each grp.skills as s}<span class="rounded-md bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-800">{s}</span>{/each}</div></div>
+											<div class="mb-2"><p class="text-xs font-bold text-ink-soft">{grp.category}</p><div class="mt-1 flex flex-wrap gap-1">{#each grp.skills as s}<span class="rounded-md bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-800">{s}</span>{/each}</div></div>
 										{/each}
 										<div class="mt-3 flex gap-2">
 											<button onclick={acceptSkillsSuggestion} class="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-emerald-700">Accept</button>
-											<button onclick={() => { skillsAiSuggestion = null; }} class="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-bold text-slate-600 hover:bg-slate-100">Dismiss</button>
+											<button onclick={() => { skillsAiSuggestion = null; }} class="rounded-lg border border-surface-muted px-3 py-1.5 text-xs font-bold text-ink-soft hover:bg-surface-muted">Dismiss</button>
 										</div>
 									</div>
 								{/if}
 								<div class="mt-3 flex gap-2">
 									<button onclick={enhanceSkills} disabled={!skillsAiInstruction.trim() || skillsAiLoading} class="flex items-center gap-1.5 rounded-lg bg-amber-500 px-4 py-1.5 text-xs font-bold text-white hover:bg-amber-600 disabled:opacity-50">{#if skillsAiLoading}<Spinner size="sm" />{/if}Generate</button>
-									<button onclick={() => { showSkillsAiPanel = false; skillsAiSuggestion = null; skillsAiError = ''; }} class="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-bold text-slate-600 hover:bg-slate-100">Close</button>
+									<button onclick={() => { showSkillsAiPanel = false; skillsAiSuggestion = null; skillsAiError = ''; }} class="rounded-lg border border-surface-muted px-3 py-1.5 text-xs font-bold text-ink-soft hover:bg-surface-muted">Close</button>
 								</div>
 							</div>
 						{/if}
@@ -2343,32 +2564,32 @@
 					{@const items = sections[sKey] ?? []}
 					<div class="space-y-3">
 						<div class="flex items-center gap-3 pb-1">
-							<h2 class="text-base font-bold text-slate-900">{cfg.label}</h2>
+							<h2 class="text-base font-bold text-ink">{cfg.label}</h2>
 							{#if items.length > 0}
-								<span class="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-bold tabular-nums text-slate-500">{items.length}</span>
+								<span class="rounded-full bg-surface-muted px-2 py-0.5 text-xs font-bold tabular-nums text-ink-soft">{items.length}</span>
 							{/if}
 						</div>
 						{#each items as item, idx}
-							<div data-item-card="{sKey}-{idx}" class="overflow-hidden rounded-[1.5rem] border bg-white shadow-sm transition-all {item.hidden ? 'border-slate-200 opacity-60' : item.expanded ? 'border-slate-300 shadow-md' : 'border-slate-200 hover:shadow-md'}">
+							<div data-item-card="{sKey}-{idx}" class="overflow-hidden rounded-[1.5rem] border bg-white shadow-sm transition-all {item.hidden ? 'border-surface-muted opacity-60' : item.expanded ? 'border-brand/20 shadow-md' : 'border-surface-muted hover:shadow-md'}">
 								<div class="flex w-full items-center gap-2 px-4 py-3">
 									<!-- Expand/collapse + title -->
 									<button type="button" onclick={() => toggleItemExpand(sKey, idx)} class="flex min-w-0 flex-1 items-center gap-2 text-left">
 										<div class="min-w-0 flex-1">
-											<p class="truncate text-sm font-bold text-slate-900 {item.hidden ? 'line-through text-slate-400' : ''}">{cfg.itemTitle(item.data, idx)}</p>
-											{#if item.hidden}<span class="mt-0.5 inline-block text-xs font-bold text-slate-400">Hidden</span>
-											{:else if item.isSaving}<span class="mt-0.5 inline-block text-xs font-bold text-slate-400">Saving…</span>
+											<p class="truncate text-sm font-bold text-ink {item.hidden ? 'line-through text-ink-muted' : ''}">{cfg.itemTitle(item.data, idx)}</p>
+											{#if item.hidden}<span class="mt-0.5 inline-block text-xs font-bold text-ink-muted">Hidden</span>
+											{:else if item.isSaving}<span class="mt-0.5 inline-block text-xs font-bold text-ink-muted">Saving…</span>
 											{:else if item.saveSuccess}<span class="mt-0.5 inline-block text-xs font-bold text-emerald-600">Saved ✓</span>
 											{:else if item.saveError}<span class="mt-0.5 inline-block text-xs font-bold text-red-500">Save failed</span>{/if}
 										</div>
-										<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="h-4 w-4 flex-shrink-0 text-slate-400 transition-transform {item.expanded ? 'rotate-180' : ''}"><path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" /></svg>
+										<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="h-4 w-4 flex-shrink-0 text-ink-muted transition-transform {item.expanded ? 'rotate-180' : ''}"><path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" /></svg>
 									</button>
 									<!-- Reorder buttons -->
 									<div class="flex flex-shrink-0 flex-col">
-										<button type="button" onclick={() => moveItemUp(sKey, idx)} disabled={idx === 0} title="Move up" class="rounded p-0.5 text-slate-300 transition-colors hover:text-slate-600 disabled:opacity-20"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="h-3.5 w-3.5"><path stroke-linecap="round" stroke-linejoin="round" d="m4.5 15.75 7.5-7.5 7.5 7.5" /></svg></button>
-										<button type="button" onclick={() => moveItemDown(sKey, idx)} disabled={idx === items.length - 1} title="Move down" class="rounded p-0.5 text-slate-300 transition-colors hover:text-slate-600 disabled:opacity-20"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="h-3.5 w-3.5"><path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" /></svg></button>
+										<button type="button" onclick={() => moveItemUp(sKey, idx)} disabled={idx === 0} title="Move up" class="rounded p-0.5 text-ink-muted transition-colors hover:text-ink-soft disabled:opacity-20"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="h-3.5 w-3.5"><path stroke-linecap="round" stroke-linejoin="round" d="m4.5 15.75 7.5-7.5 7.5 7.5" /></svg></button>
+										<button type="button" onclick={() => moveItemDown(sKey, idx)} disabled={idx === items.length - 1} title="Move down" class="rounded p-0.5 text-ink-muted transition-colors hover:text-ink-soft disabled:opacity-20"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="h-3.5 w-3.5"><path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" /></svg></button>
 									</div>
 									<!-- Hide toggle -->
-									<button type="button" onclick={() => toggleItemHidden(sKey, idx)} title={item.hidden ? 'Show in portfolio' : 'Hide from portfolio'} class="flex-shrink-0 rounded-lg border p-1.5 transition-colors {item.hidden ? 'border-slate-200 bg-slate-100 text-slate-400 hover:bg-slate-200' : 'border-slate-200 text-slate-400 hover:bg-slate-100 hover:text-slate-600'}">
+									<button type="button" onclick={() => toggleItemHidden(sKey, idx)} title={item.hidden ? 'Show in portfolio' : 'Hide from portfolio'} class="flex-shrink-0 rounded-lg border p-1.5 transition-colors {item.hidden ? 'border-surface-muted bg-surface-muted text-ink-muted hover:bg-surface-muted' : 'border-surface-muted text-ink-muted hover:bg-surface-muted hover:text-ink-soft'}">
 										{#if item.hidden}
 											<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="h-3.5 w-3.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3.98 8.223A10.477 10.477 0 0 0 1.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.451 10.451 0 0 1 12 4.5c4.756 0 8.773 3.162 10.065 7.498a10.522 10.522 0 0 1-4.293 5.774M6.228 6.228 3 3m3.228 3.228 3.65 3.65m7.894 7.894L21 21m-3.228-3.228-3.65-3.65m0 0a3 3 0 1 0-4.243-4.243m4.242 4.242L9.88 9.88" /></svg>
 										{:else}
@@ -2380,18 +2601,18 @@
 								</div>
 								{#if item.expanded}
 									{@const enhanceable = cfg.fields.filter((f) => f.aiEnhanceable)}
-									<div class="space-y-4 border-t border-slate-100 bg-slate-50/40 px-6 pb-6 pt-4">
+									<div class="space-y-4 border-t border-surface-muted bg-surface-subtle/40 px-6 pb-6 pt-4">
 										{#each cfg.fields as field}
 											<div>
 												{#if field.inputType === 'images'}
 													{@const stateKey = `${sKey}-${idx}`}
 													{@const imgs = (item.data[field.key] as string[]) ?? []}
-													<p class="mb-2 text-xs font-bold uppercase tracking-widest text-slate-500">{field.label}</p>
+													<p class="mb-2 text-xs font-bold uppercase tracking-widest text-ink-soft">{field.label}</p>
 													{#if imgs.length > 0}
 														<div class="mb-3 grid grid-cols-3 gap-2">
 															{#each imgs as imgUrl, imgIdx}
 																<div class="relative">
-																	<img src={imgUrl} alt="Uploaded" class="h-20 w-full rounded-xl object-cover ring-1 ring-slate-200" />
+																	<img src={imgUrl} alt="Uploaded" class="h-20 w-full rounded-xl object-cover ring-1 ring-surface-muted" />
 																	<button
 																		type="button"
 																		aria-label="Remove image"
@@ -2402,32 +2623,66 @@
 															{/each}
 														</div>
 													{/if}
+													{#if aiImagePending[stateKey]}
+														<div class="mb-3 rounded-xl border border-amber-200 bg-amber-50 p-3">
+															<p class="mb-2 text-xs font-bold text-amber-700">AI-generated image — add to project?</p>
+															<img src={aiImagePending[stateKey]} alt="AI generated" class="mb-2 h-32 w-full rounded-lg object-cover" />
+															<div class="flex gap-2">
+																<button
+																	type="button"
+																	onclick={() => acceptAiImage(sKey, idx)}
+																	class="flex-1 rounded-lg bg-amber-500 px-3 py-1.5 text-xs font-bold text-white hover:bg-amber-600 transition-colors"
+																>Add to project</button>
+																<button
+																	type="button"
+																	onclick={() => discardAiImage(sKey, idx)}
+																	class="flex-1 rounded-lg border border-amber-200 bg-white px-3 py-1.5 text-xs font-bold text-amber-700 hover:bg-amber-50 transition-colors"
+																>Discard</button>
+															</div>
+														</div>
+													{/if}
 													{#if imgs.length < MAX_ITEM_IMAGES}
-														<label class="flex cursor-pointer items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm font-bold text-slate-700 hover:border-slate-400 hover:bg-white transition-colors">
-															<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="h-4 w-4 flex-shrink-0"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5m-13.5-9L12 3m0 0 4.5 4.5M12 3v13.5" /></svg>
-															{itemImageUploadStatus[stateKey] === 'uploading' ? 'Uploading…' : `Add image (${imgs.length}/${MAX_ITEM_IMAGES})`}
-															<input
-																type="file"
-																accept="image/jpeg,image/png,image/webp,image/gif"
-																style="position:fixed;top:-100px;left:-100px;opacity:0;pointer-events:none"
-																disabled={itemImageUploadStatus[stateKey] === 'uploading'}
-																onchange={(e) => {
-																	const f = (e.target as HTMLInputElement).files?.[0];
-																	if (f) uploadSectionImage(sKey, idx, f);
-																	(e.target as HTMLInputElement).value = '';
-																}}
-															/>
-														</label>
+														<div class="flex gap-2">
+															<label class="flex flex-1 cursor-pointer items-center gap-2 rounded-xl border border-surface-muted bg-surface-subtle px-4 py-2.5 text-sm font-bold text-ink-soft hover:border-brand/40 hover:bg-white transition-colors">
+																<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="h-4 w-4 flex-shrink-0"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5m-13.5-9L12 3m0 0 4.5 4.5M12 3v13.5" /></svg>
+																{itemImageUploadStatus[stateKey] === 'uploading' ? 'Uploading…' : `Upload (${imgs.length}/${MAX_ITEM_IMAGES})`}
+																<input
+																	type="file"
+																	accept="image/jpeg,image/png,image/webp,image/gif"
+																	style="position:fixed;top:-100px;left:-100px;opacity:0;pointer-events:none"
+																	disabled={itemImageUploadStatus[stateKey] === 'uploading'}
+																	onchange={(e) => {
+																		const f = (e.target as HTMLInputElement).files?.[0];
+																		if (f) uploadSectionImage(sKey, idx, f);
+																		(e.target as HTMLInputElement).value = '';
+																	}}
+																/>
+															</label>
+															<button
+																type="button"
+																disabled={aiImageGenerating[stateKey] || !!aiImagePending[stateKey]}
+																onclick={() => generateAiImage(sKey, idx)}
+																class="flex items-center gap-1.5 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm font-bold text-amber-700 hover:bg-amber-100 disabled:opacity-50 transition-colors"
+															>
+																{#if aiImageGenerating[stateKey]}
+																	<svg class="h-4 w-4 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+																	Generating…
+																{:else}
+																	✦ Generate
+																{/if}
+															</button>
+														</div>
 													{:else}
-														<p class="text-xs text-slate-400">Maximum {MAX_ITEM_IMAGES} images reached</p>
+														<p class="text-xs text-ink-muted">Maximum {MAX_ITEM_IMAGES} images reached</p>
 													{/if}
 													{#if itemImageUploadError[stateKey]}<p class="mt-1 text-xs font-bold text-red-500">{itemImageUploadError[stateKey]}</p>{/if}
+													{#if aiImageError[stateKey]}<p class="mt-1 text-xs font-bold text-red-500">{aiImageError[stateKey]}</p>{/if}
 												{:else}
-													<label for="{sKey}-{idx}-{field.key}" class="mb-1 block text-xs font-bold uppercase tracking-widest text-slate-500">{field.label}</label>
+													<label for="{sKey}-{idx}-{field.key}" class="mb-1 block text-xs font-bold uppercase tracking-widest text-ink-soft">{field.label}</label>
 													{#if field.inputType === 'textarea' || field.inputType === 'list'}
-														<textarea id="{sKey}-{idx}-{field.key}" value={getFieldValue(item.data, field.key, field.inputType)} oninput={(e) => setFieldValue(sKey, idx, field.key, field.inputType, (e.target as HTMLTextAreaElement).value)} onblur={() => autoSaveItem(sKey, idx)} rows={field.inputType === 'list' ? 3 : 4} maxlength={field.limit} placeholder={field.placeholder ?? (field.inputType === 'list' ? 'One item per line' : '')} class="w-full resize-none rounded-xl border border-slate-200 bg-slate-50/50 px-4 py-3 text-sm text-slate-900 outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-400/30"></textarea>
+														<textarea id="{sKey}-{idx}-{field.key}" value={getFieldValue(item.data, field.key, field.inputType)} oninput={(e) => setFieldValue(sKey, idx, field.key, field.inputType, (e.target as HTMLTextAreaElement).value)} onblur={() => autoSaveItem(sKey, idx)} rows={field.inputType === 'list' ? 3 : 4} maxlength={field.limit} placeholder={field.placeholder ?? (field.inputType === 'list' ? 'One item per line' : '')} class="w-full resize-none rounded-xl border border-surface-muted bg-surface-subtle/50 px-4 py-3 text-sm text-ink outline-none focus:border-brand/60 focus:ring-2 focus:ring-brand/15"></textarea>
 													{:else}
-														<input id="{sKey}-{idx}-{field.key}" type={field.inputType === 'url' ? 'url' : 'text'} value={getFieldValue(item.data, field.key, field.inputType)} oninput={(e) => setFieldValue(sKey, idx, field.key, field.inputType, (e.target as HTMLInputElement).value)} onblur={() => autoSaveItem(sKey, idx)} maxlength={field.limit} placeholder={field.placeholder ?? ''} class="w-full rounded-xl border border-slate-200 bg-slate-50/50 px-4 py-3 text-sm text-slate-900 outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-400/30" />
+														<input id="{sKey}-{idx}-{field.key}" type={field.inputType === 'url' ? 'url' : 'text'} value={getFieldValue(item.data, field.key, field.inputType)} oninput={(e) => setFieldValue(sKey, idx, field.key, field.inputType, (e.target as HTMLInputElement).value)} onblur={() => autoSaveItem(sKey, idx)} maxlength={field.limit} placeholder={field.placeholder ?? ''} class="w-full rounded-xl border border-surface-muted bg-surface-subtle/50 px-4 py-3 text-sm text-ink outline-none focus:border-brand/60 focus:ring-2 focus:ring-brand/15" />
 													{/if}
 												{/if}
 											</div>
@@ -2451,17 +2706,17 @@
 												{#if item.aiSuggestion}
 													<div class="mt-3 rounded-lg border border-emerald-100 bg-emerald-50/50 p-3">
 														<p class="mb-1 text-xs font-bold text-emerald-700">Suggestion</p>
-														{#if Array.isArray(item.aiSuggestion)}<ul class="space-y-1">{#each item.aiSuggestion as s}<li class="text-sm text-slate-700">• {s}</li>{/each}</ul>
-														{:else}<p class="text-sm text-slate-700">{item.aiSuggestion}</p>{/if}
+														{#if Array.isArray(item.aiSuggestion)}<ul class="space-y-1">{#each item.aiSuggestion as s}<li class="text-sm text-ink-soft">• {s}</li>{/each}</ul>
+														{:else}<p class="text-sm text-ink-soft">{item.aiSuggestion}</p>{/if}
 														<div class="mt-3 flex gap-2">
 															<button onclick={() => acceptItemSuggestion(sKey, idx)} class="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-emerald-700">Accept</button>
-															<button onclick={() => { const u = [...sections[sKey]]; u[idx] = { ...u[idx], aiSuggestion: null }; sections = { ...sections, [sKey]: u }; }} class="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-bold text-slate-600 hover:bg-slate-100">Dismiss</button>
+															<button onclick={() => { const u = [...sections[sKey]]; u[idx] = { ...u[idx], aiSuggestion: null }; sections = { ...sections, [sKey]: u }; }} class="rounded-lg border border-surface-muted px-3 py-1.5 text-xs font-bold text-ink-soft hover:bg-surface-muted">Dismiss</button>
 														</div>
 													</div>
 												{/if}
 												<div class="mt-3 flex gap-2">
 													<button onclick={() => enhanceItem(sKey, idx)} disabled={!item.aiField || !item.aiInstruction.trim() || item.aiLoading} class="flex items-center gap-1.5 rounded-lg bg-amber-500 px-4 py-1.5 text-xs font-bold text-white hover:bg-amber-600 disabled:opacity-50">{#if item.aiLoading}<Spinner size="sm" />{/if}Generate</button>
-													<button onclick={() => toggleItemAiPanel(sKey, idx)} class="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-bold text-slate-600 hover:bg-slate-100">Close</button>
+													<button onclick={() => toggleItemAiPanel(sKey, idx)} class="rounded-lg border border-surface-muted px-3 py-1.5 text-xs font-bold text-ink-soft hover:bg-surface-muted">Close</button>
 												</div>
 											</div>
 										{/if}
@@ -2469,8 +2724,8 @@
 								{/if}
 							</div>
 						{/each}
-						<button onclick={() => addItem(sKey)} class="flex w-full items-center justify-center gap-2 rounded-[1.5rem] border-2 border-dashed border-slate-200 bg-white py-4 text-sm font-bold text-slate-400 transition-all hover:border-slate-400 hover:bg-slate-50 hover:text-slate-700">
-							<span class="flex h-6 w-6 items-center justify-center rounded-full bg-slate-100 text-base font-bold leading-none transition-colors group-hover:bg-slate-200">+</span>
+						<button onclick={() => addItem(sKey)} class="flex w-full items-center justify-center gap-2 rounded-[1.5rem] border-2 border-dashed border-surface-muted bg-white py-4 text-sm font-bold text-ink-muted transition-all hover:border-brand/40 hover:bg-surface-subtle hover:text-ink-soft">
+							<span class="flex h-6 w-6 items-center justify-center rounded-full bg-surface-muted text-base font-bold leading-none transition-colors group-hover:bg-surface-muted">+</span>
 							Add {cfg.label.replace(/s$/, '')}
 						</button>
 					</div>
@@ -2479,14 +2734,169 @@
 					{@const sKey = activeTab}
 					{@const cfg = SECTION_CONFIG[sKey]}
 					{@const isDirtyStr = stringSections[sKey] !== stringSectionOriginals[sKey]}
-					<div class="rounded-[1.5rem] border border-slate-100 bg-white p-6 shadow-sm">
-						<p class="mb-2 text-xs font-bold uppercase tracking-widest text-slate-400">{cfg.label}</p>
-						{#if cfg.type === 'list'}<p class="mb-3 text-xs text-slate-400">Enter one item per line.</p>{/if}
-						<textarea value={stringSections[sKey] ?? ''} oninput={(e) => { stringSections = { ...stringSections, [sKey]: (e.target as HTMLTextAreaElement).value }; }} onblur={() => autoSaveStringSection(sKey)} rows={6} class="w-full resize-none rounded-xl border border-slate-200 bg-slate-50/50 px-4 py-3 text-sm text-slate-900 outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-400/30"></textarea>
+					<div class="rounded-[1.5rem] border border-surface-muted bg-white p-6 shadow-sm">
+						<p class="mb-2 text-xs font-bold uppercase tracking-widest text-ink-muted">{cfg.label}</p>
+						{#if cfg.type === 'list'}<p class="mb-3 text-xs text-ink-muted">Enter one item per line.</p>{/if}
+						<textarea value={stringSections[sKey] ?? ''} oninput={(e) => { stringSections = { ...stringSections, [sKey]: (e.target as HTMLTextAreaElement).value }; }} onblur={() => autoSaveStringSection(sKey)} rows={6} class="w-full resize-none rounded-xl border border-surface-muted bg-surface-subtle/50 px-4 py-3 text-sm text-ink outline-none focus:border-brand/60 focus:ring-2 focus:ring-brand/15"></textarea>
 						<div class="mt-3">
 							{#if stringSectionStatus[sKey] === 'error'}<p class="text-xs font-bold text-red-500">Save failed. Please try again.</p>
-							{:else if stringSectionStatus[sKey] === 'saving'}<p class="text-xs font-bold text-slate-400">Saving…</p>
+							{:else if stringSectionStatus[sKey] === 'saving'}<p class="text-xs font-bold text-ink-muted">Saving…</p>
 							{:else if stringSectionStatus[sKey] === 'saved'}<p class="text-xs font-bold text-emerald-600">Saved ✓</p>{/if}
+						</div>
+					</div>
+
+				{:else if activeTab === 'custom_sections'}
+					<div class="space-y-3">
+						<div class="flex items-center gap-3 pb-1">
+							<h2 class="text-base font-bold text-ink">Custom Sections</h2>
+							{#if customSections.length > 0}
+								<span class="rounded-full bg-surface-muted px-2 py-0.5 text-xs font-bold tabular-nums text-ink-soft">{customSections.length}</span>
+							{/if}
+							{#if csSaveStatus === 'saved'}
+								<span class="ml-auto text-xs font-bold text-emerald-600">Saved ✓</span>
+							{:else if csSaveStatus === 'saving'}
+								<span class="ml-auto text-xs font-bold text-ink-muted">Saving…</span>
+							{:else if csSaveStatus === 'error'}
+								<span class="ml-auto text-xs font-bold text-red-500">{csSaveError}</span>
+							{/if}
+						</div>
+
+						<!-- Existing custom sections -->
+						{#each customSections as cs, csIdx}
+							<div class="overflow-hidden rounded-[1.5rem] border bg-white shadow-sm transition-all {csExpanded[csIdx] ? 'border-brand/20 shadow-md' : 'border-surface-muted hover:shadow-md'}">
+								<!-- Section header -->
+								<div class="flex w-full items-center gap-2 px-4 py-3">
+									<button type="button" onclick={() => { csExpanded = { ...csExpanded, [csIdx]: !csExpanded[csIdx] }; }} class="flex min-w-0 flex-1 items-center gap-2 text-left">
+										<div class="min-w-0 flex-1">
+											<p class="truncate text-sm font-bold text-ink">{cs.title || `Section ${csIdx + 1}`}</p>
+											<p class="mt-0.5 text-xs text-ink-muted capitalize">{cs.display_type} · {cs.items.length} item{cs.items.length !== 1 ? 's' : ''}</p>
+										</div>
+										<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="h-4 w-4 flex-shrink-0 text-ink-muted transition-transform {csExpanded[csIdx] ? 'rotate-180' : ''}"><path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" /></svg>
+									</button>
+									<div class="flex flex-shrink-0 items-center gap-1">
+										<button type="button" onclick={() => moveCustomSectionUp(csIdx)} disabled={csIdx === 0} title="Move section up" class="rounded p-1 text-ink-muted hover:text-ink-soft disabled:opacity-20"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="h-3.5 w-3.5"><path stroke-linecap="round" stroke-linejoin="round" d="m4.5 15.75 7.5-7.5 7.5 7.5" /></svg></button>
+										<button type="button" onclick={() => moveCustomSectionDown(csIdx)} disabled={csIdx === customSections.length - 1} title="Move section down" class="rounded p-1 text-ink-muted hover:text-ink-soft disabled:opacity-20"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="h-3.5 w-3.5"><path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" /></svg></button>
+										<button type="button" onclick={() => deleteCustomSection(csIdx)} class="rounded-lg border border-red-100 bg-red-50 px-2 py-1 text-xs font-bold text-red-500 hover:bg-red-100">Delete</button>
+									</div>
+								</div>
+
+								{#if csExpanded[csIdx]}
+									<div class="space-y-4 border-t border-surface-muted bg-surface-subtle/40 px-6 pb-6 pt-4">
+										<!-- Section metadata -->
+										<div class="grid grid-cols-2 gap-4">
+											<div>
+												<label class="mb-1 block text-xs font-bold uppercase tracking-widest text-ink-soft">Section Title</label>
+												<input type="text" value={cs.title} oninput={(e) => { const u = [...customSections]; u[csIdx] = { ...u[csIdx], title: (e.target as HTMLInputElement).value }; customSections = u; }} onblur={autoSaveCustomSections} maxlength={200} class="w-full rounded-xl border border-surface-muted bg-surface-subtle/50 px-3 py-2 text-sm text-ink outline-none focus:border-brand/60 focus:ring-2 focus:ring-brand/15" />
+											</div>
+											<div>
+												<label class="mb-1 block text-xs font-bold uppercase tracking-widest text-ink-soft">Display Type</label>
+												<select value={cs.display_type} onchange={(e) => { const u = [...customSections]; u[csIdx] = { ...u[csIdx], display_type: (e.target as HTMLSelectElement).value as 'cards'|'list'|'timeline' }; customSections = u; autoSaveCustomSections(); }} class="w-full rounded-xl border border-surface-muted bg-surface-subtle/50 px-3 py-2 text-sm text-ink outline-none focus:border-brand/60 focus:ring-2 focus:ring-brand/15">
+													<option value="cards">Cards</option>
+													<option value="list">List</option>
+													<option value="timeline">Timeline</option>
+												</select>
+											</div>
+										</div>
+
+										<!-- Items -->
+										{#each cs.items as item, itemIdx}
+											<div class="rounded-xl border border-surface-muted bg-white p-4 space-y-3">
+												<div class="flex items-center justify-between gap-2">
+													<p class="text-xs font-bold text-ink-soft">Item {itemIdx + 1}</p>
+													<div class="flex items-center gap-1">
+														<button type="button" onclick={() => moveCsItemUp(csIdx, itemIdx)} disabled={itemIdx === 0} title="Move up" class="rounded p-0.5 text-ink-muted hover:text-ink-soft disabled:opacity-20"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="h-3.5 w-3.5"><path stroke-linecap="round" stroke-linejoin="round" d="m4.5 15.75 7.5-7.5 7.5 7.5" /></svg></button>
+														<button type="button" onclick={() => moveCsItemDown(csIdx, itemIdx)} disabled={itemIdx === cs.items.length - 1} title="Move down" class="rounded p-0.5 text-ink-muted hover:text-ink-soft disabled:opacity-20"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="h-3.5 w-3.5"><path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" /></svg></button>
+														<button type="button" onclick={() => removeCsItem(csIdx, itemIdx)} class="rounded-lg border border-red-100 bg-red-50 px-2 py-1 text-xs font-bold text-red-500 hover:bg-red-100">Remove</button>
+													</div>
+												</div>
+												<div>
+													<label class="mb-1 block text-xs font-bold uppercase tracking-widest text-ink-soft">Label / Title</label>
+													<input type="text" value={item.label ?? ''} oninput={(e) => updateCsItem(csIdx, itemIdx, 'label', (e.target as HTMLInputElement).value)} onblur={autoSaveCustomSections} maxlength={200} placeholder="e.g. Conference name, award title" class="w-full rounded-xl border border-surface-muted bg-surface-subtle/50 px-3 py-2 text-sm text-ink outline-none focus:border-brand/60 focus:ring-2 focus:ring-brand/15" />
+												</div>
+												<div>
+													<label class="mb-1 block text-xs font-bold uppercase tracking-widest text-ink-soft">Description / Content</label>
+													<textarea value={item.value ?? ''} oninput={(e) => updateCsItem(csIdx, itemIdx, 'value', (e.target as HTMLTextAreaElement).value)} onblur={autoSaveCustomSections} rows={3} maxlength={1000} placeholder="Main description or body text" class="w-full resize-none rounded-xl border border-surface-muted bg-surface-subtle/50 px-3 py-2 text-sm text-ink outline-none focus:border-brand/60 focus:ring-2 focus:ring-brand/15"></textarea>
+												</div>
+												<div class="grid grid-cols-2 gap-3">
+													<div>
+														<label class="mb-1 block text-xs font-bold uppercase tracking-widest text-ink-soft">Subtitle</label>
+														<input type="text" value={item.subtitle ?? ''} oninput={(e) => updateCsItem(csIdx, itemIdx, 'subtitle', (e.target as HTMLInputElement).value)} onblur={autoSaveCustomSections} maxlength={200} placeholder="e.g. date, org" class="w-full rounded-xl border border-surface-muted bg-surface-subtle/50 px-3 py-2 text-sm text-ink outline-none focus:border-brand/60 focus:ring-2 focus:ring-brand/15" />
+													</div>
+													<div>
+														<label class="mb-1 block text-xs font-bold uppercase tracking-widest text-ink-soft">URL</label>
+														<input type="url" value={item.url ?? ''} oninput={(e) => updateCsItem(csIdx, itemIdx, 'url', (e.target as HTMLInputElement).value)} onblur={autoSaveCustomSections} maxlength={500} placeholder="https://..." class="w-full rounded-xl border border-surface-muted bg-surface-subtle/50 px-3 py-2 text-sm text-ink outline-none focus:border-brand/60 focus:ring-2 focus:ring-brand/15" />
+													</div>
+												</div>
+												<div>
+													<label class="mb-1 block text-xs font-bold uppercase tracking-widest text-ink-soft">Tags (one per line)</label>
+													<textarea value={(item.tags ?? []).join('\n')} oninput={(e) => updateCsItem(csIdx, itemIdx, 'tags', (e.target as HTMLTextAreaElement).value)} onblur={autoSaveCustomSections} rows={2} placeholder="e.g. React&#10;TypeScript" class="w-full resize-none rounded-xl border border-surface-muted bg-surface-subtle/50 px-3 py-2 text-sm text-ink outline-none focus:border-brand/60 focus:ring-2 focus:ring-brand/15"></textarea>
+												</div>
+											</div>
+										{/each}
+
+										<button onclick={() => addCsItem(csIdx)} class="flex w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed border-surface-muted bg-white py-3 text-sm font-bold text-ink-muted transition-all hover:border-brand/40 hover:bg-surface-subtle hover:text-ink-soft">+ Add Item</button>
+									</div>
+								{/if}
+							</div>
+						{/each}
+
+						<!-- AI classify panel -->
+						<div class="rounded-[1.5rem] border border-surface-muted bg-white p-6 shadow-sm">
+							<p class="mb-1 text-sm font-bold text-ink">+ Add a Custom Section</p>
+							<p class="mb-4 text-xs text-ink-muted">Describe what you'd like to add. AI will suggest the best way to display it or merge it into an existing section.</p>
+							<div class="space-y-3">
+								<div>
+									<label class="mb-1 block text-xs font-bold uppercase tracking-widest text-ink-soft">Describe the content</label>
+									<textarea value={customSectionInput} oninput={(e) => { customSectionInput = (e.target as HTMLTextAreaElement).value; }} rows={4} maxlength={2000} placeholder="e.g. I've spoken at PyCon 2024, JSConf 2023, and DevFest 2022. I also co-authored a paper on distributed systems…" class="w-full resize-none rounded-xl border border-surface-muted bg-surface-subtle/50 px-4 py-3 text-sm text-ink outline-none focus:border-brand/60 focus:ring-2 focus:ring-brand/15"></textarea>
+									<p class="mt-1 text-right text-xs text-ink-muted">{customSectionInput.length}/2000</p>
+								</div>
+								<div>
+									<label class="mb-1 block text-xs font-bold uppercase tracking-widest text-ink-soft">Section title hint <span class="font-normal normal-case text-ink-muted">(optional)</span></label>
+									<input type="text" value={customSectionTitleHint} oninput={(e) => { customSectionTitleHint = (e.target as HTMLInputElement).value; }} maxlength={100} placeholder="e.g. Conference Talks, Publications, Languages" class="w-full rounded-xl border border-surface-muted bg-surface-subtle/50 px-4 py-3 text-sm text-ink outline-none focus:border-brand/60 focus:ring-2 focus:ring-brand/15" />
+								</div>
+								<button onclick={classifyCustomSection} disabled={!customSectionInput.trim() || customSectionAiStatus === 'loading'} class="flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm font-bold text-amber-700 hover:bg-amber-100 disabled:opacity-50 transition-colors">
+									{#if customSectionAiStatus === 'loading'}
+										<Spinner size="sm" />
+									{/if}
+									✦ Classify with AI
+								</button>
+							</div>
+
+							{#if customSectionAiError}
+								<p class="mt-4 text-xs font-bold text-red-500">{customSectionAiError}</p>
+							{/if}
+
+							{#if customSectionAiResult}
+								{#if customSectionAiResult.action === 'merge'}
+									<div class="mt-4 rounded-xl border border-amber-100 bg-amber-50/60 p-4">
+										<p class="mb-1 text-sm font-bold text-amber-700">This fits in an existing section</p>
+										<p class="mb-3 text-xs text-amber-700/80">AI suggests adding this to your <strong class="capitalize">{customSectionAiResult.targetSection}</strong> section instead of creating a new one.</p>
+										<div class="flex gap-2">
+											<button onclick={() => { activeTab = customSectionAiResult!.targetSection; customSectionAiResult = null; customSectionAiStatus = 'idle'; }} class="rounded-lg bg-amber-500 px-4 py-1.5 text-xs font-bold text-white hover:bg-amber-600 capitalize">Go to {customSectionAiResult.targetSection}</button>
+											<button onclick={() => { customSectionAiResult = null; customSectionAiStatus = 'idle'; }} class="rounded-lg border border-surface-muted px-3 py-1.5 text-xs font-bold text-ink-soft hover:bg-surface-muted">Dismiss</button>
+										</div>
+									</div>
+								{:else if customSectionAiResult.action === 'new_section'}
+									<div class="mt-4 rounded-xl border border-emerald-100 bg-emerald-50/50 p-4">
+										<p class="mb-1 text-xs font-bold uppercase tracking-widest text-emerald-700">New Section Preview</p>
+										<p class="mb-0.5 text-sm font-bold text-ink">{customSectionAiResult.section.title}</p>
+										<p class="mb-3 text-xs text-ink-muted capitalize">{customSectionAiResult.section.display_type} · {customSectionAiResult.section.items.length} item{customSectionAiResult.section.items.length !== 1 ? 's' : ''}</p>
+										{#each customSectionAiResult.section.items.slice(0, 3) as previewItem}
+											<div class="mb-1.5 rounded-lg bg-emerald-50 px-3 py-2">
+												{#if previewItem.label}<p class="text-xs font-bold text-ink-soft">{previewItem.label}</p>{/if}
+												{#if previewItem.value}<p class="mt-0.5 text-xs text-ink-muted line-clamp-2">{previewItem.value}</p>{/if}
+											</div>
+										{/each}
+										{#if customSectionAiResult.section.items.length > 3}
+											<p class="mt-1 mb-3 text-xs text-ink-muted">+{customSectionAiResult.section.items.length - 3} more item{customSectionAiResult.section.items.length - 3 !== 1 ? 's' : ''}</p>
+										{/if}
+										<div class="mt-3 flex gap-2">
+											<button onclick={() => acceptNewCustomSection(customSectionAiResult!.section)} class="rounded-lg bg-emerald-600 px-4 py-1.5 text-xs font-bold text-white hover:bg-emerald-700">Add to Portfolio</button>
+											<button onclick={() => { customSectionAiResult = null; customSectionAiStatus = 'idle'; }} class="rounded-lg border border-surface-muted px-3 py-1.5 text-xs font-bold text-ink-soft hover:bg-surface-muted">Dismiss</button>
+										</div>
+									</div>
+								{/if}
+							{/if}
 						</div>
 					</div>
 				{/if}
@@ -2507,20 +2917,20 @@
 {#if aiToolbar}
 	{@const toolbarTop = aiToolbar.iframeRect.top + aiToolbar.selectionRect.top - 64}
 	{@const toolbarLeft = Math.max(8, aiToolbar.iframeRect.left + aiToolbar.selectionRect.left + aiToolbar.selectionRect.width / 2 - 160)}
-	<div class="fixed z-50 w-80 rounded-2xl bg-slate-900 p-3 shadow-2xl" style="top:{toolbarTop}px;left:{toolbarLeft}px">
+	<div class="fixed z-50 w-80 rounded-2xl bg-brand p-3 shadow-2xl" style="top:{toolbarTop}px;left:{toolbarLeft}px">
 		<p class="mb-1.5 text-xs font-bold text-white">✦ AI Enhance</p>
-		<p class="mb-2 truncate text-xs text-slate-400">"{aiToolbar.selectedText.length > 60 ? aiToolbar.selectedText.slice(0, 60) + '…' : aiToolbar.selectedText}"</p>
+		<p class="mb-2 truncate text-xs text-ink-muted">"{aiToolbar.selectedText.length > 60 ? aiToolbar.selectedText.slice(0, 60) + '…' : aiToolbar.selectedText}"</p>
 		<!-- svelte-ignore a11y_autofocus -->
 		<input autofocus bind:value={aiToolbar.instruction} placeholder="e.g. Make it more impactful…"
 			onkeydown={(e) => { if (e.key === 'Enter') runAiFromToolbar(); if (e.key === 'Escape') aiToolbar = null; }}
-			class="mb-2 w-full rounded-lg bg-slate-800 px-3 py-2 text-sm text-white placeholder-slate-500 outline-none focus:ring-2 focus:ring-indigo-500" />
+			class="mb-2 w-full rounded-lg bg-ink px-3 py-2 text-sm text-white placeholder-ink-muted outline-none focus:ring-2 focus:ring-indigo-500" />
 		<div class="flex gap-2">
 			<button onclick={runAiFromToolbar} disabled={aiToolbar.loading}
 				class="flex-1 rounded-lg bg-indigo-600 py-1.5 text-xs font-bold text-white hover:bg-indigo-500 disabled:opacity-50">
 				{aiToolbar.loading ? 'Enhancing…' : 'Enhance'}
 			</button>
 			<button onclick={() => aiToolbar = null}
-				class="rounded-lg bg-slate-700 px-3 py-1.5 text-xs font-bold text-slate-300 hover:bg-slate-600">
+				class="rounded-lg bg-surface-muted px-3 py-1.5 text-xs font-bold text-ink-muted hover:bg-surface-muted hover:text-ink">
 				Cancel
 			</button>
 		</div>
@@ -2532,14 +2942,14 @@
 {#if listEditor}
 	{@const listTop = Math.min(listEditor.iframeRect.top + listEditor.fieldRect.top, (typeof window !== 'undefined' ? window.innerHeight : 800) - 380)}
 	{@const listLeft = Math.max(8, listEditor.iframeRect.left + listEditor.fieldRect.left)}
-	<div bind:this={listEditorEl} class="fixed z-50 w-80 rounded-2xl border border-slate-200 bg-white shadow-2xl" style="top:{Math.max(8, listTop)}px;left:{listLeft}px">
-		<div class="flex items-center justify-between border-b border-slate-100 px-4 py-3">
-			<p class="text-sm font-bold text-slate-900">Edit items</p>
-			<button onclick={() => listEditor = null} class="text-lg leading-none text-slate-400 hover:text-slate-700">×</button>
+	<div bind:this={listEditorEl} class="fixed z-50 w-80 rounded-2xl border border-surface-muted bg-white shadow-2xl" style="top:{Math.max(8, listTop)}px;left:{listLeft}px">
+		<div class="flex items-center justify-between border-b border-surface-muted px-4 py-3">
+			<p class="text-sm font-bold text-ink">Edit items</p>
+			<button onclick={() => listEditor = null} class="text-lg leading-none text-ink-muted hover:text-ink-soft">×</button>
 		</div>
 		<div class="max-h-72 overflow-y-auto px-3 py-2">
 			{#each listEditor.items as item, i}
-				<div class="group flex items-center gap-1 rounded-lg px-1 py-0.5 hover:bg-slate-50">
+				<div class="group flex items-center gap-1 rounded-lg px-1 py-0.5 hover:bg-surface-subtle">
 					<span class="w-5 flex-shrink-0 text-center text-sm font-bold text-indigo-400">•</span>
 					<input
 						data-list-input
@@ -2548,10 +2958,10 @@
 						oninput={(e) => updateListItem(i, (e.target as HTMLInputElement).value)}
 						onkeydown={(e) => handleListItemKeydown(e, i)}
 						placeholder="Enter item…"
-						class="min-w-0 flex-1 bg-transparent py-1.5 text-sm text-slate-800 outline-none placeholder:text-slate-300"
+						class="min-w-0 flex-1 bg-transparent py-1.5 text-sm text-ink outline-none placeholder:text-ink-muted"
 					/>
 					{#if listEditor.items.length > 1}
-						<button onclick={() => removeListItem(i)} aria-label="Remove item" class="flex-shrink-0 rounded p-0.5 text-slate-200 opacity-0 hover:text-red-400 group-hover:opacity-100">
+						<button onclick={() => removeListItem(i)} aria-label="Remove item" class="flex-shrink-0 rounded p-0.5 text-ink-muted opacity-0 hover:text-red-400 group-hover:opacity-100">
 							<svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" /></svg>
 						</button>
 					{/if}
@@ -2563,13 +2973,13 @@
 			</button>
 		</div>
 		{#if listEditor.error}<p class="px-4 pb-1 text-xs text-red-500">{listEditor.error}</p>{/if}
-		<div class="flex gap-2 border-t border-slate-100 px-4 py-3">
+		<div class="flex gap-2 border-t border-surface-muted px-4 py-3">
 			<button onclick={() => listEditor = null}
-				class="flex-1 rounded-xl border border-slate-200 py-2 text-sm font-bold text-slate-600 hover:bg-slate-50">
+				class="flex-1 rounded-xl border border-surface-muted py-2 text-sm font-bold text-ink-soft hover:bg-surface-subtle">
 				Cancel
 			</button>
 			<button onclick={saveListEditor} disabled={listEditor.saving}
-				class="flex-1 rounded-xl bg-slate-900 py-2 text-sm font-bold text-white hover:bg-slate-800 disabled:opacity-40">
+				class="flex-1 rounded-xl bg-brand py-2 text-sm font-bold text-white hover:bg-brand-dark disabled:opacity-40">
 				{listEditor.saving ? 'Saving…' : 'Save'}
 			</button>
 		</div>
@@ -2588,10 +2998,10 @@
 					<path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
 				</svg>
 			</div>
-			<h3 class="mb-1 text-base font-bold text-slate-900">Delete this item?</h3>
-			<p class="mb-6 text-sm text-slate-500">This action cannot be undone.</p>
+			<h3 class="mb-1 text-base font-bold text-ink">Delete this item?</h3>
+			<p class="mb-6 text-sm text-ink-soft">This action cannot be undone.</p>
 			<div class="flex gap-3">
-				<button onclick={cancelDelete} class="flex-1 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 transition hover:bg-slate-50">Cancel</button>
+				<button onclick={cancelDelete} class="flex-1 rounded-xl border border-surface-muted bg-white px-4 py-2.5 text-sm font-bold text-ink-soft transition hover:bg-surface-subtle">Cancel</button>
 				<button onclick={confirmDelete} class="flex-1 rounded-xl bg-red-500 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-red-600">Delete</button>
 			</div>
 		</div>

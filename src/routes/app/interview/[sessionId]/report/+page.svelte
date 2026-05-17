@@ -62,17 +62,17 @@
 </script>
 
 <svelte:head>
-	<title>Interview Report — AIfolio</title>
+	<title>Interview Report — Portfolio.ai</title>
 </svelte:head>
 
 <div class="min-h-screen bg-surface-subtle pb-20">
 	<!-- Header -->
-	<header class="border-b border-slate-100 bg-white px-6 py-5">
+	<header class="border-b border-surface-muted bg-white px-6 py-5">
 		<div class="mx-auto flex max-w-4xl items-center justify-between">
 			<div>
-				<h1 class="font-serif text-2xl font-bold text-slate-900">Interview Report</h1>
+				<h1 class="font-display text-2xl font-bold text-ink">Interview Report</h1>
 				{#if sessionMeta}
-					<p class="mt-0.5 text-sm text-slate-400">
+					<p class="mt-0.5 text-sm text-ink-muted">
 						{sessionMeta.mode === 'follow-up' ? 'Adaptive' : 'Standard'} ·
 						{sessionMeta.difficulty.charAt(0).toUpperCase() + sessionMeta.difficulty.slice(1)} ·
 						{formatDate(sessionMeta.createdAt)}
@@ -81,7 +81,7 @@
 			</div>
 			<button
 				onclick={() => goto('/app/dashboard')}
-				class="rounded-xl border border-slate-200 px-4 py-2 text-sm font-bold text-slate-600 transition-all hover:border-slate-400 hover:text-slate-900"
+				class="rounded-xl border border-surface-muted px-4 py-2 text-sm font-bold text-ink-soft transition-all hover:border-brand/40 hover:text-ink"
 			>
 				← Dashboard
 			</button>
@@ -101,67 +101,67 @@
 			<div use:reveal={{ y: 16, delay: 50 }} class="space-y-6">
 
 				<!-- ── Hero score card (dark) ── -->
-				<div class="rounded-[2rem] bg-slate-900 p-8 text-white shadow-2xl">
+				<div class="rounded-[2rem] bg-brand p-8 text-white shadow-2xl">
 					<div class="flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
 						<!-- Score -->
 						<div class="flex items-end gap-3">
 							<span class="text-8xl font-black leading-none tracking-tight">{report.overallScore}</span>
 							<div class="mb-2">
-								<span class="text-3xl font-bold text-slate-400">/10</span>
-								<p class="mt-1 text-xs font-bold tracking-widest uppercase text-slate-400">Overall Score</p>
+								<span class="text-3xl font-bold text-ink-muted">/10</span>
+								<p class="mt-1 text-xs font-bold tracking-widest uppercase text-ink-muted">Overall Score</p>
 							</div>
 						</div>
 
 						<!-- Divider on desktop -->
-						<div class="hidden h-20 w-px bg-slate-700 sm:block"></div>
+						<div class="hidden h-20 w-px bg-surface-muted sm:block"></div>
 
 						<!-- Stats grid -->
 						<div class="grid grid-cols-2 gap-4 sm:gap-6">
 							<div>
 								<p class="text-2xl font-black">{report.totalAnswered}</p>
-								<p class="text-xs font-medium text-slate-400">Questions answered</p>
+								<p class="text-xs font-medium text-ink-muted">Questions answered</p>
 							</div>
 							{#if sessionMeta}
 								<div>
 									<p class="text-2xl font-black capitalize">{sessionMeta.difficulty}</p>
-									<p class="text-xs font-medium text-slate-400">Difficulty</p>
+									<p class="text-xs font-medium text-ink-muted">Difficulty</p>
 								</div>
 								<div>
 									<p class="text-2xl font-black">{sessionMeta.mode === 'follow-up' ? 'Adaptive' : 'Standard'}</p>
-									<p class="text-xs font-medium text-slate-400">Mode</p>
+									<p class="text-xs font-medium text-ink-muted">Mode</p>
 								</div>
 								<div>
 									<p class="text-lg font-black">{formatDate(sessionMeta.createdAt)}</p>
-									<p class="text-xs font-medium text-slate-400">Date</p>
+									<p class="text-xs font-medium text-ink-muted">Date</p>
 								</div>
 							{/if}
 						</div>
 					</div>
 
 					<!-- Score bar + topic highlights -->
-					<div class="mt-6 space-y-4 border-t border-slate-700 pt-5">
+					<div class="mt-6 space-y-4 border-t border-surface-muted pt-5">
 						<div class="flex items-center gap-3">
-							<div class="h-1.5 flex-1 overflow-hidden rounded-full bg-slate-700">
+							<div class="h-1.5 flex-1 overflow-hidden rounded-full bg-surface-muted">
 								<div
 									class="h-full rounded-full bg-white transition-all duration-700"
 									style="width: {(report.overallScore / 10) * 100}%"
 								></div>
 							</div>
-							<span class="text-xs font-bold tracking-widest uppercase text-slate-300">{scoreLabel(report.overallScore)}</span>
+							<span class="text-xs font-bold tracking-widest uppercase text-ink-muted">{scoreLabel(report.overallScore)}</span>
 						</div>
 
 						{#if bestTopic || weakestTopic}
 							<div class="flex flex-wrap gap-2">
 								{#if bestTopic}
 									<span class="inline-flex items-center gap-1.5 rounded-lg bg-white/10 px-3 py-1.5 text-xs font-bold text-white backdrop-blur-sm">
-										<span class="text-slate-300">Best</span>
+										<span class="text-ink-muted">Best</span>
 										{bestTopic[0]}
 										<span class="ml-0.5 rounded bg-white/20 px-1 font-black">{bestTopic[1]}</span>
 									</span>
 								{/if}
 								{#if weakestTopic}
 									<span class="inline-flex items-center gap-1.5 rounded-lg bg-white/10 px-3 py-1.5 text-xs font-bold text-white backdrop-blur-sm">
-										<span class="text-slate-300">Focus</span>
+										<span class="text-ink-muted">Focus</span>
 										{weakestTopic[0]}
 										<span class="ml-0.5 rounded bg-white/20 px-1 font-black">{weakestTopic[1]}</span>
 									</span>
@@ -175,23 +175,23 @@
 				{#if sortedTopics.length > 0}
 					<div>
 						<div class="mb-4 flex items-baseline gap-2">
-							<h2 class="text-xs font-bold tracking-widest text-slate-400 uppercase">Topic Breakdown</h2>
-							<span class="text-xs text-slate-300">· scored out of 10</span>
+							<h2 class="text-xs font-bold tracking-widest text-ink-muted uppercase">Topic Breakdown</h2>
+							<span class="text-xs text-ink-muted">· scored out of 10</span>
 						</div>
 						<div class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
 							{#each sortedTopics as [topic, score], i (topic)}
-								<div class="group rounded-2xl border border-slate-100 bg-white p-5 shadow-sm transition-shadow hover:shadow-md">
+								<div class="group rounded-2xl border border-surface-muted bg-white p-5 shadow-sm transition-shadow hover:shadow-md">
 									<!-- Rank chip + topic name -->
 									<div class="mb-3 flex items-center justify-between">
-										<p class="truncate text-xs font-bold tracking-wide text-slate-400 uppercase pr-2">{topic}</p>
-										<span class="flex-shrink-0 text-[10px] font-black text-slate-200 tabular-nums">#{i + 1}</span>
+										<p class="truncate text-xs font-bold tracking-wide text-ink-muted uppercase pr-2">{topic}</p>
+										<span class="flex-shrink-0 text-[10px] font-black text-ink-muted tabular-nums">#{i + 1}</span>
 									</div>
 									<!-- Score number -->
-									<p class="text-4xl font-black text-slate-900 leading-none">{score}</p>
+									<p class="text-4xl font-black text-ink leading-none">{score}</p>
 									<!-- Bar -->
-									<div class="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
+									<div class="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-surface-muted">
 										<div
-											class="h-full rounded-full bg-slate-900 transition-all duration-500"
+											class="h-full rounded-full bg-brand transition-all duration-500"
 											style="width: {(Number(score) / 10) * 100}%"
 										></div>
 									</div>
@@ -205,16 +205,16 @@
 				{#if report.strengths.length > 0 || report.weaknesses.length > 0}
 					<div class="grid grid-cols-1 gap-5 sm:grid-cols-2">
 						{#if report.strengths.length > 0}
-							<div class="rounded-[1.5rem] border border-slate-100 bg-white p-6 shadow-sm">
+							<div class="rounded-[1.5rem] border border-surface-muted bg-white p-6 shadow-sm">
 								<div class="mb-5 flex items-center gap-3">
 									<div class="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-xs font-black text-emerald-600 ring-1 ring-emerald-100">✓</div>
-									<h2 class="text-xs font-bold tracking-widest text-slate-500 uppercase">What went well</h2>
+									<h2 class="text-xs font-bold tracking-widest text-ink-soft uppercase">What went well</h2>
 								</div>
 								<ul class="space-y-3">
 									{#each report.strengths as s, i}
 										<li class="flex items-start gap-3">
-											<span class="mt-0.5 text-xs font-black text-slate-300 tabular-nums">{pad(i + 1)}</span>
-											<span class="text-sm leading-relaxed text-slate-700">{s}</span>
+											<span class="mt-0.5 text-xs font-black text-ink-muted tabular-nums">{pad(i + 1)}</span>
+											<span class="text-sm leading-relaxed text-ink-soft">{s}</span>
 										</li>
 									{/each}
 								</ul>
@@ -222,16 +222,16 @@
 						{/if}
 
 						{#if report.weaknesses.length > 0}
-							<div class="rounded-[1.5rem] border border-slate-100 bg-white p-6 shadow-sm">
+							<div class="rounded-[1.5rem] border border-surface-muted bg-white p-6 shadow-sm">
 								<div class="mb-5 flex items-center gap-3">
 									<div class="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-xl bg-amber-50 text-xs font-black text-amber-600 ring-1 ring-amber-100">→</div>
-									<h2 class="text-xs font-bold tracking-widest text-slate-500 uppercase">Areas to improve</h2>
+									<h2 class="text-xs font-bold tracking-widest text-ink-soft uppercase">Areas to improve</h2>
 								</div>
 								<ul class="space-y-3">
 									{#each report.weaknesses as w, i}
 										<li class="flex items-start gap-3">
-											<span class="mt-0.5 text-xs font-black text-slate-300 tabular-nums">{pad(i + 1)}</span>
-											<span class="text-sm leading-relaxed text-slate-700">{w}</span>
+											<span class="mt-0.5 text-xs font-black text-ink-muted tabular-nums">{pad(i + 1)}</span>
+											<span class="text-sm leading-relaxed text-ink-soft">{w}</span>
 										</li>
 									{/each}
 								</ul>
@@ -242,19 +242,19 @@
 
 				<!-- ── Suggestions ── -->
 				{#if report.suggestions.length > 0}
-					<div class="rounded-[1.5rem] border border-slate-100 bg-white p-6 shadow-sm">
+					<div class="rounded-[1.5rem] border border-surface-muted bg-white p-6 shadow-sm">
 						<div class="mb-5 flex items-center gap-3">
-							<div class="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-xl bg-slate-50 text-xs font-black text-slate-500 border border-slate-200">★</div>
+							<div class="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-xl bg-surface-subtle text-xs font-black text-ink-soft border border-surface-muted">★</div>
 							<div>
-								<h2 class="text-xs font-bold tracking-widest text-slate-500 uppercase">Action Plan</h2>
-								<p class="text-xs text-slate-400 mt-0.5">Focus on these to improve your score</p>
+								<h2 class="text-xs font-bold tracking-widest text-ink-soft uppercase">Action Plan</h2>
+								<p class="text-xs text-ink-muted mt-0.5">Focus on these to improve your score</p>
 							</div>
 						</div>
-						<ul class="divide-y divide-slate-50">
+						<ul class="divide-y divide-surface-muted">
 							{#each report.suggestions as s, i}
 								<li class="flex items-start gap-4 py-3.5 first:pt-0 last:pb-0">
-									<span class="mt-0.5 flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-md bg-slate-900 text-[10px] font-black text-white">{i + 1}</span>
-									<span class="text-sm leading-relaxed text-slate-700">{s}</span>
+									<span class="mt-0.5 flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-md bg-brand text-[10px] font-black text-white">{i + 1}</span>
+									<span class="text-sm leading-relaxed text-ink-soft">{s}</span>
 								</li>
 							{/each}
 						</ul>
@@ -265,13 +265,13 @@
 				<div class="flex flex-col gap-3 pt-2 sm:flex-row">
 					<button
 						onclick={() => goto('/app/interview/setup')}
-						class="flex flex-1 items-center justify-center gap-2 rounded-2xl bg-slate-900 py-4 text-sm font-bold text-white shadow-lg transition-all hover:bg-slate-800 active:scale-95"
+						class="flex flex-1 items-center justify-center gap-2 rounded-2xl bg-brand py-4 text-sm font-bold text-white shadow-lg transition-all hover:bg-brand-dark active:scale-95"
 					>
 						Practice Again
 					</button>
 					<button
 						onclick={() => goto('/app/dashboard')}
-						class="flex flex-1 items-center justify-center rounded-2xl border border-slate-200 bg-white py-4 text-sm font-bold text-slate-700 transition-all hover:border-slate-400 active:scale-95"
+						class="flex flex-1 items-center justify-center rounded-2xl border border-surface-muted bg-white py-4 text-sm font-bold text-ink-soft transition-all hover:border-brand/40 active:scale-95"
 					>
 						Go to Dashboard
 					</button>

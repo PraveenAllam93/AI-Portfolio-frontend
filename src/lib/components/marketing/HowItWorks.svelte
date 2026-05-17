@@ -252,7 +252,7 @@
 	}
 	.step.on {
 		background: var(--color-warm-lav);
-		border-color: #d0c8f0;
+		border-color: rgba(124, 58, 237, 0.28);
 	}
 	.step:hover:not(.on) {
 		background: var(--color-warm-cream);
@@ -312,7 +312,7 @@
 		color: var(--color-warm-muted);
 	}
 	.step.on .stag {
-		border-color: #c0b8e8;
+		border-color: rgba(124, 58, 237, 0.22);
 		color: var(--color-warm-indigo);
 	}
 
@@ -388,7 +388,7 @@
 	}
 	.file-ready {
 		margin-top: 12px;
-		background: var(--color-warm-cream);
+		background: var(--color-warm-cream2);
 		border-radius: 8px;
 		padding: 10px;
 		font-size: 11px;
@@ -438,7 +438,7 @@
 	}
 	.prog-fill {
 		height: 100%;
-		background: linear-gradient(90deg, var(--color-warm-indigo), var(--color-warm-coral));
+		background: linear-gradient(90deg, var(--color-brand-dark), var(--color-brand-light));
 		border-radius: 100px;
 		animation: prog-fill 2.4s ease forwards;
 	}
@@ -533,7 +533,7 @@
 		margin-bottom: 12px;
 	}
 	.pub-stat {
-		background: var(--color-warm-cream);
+		background: var(--color-warm-cream2);
 		border-radius: 8px;
 		padding: 10px;
 		text-align: center;

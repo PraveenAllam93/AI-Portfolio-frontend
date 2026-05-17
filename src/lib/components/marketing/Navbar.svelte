@@ -148,18 +148,19 @@
 		font-family: var(--font-body-dm);
 		font-size: 13px;
 		font-weight: 700;
-		color: #fff;
-		background: var(--color-warm-ink);
-		border: none;
+		color: var(--color-warm-ink);
+		background: transparent;
+		border: 1.5px solid var(--color-warm-ink);
 		cursor: pointer;
-		padding: 9px 20px;
+		padding: 8px 20px;
 		border-radius: 100px;
 		text-decoration: none;
-		transition: transform 0.15s, box-shadow 0.15s;
+		transition: background 0.15s, color 0.15s, transform 0.15s;
 	}
 	.btn-nav:hover {
+		background: var(--color-warm-ink);
+		color: #fff;
 		transform: translateY(-1px);
-		box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);
 	}
 	.hamburger {
 		display: none;
@@ -194,8 +195,9 @@
 		font-weight: 600 !important;
 	}
 	.mobile-cta {
-		background: var(--color-warm-ink);
-		color: #fff !important;
+		background: transparent;
+		color: var(--color-warm-ink) !important;
+		border: 1.5px solid var(--color-warm-ink);
 		font-weight: 700 !important;
 		padding: 10px 16px;
 		border-radius: 100px;

@@ -273,9 +273,16 @@ export function html(v: NormalizedData): string {
 	const navAnchors: [string, string][] = [];
 	if (v.bio) navAnchors.push(['about', 'About']);
 	for (const key of order) {
-		if (!hidden.has(key) && key in NAV_LABELS) {
+		if (hidden.has(key)) continue;
+		if (key === 'custom_sections') {
+			for (const cs of v.custom_sections ?? []) {
+				if (cs.items?.length) navAnchors.push([cs.section_id, cs.title]);
+			}
+			continue;
+		}
+		if (key in NAV_LABELS) {
 			const dataKey = key === 'skills' ? 'skill_groups' : key;
-			const data = (v as Record<string, unknown>)[dataKey];
+			const data = (v as unknown as Record<string, unknown>)[dataKey];
 			if (data && (Array.isArray(data) ? data.length > 0 : Boolean(data))) {
 				navAnchors.push([key, NAV_LABELS[key]]);
 			}
@@ -515,6 +522,26 @@ ${socialHtml ? `<div class="links-container"><div class="links-grid">${socialHtm
 </section>`
 			: '';
 
+	// Custom sections
+	const customSectionsHtml = !hidden.has('custom_sections') && (v.custom_sections?.length ?? 0) > 0
+		? (v.custom_sections ?? []).map((cs, csIdx) => {
+			if (!cs.items?.length) return '';
+			const items = cs.items.map((item, i) => `<div class="project-card" data-item-wrap>
+<button class="ce-del-btn" data-del-section="custom_sections" data-del-index="${i}">&#x2715;</button>
+${item.label ? `<h3 class="project-title">${item.label}</h3>` : ''}
+${item.subtitle ? `<p class="project-description">${item.subtitle}</p>` : ''}
+${item.value ? `<p class="project-description">${item.value}</p>` : ''}
+${item.tags?.length ? `<div class="project-tech">${item.tags.map((t) => `<span class="tech-tag">${t}</span>`).join('')}</div>` : ''}
+${item.url ? `<a href="${item.url}" class="project-link" target="_blank" rel="noopener noreferrer">View &#8599;</a>` : ''}
+</div>`).join('\n');
+			return `<section id="${cs.section_id}">
+<div class="section-header"><h2>${cs.title}</h2></div>
+<div class="projects-grid">${items}</div>
+<button class="ce-add-btn" data-add-section="custom_sections.${csIdx}.items">+ Add Item</button>
+</section>`;
+		}).filter(Boolean).join('\n')
+		: '';
+
 	// Build ordered sections
 	const sectionRenderers: Record<string, string> = {
 		experience: expHtml,
@@ -523,6 +550,7 @@ ${socialHtml ? `<div class="links-container"><div class="links-grid">${socialHtm
 		education: educationHtml,
 		certifications: certsHtml,
 		achievements: achievementsHtml,
+		custom_sections: customSectionsHtml,
 	};
 
 	const orderedContent = order

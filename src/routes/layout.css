@@ -4,7 +4,7 @@
 
 @theme {
 	--font-serif: 'Playfair Display', serif;
-	--font-sans: 'Inter', system-ui, sans-serif;
+	--font-sans: 'DM Sans', 'Inter', system-ui, sans-serif;
 	--font-display: 'Space Grotesk', sans-serif;
 	--font-body-dm: 'DM Sans', sans-serif;
 
@@ -13,15 +13,15 @@
 	--color-brand-light: #a78bfa;
 	--color-brand-dark: #5b21b6;
 
-	/* Surfaces */
-	--color-surface: #ffffff;
-	--color-surface-subtle: #f8fafc;
-	--color-surface-muted: #f1f5f9;
+	/* Surfaces — warm parchment to match marketing palette */
+	--color-surface: #ffffff;            /* cards, inputs, modals — stay white */
+	--color-surface-subtle: #f5f0ea;     /* page shell backgrounds — warm parchment */
+	--color-surface-muted: #e0d9d0;      /* borders, dividers, tags */
 
-	/* Text */
-	--color-ink: #0f172a;
-	--color-ink-soft: #475569;
-	--color-ink-muted: #94a3b8;
+	/* Text — pure neutral, no blue cast */
+	--color-ink: #111111;                /* near-black */
+	--color-ink-soft: #555555;           /* mid-neutral */
+	--color-ink-muted: #999999;          /* light-neutral */
 
 	/* Accents */
 	--color-accent-emerald: #10b981;
@@ -29,22 +29,22 @@
 	--color-accent-rose: #f43f5e;
 	--color-accent-cyan: #06b6d4;
 
-	/* Marketing warm palette */
-	--color-warm-ink: #1a1a1a;
-	--color-warm-muted: #6b6b7b;
-	--color-warm-dim: #9999aa;
-	--color-warm-cream: #f5f0ea;
-	--color-warm-cream2: #f0ebe3;
-	--color-warm-border: #e2ddd6;
-	--color-warm-border-dark: #c8c2b8;
-	--color-warm-coral: #ff5c3a;
-	--color-warm-amber: #f5a623;
-	--color-warm-mint: #00c896;
-	--color-warm-indigo: #5b3fd4;
-	--color-warm-peach: #fdf0ea;
-	--color-warm-mint-bg: #eaf7f2;
-	--color-warm-lav: #eeeaf8;
-	--color-warm-yellow: #fdf6e3;
+	/* Marketing palette — pure neutral (matches reference screenshots) */
+	--color-warm-ink: #111111;           /* pure near-black */
+	--color-warm-muted: #666666;         /* neutral mid-gray */
+	--color-warm-dim: #999999;           /* neutral light-gray */
+	--color-warm-cream: #f5f0ea;         /* warm parchment — main section bg */
+	--color-warm-cream2: #ede8e1;        /* warm parchment-2 — subtle section bg */
+	--color-warm-border: #e0d9d0;        /* warm parchment border */
+	--color-warm-border-dark: #d4d4d4;   /* neutral-300 border */
+	--color-warm-coral: #7c3aed;         /* brand purple */
+	--color-warm-amber: #f59e0b;         /* accent-amber */
+	--color-warm-mint: #10b981;          /* accent-emerald */
+	--color-warm-indigo: #7c3aed;        /* brand purple */
+	--color-warm-peach: #fff5f2;         /* coral tint — light warm bg */
+	--color-warm-mint-bg: #f0fdf4;       /* emerald-50 */
+	--color-warm-lav: #fffbf0;           /* amber tint — light warm bg */
+	--color-warm-yellow: #fefce8;        /* amber-50 — light yellow bg (architect cards) */
 }
 
 html {
@@ -54,15 +54,23 @@ html {
 body {
 	font-family: var(--font-sans);
 	color: var(--color-ink);
-	background-color: #ffffff;
+	background-color: #f5f0ea;
+	-webkit-font-smoothing: antialiased;
+	-moz-osx-font-smoothing: grayscale;
+}
+
+/* ── Global heading font (Space Grotesk across all pages) ── */
+h1, h2, h3, h4, h5, h6 {
+	font-family: var(--font-display);
+	letter-spacing: -0.02em;
 }
 
 /* ── Glassmorphism ───────────────────────────────────── */
 .glass {
-	background: rgba(255, 255, 255, 0.7);
+	background: rgba(255, 255, 255, 0.85);
 	backdrop-filter: blur(12px);
 	-webkit-backdrop-filter: blur(12px);
-	border: 1px solid rgba(255, 255, 255, 0.3);
+	border: 1px solid rgba(0, 0, 0, 0.06);
 }
 
 /* ── Shimmer Effect ─────────────────────────────────── */
@@ -81,7 +89,7 @@ body {
 	background: linear-gradient(
 		45deg,
 		transparent 45%,
-		rgba(255, 255, 255, 0.1) 50%,
+		rgba(255, 255, 255, 0.15) 50%,
 		transparent 55%
 	);
 	animation: shimmer-anim 3s infinite;
@@ -121,7 +129,7 @@ body {
 	animation: draw-check 0.6s ease forwards 0.3s;
 }
 
-/* ── Infinite marquee (PortfolioShowcase) ─────────────── */
+/* ── Infinite marquee ─────────────────────────────────── */
 @keyframes marquee {
 	from {
 		transform: translateX(0);
@@ -151,7 +159,7 @@ body {
 	animation-play-state: paused;
 }
 
-/* ── Marketing bob animation ─────────────────────────── */
+/* ── Marketing animations ────────────────────────────── */
 @keyframes bob {
 	0%, 100% { transform: translateY(0); }
 	50% { transform: translateY(-7px); }
@@ -167,6 +175,17 @@ body {
 @keyframes prog-fill {
 	from { width: 0; }
 	to { width: 88%; }
+}
+
+/* ── Scroll-reveal utility ───────────────────────────── */
+.reveal {
+	opacity: 0;
+	transform: translateY(20px);
+	transition: opacity 0.55s ease, transform 0.55s ease;
+}
+.reveal.visible {
+	opacity: 1;
+	transform: none;
 }
 
 /* ── Reduced motion ──────────────────────────────────── */

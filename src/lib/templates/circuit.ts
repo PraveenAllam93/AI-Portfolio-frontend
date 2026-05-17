@@ -460,9 +460,15 @@ export function html(v: NormalizedData): string {
 	if (v.bio || v.location || v.email || v.phone) navAnchors.push('about');
 	for (const key of order) {
 		if (hidden.has(key)) continue;
+		if (key === 'custom_sections') {
+			for (const cs of v.custom_sections ?? []) {
+				if (cs.items?.length) navAnchors.push(cs.section_id);
+			}
+			continue;
+		}
 		if (['experience', 'skills', 'projects', 'education', 'certifications', 'achievements', 'awards', 'campaigns', 'financial_modeling', 'investment_portfolios'].includes(key)) {
 			const dk = key === 'skills' ? 'skill_groups' : key;
-			const d = (v as Record<string, unknown>)[dk];
+			const d = (v as unknown as Record<string, unknown>)[dk];
 			if (d && (Array.isArray(d) ? d.length > 0 : Boolean(d))) navAnchors.push(key);
 		}
 	}
@@ -811,12 +817,37 @@ ${p.performance_return ? `<div class="inv-ret">Return: ${p.performance_return}</
 </div>
 </section>` : '';
 
+	const customSectionsHtml = !hidden.has('custom_sections') && (v.custom_sections?.length ?? 0) > 0
+		? (v.custom_sections ?? []).map((cs, csIdx) => {
+			if (!cs.items?.length) return '';
+			const items = cs.items.map((item, i) => `<div class="card fade-in" data-item-wrap>
+<button class="ce-del-btn" data-del-section="custom_sections" data-del-index="${i}">&#x2715;</button>
+${item.label ? `<div class="card-title">${item.label}</div>` : ''}
+${item.subtitle ? `<div class="card-sub">${item.subtitle}</div>` : ''}
+${item.value ? `<p class="card-desc">${item.value}</p>` : ''}
+${item.tags?.length ? `<div style="display:flex;flex-wrap:wrap;gap:.4rem;margin-top:.6rem">${item.tags.map((t) => `<span class="tech-tag">${t}</span>`).join('')}</div>` : ''}
+${item.url ? `<a href="${item.url}" style="color:var(--accent);font-size:.85rem;margin-top:.5rem;display:inline-block" target="_blank" rel="noopener noreferrer">View &#8599;</a>` : ''}
+</div>`).join('\n');
+			const grid = cs.display_type === 'cards'
+				? `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:1.5rem">${items}</div>`
+				: `<div style="display:flex;flex-direction:column;gap:1rem">${items}</div>`;
+			return `<section id="${cs.section_id}">
+<div class="section-header fade-in">
+  <p class="section-tag">${cs.display_type}</p>
+  <h2 class="section-title">${cs.title}</h2>
+</div>
+${grid}
+<button class="ce-add-btn" data-add-section="custom_sections.${csIdx}.items">+ Add Item</button>
+</section>`;
+		}).filter(Boolean).join('\n')
+		: '';
+
 	const sectionMap: Record<string, string> = {
 		experience: expHtml, skills: skillsHtml, projects: projectsHtml,
 		education: educationHtml, certifications: certsHtml, achievements: achievementsHtml,
 		awards: awardsHtml, campaigns: campaignsHtml, financial_modeling: finHtml,
 		investment_portfolios: invHtml, design_philosophy: designHtml,
-		software_proficiency: softwareHtml,
+		software_proficiency: softwareHtml, custom_sections: customSectionsHtml,
 	};
 
 	const orderedSections = order

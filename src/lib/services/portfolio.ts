@@ -242,6 +242,31 @@ export async function getImageUploadUrl(
 	}
 }
 
+/**
+ * Generate an AI image for a project or experience item via DALL-E 3.
+ * Returns the CloudFront imageUrl — does NOT save; caller must accept explicitly.
+ */
+export async function generateProjectImage(
+	userId: string,
+	sectionKey: string,
+	itemIdx: number
+): Promise<ServiceResult<{ imageUrl: string }>> {
+	try {
+		const res = await fetch(`/api/portfolio/${userId}/project-image/generate`, {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ sectionKey, itemIdx })
+		});
+		if (!res.ok) {
+			const err = await res.json().catch(() => ({}));
+			return { ok: false, error: (err as { error?: string }).error ?? 'Image generation failed' };
+		}
+		return { ok: true, data: await res.json() };
+	} catch {
+		return { ok: false, error: 'Network error' };
+	}
+}
+
 // LLM portfolio suggestions
 
 export interface LlmSuggestion {
@@ -272,6 +297,29 @@ export async function getAiSuggestions(
 		if (!res.ok) return { ok: false, error: 'Failed to get suggestions' };
 		const json = await res.json();
 		return { ok: true, data: { suggestions: json.suggestions ?? [] } };
+	} catch {
+		return { ok: false, error: 'Network error' };
+	}
+}
+
+// Custom section classifier
+
+export async function addCustomSection(
+	userId: string,
+	text: string,
+	title?: string
+): Promise<ServiceResult<{ action: string; targetSection?: string; item?: Record<string, unknown>; section?: unknown }>> {
+	try {
+		const res = await fetch(`/api/portfolio/${userId}/custom-section`, {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ text, ...(title ? { title } : {}) })
+		});
+		if (!res.ok) {
+			const err = await res.json().catch(() => ({}));
+			return { ok: false, error: (err as { error?: string }).error ?? 'Failed to classify section' };
+		}
+		return { ok: true, data: await res.json() };
 	} catch {
 		return { ok: false, error: 'Network error' };
 	}

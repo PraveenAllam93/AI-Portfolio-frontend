@@ -15,18 +15,18 @@
 
 	const containerStyles: Record<string, string> = {
 		live: 'bg-emerald-50 border-emerald-100 text-emerald-600',
-		neutral: 'bg-slate-100 border-slate-200 text-slate-600',
+		neutral: 'bg-surface-muted border-surface-muted text-ink-soft',
 		error: 'bg-red-50 border-red-100 text-red-600',
 		warning: 'bg-amber-50 border-amber-200 text-amber-700',
-		processing: 'bg-blue-50 border-blue-100 text-blue-600'
+		processing: 'bg-brand/10 border-brand/20 text-brand'
 	};
 
 	const dotStyles: Record<string, string> = {
 		live: 'bg-emerald-500',
-		neutral: 'bg-slate-400',
+		neutral: 'bg-ink-muted',
 		error: 'bg-red-500',
 		warning: 'bg-amber-500',
-		processing: 'bg-blue-500'
+		processing: 'bg-brand'
 	};
 </script>
 

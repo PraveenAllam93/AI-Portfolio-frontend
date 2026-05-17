@@ -127,7 +127,7 @@
 						</svg>
 					</div>
 
-					<h2 class="mt-5 font-serif text-2xl font-bold text-slate-900">Processing failed</h2>
+					<h2 class="mt-5 font-display text-2xl font-bold text-ink">Processing failed</h2>
 
 					<!-- failureStage badge — shown when backend tells us where it broke -->
 					{#if $resumeProcessing.failureStage}
@@ -139,7 +139,7 @@
 					{/if}
 
 					<!-- failureReason is human-readable from backend — display directly -->
-					<p class="mt-4 text-sm text-slate-500">
+					<p class="mt-4 text-sm text-ink-soft">
 						{$resumeProcessing.failureReason ??
 							'Something went wrong while processing your resume.'}
 					</p>
@@ -147,13 +147,13 @@
 					<div class="mt-8 flex flex-col gap-3 sm:flex-row sm:justify-center">
 						<a
 							href="/app/resumes/upload"
-							class="flex justify-center items-center rounded-xl bg-slate-900 px-6 py-3 text-sm font-bold text-white shadow-md transition-all hover:bg-slate-800 active:scale-95"
+							class="flex justify-center items-center rounded-xl bg-brand px-6 py-3 text-sm font-bold text-white shadow-md transition-all hover:bg-brand-dark active:scale-95"
 						>
 							Try again
 						</a>
 						<a
 							href="/app/dashboard"
-							class="flex justify-center items-center rounded-xl border border-slate-200 bg-slate-50 px-6 py-3 text-sm font-bold text-slate-600 transition-colors hover:border-slate-300 hover:text-slate-900 hover:bg-slate-100"
+							class="flex justify-center items-center rounded-xl border border-surface-muted bg-surface-subtle px-6 py-3 text-sm font-bold text-ink-soft transition-colors hover:border-brand/30 hover:text-ink hover:bg-surface-muted"
 						>
 							Go to Dashboard
 						</a>
@@ -185,13 +185,13 @@
 							/>
 						</svg>
 					</div>
-					<h2 class="mt-5 font-serif text-2xl font-bold text-slate-900">Connection lost</h2>
-					<p class="mt-3 text-sm text-slate-500">
+					<h2 class="mt-5 font-display text-2xl font-bold text-ink">Connection lost</h2>
+					<p class="mt-3 text-sm text-ink-soft">
 						Could not reach the server. Your portfolio may still be processing.
 					</p>
 					<button
 						onclick={() => resumeProcessing.retry()}
-						class="mt-8 flex w-full justify-center items-center rounded-xl bg-slate-900 px-8 py-3 text-sm font-bold text-white shadow-md transition-all hover:bg-slate-800 active:scale-95"
+						class="mt-8 flex w-full justify-center items-center rounded-xl bg-brand px-8 py-3 text-sm font-bold text-white shadow-md transition-all hover:bg-brand-dark active:scale-95"
 					>
 						Retry
 					</button>
@@ -200,11 +200,11 @@
 
 			<!-- ── Normal: processing or complete ───────────────────────────────────── -->
 		{:else}
-			<div class="overflow-hidden rounded-[2.5rem] border border-slate-200 bg-white shadow-xl">
+			<div class="overflow-hidden rounded-[2.5rem] border border-surface-muted bg-white shadow-xl">
 				<!-- Progress bar — driven by backend progress field (0–100) -->
-				<div class="relative h-2 w-full overflow-hidden bg-slate-100">
+				<div class="relative h-2 w-full overflow-hidden bg-surface-muted">
 					<div
-						class="absolute inset-y-0 left-0 transition-all duration-700 ease-out bg-slate-900"
+						class="absolute inset-y-0 left-0 transition-all duration-700 ease-out bg-brand"
 						style="width: {$resumeProcessing.progress}%;"
 					></div>
 					{#if $resumeProcessing.polling && $resumeProcessing.status !== 'COMPLETE'}
@@ -220,15 +220,15 @@
 								<p class="text-xs font-bold tracking-widest text-emerald-500 uppercase">
 									All done
 								</p>
-								<h1 class="mt-2 font-serif text-3xl font-bold text-slate-900">
+								<h1 class="mt-2 font-display text-3xl font-bold text-ink" style="letter-spacing:-0.02em">
 									Your portfolio is live!
 								</h1>
 							</div>
 						{:else}
-							<p class="text-xs font-bold tracking-widest text-slate-400 uppercase">
+							<p class="text-xs font-bold tracking-widest text-ink-muted uppercase">
 								Working on it
 							</p>
-							<h1 class="mt-2 font-serif text-3xl font-bold text-slate-900">
+							<h1 class="mt-2 font-display text-3xl font-bold text-ink" style="letter-spacing:-0.02em">
 								Building your portfolio
 							</h1>
 						{/if}
@@ -243,7 +243,7 @@
 								<div class="flex flex-col items-center">
 									<div
 										class="relative flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl transition-all duration-500 border
-										{done ? 'bg-slate-900 border-slate-900 text-white shadow-md' : active ? 'bg-slate-900 border-slate-900 text-white' : 'bg-slate-50 border-slate-200 text-slate-400'}"
+										{done ? 'bg-brand border-brand text-white shadow-md' : active ? 'bg-brand border-brand text-white' : 'bg-surface-subtle border-surface-muted text-ink-muted'}"
 									>
 										{#if done}
 											<span class="check-pop">
@@ -278,11 +278,11 @@
 
 									{#if i < STEPS.length - 1}
 										<div
-											class="my-2 w-0.5 flex-1 overflow-hidden rounded-full bg-slate-100"
+											class="my-2 w-0.5 flex-1 overflow-hidden rounded-full bg-surface-muted"
 											style="min-height: 2rem;"
 										>
 											<div
-												class="w-full rounded-full transition-all duration-700 ease-out bg-slate-900"
+												class="w-full rounded-full transition-all duration-700 ease-out bg-brand"
 												style="height: {done ? '100%' : '0%'};"
 											></div>
 										</div>
@@ -292,14 +292,14 @@
 								<div class="pb-8 {i === STEPS.length - 1 ? 'pb-2' : ''}">
 									<p
 										class="mt-3 text-base font-bold transition-colors duration-300
-										{done ? 'text-slate-900' : active ? 'text-slate-900' : 'text-slate-400'}"
+										{done ? 'text-ink' : active ? 'text-ink' : 'text-ink-muted'}"
 									>
 										{step.label}
 									</p>
 									{#if active}
 										<p
 											in:fade={{ duration: 250 }}
-											class="mt-1 text-sm leading-relaxed text-slate-500"
+											class="mt-1 text-sm leading-relaxed text-ink-soft"
 										>
 											{$resumeProcessing.message ?? step.fallback}
 										</p>
@@ -307,14 +307,14 @@
 											<div class="mt-3 flex gap-1.5">
 												{#each [0, 1, 2] as dot}
 													<div
-														class="dot-bounce h-1.5 w-1.5 rounded-full bg-slate-400"
+														class="dot-bounce h-1.5 w-1.5 rounded-full bg-brand/50"
 														style="animation-delay: {dot * 0.18}s"
 													></div>
 												{/each}
 											</div>
 										{/if}
 									{:else if done}
-										<p class="mt-1 text-sm text-slate-500">{step.fallback}</p>
+										<p class="mt-1 text-sm text-ink-soft">{step.fallback}</p>
 									{/if}
 								</div>
 							</li>
@@ -325,13 +325,13 @@
 					{#if $resumeProcessing.status === 'COMPLETE' && $resumeProcessing.portfolioPath}
 						<div
 							in:fly={{ y: 20, duration: 450, easing: cubicOut }}
-							class="mt-6 overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 p-6"
+							class="mt-6 overflow-hidden rounded-2xl border border-surface-muted bg-surface-subtle p-6"
 						>
-							<p class="mb-3 text-xs font-bold tracking-widest text-slate-500 uppercase">
+							<p class="mb-3 text-xs font-bold tracking-widest text-ink-soft uppercase">
 								Your portfolio URL
 							</p>
 							<div
-								class="flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm"
+								class="flex items-center gap-3 rounded-xl border border-surface-muted bg-white px-4 py-3 shadow-sm"
 							>
 								<svg
 									xmlns="http://www.w3.org/2000/svg"
@@ -339,7 +339,7 @@
 									viewBox="0 0 24 24"
 									stroke-width="2"
 									stroke="currentColor"
-									class="h-5 w-5 shrink-0 text-slate-400"
+									class="h-5 w-5 shrink-0 text-ink-muted"
 								>
 									<path
 										stroke-linecap="round"
@@ -347,13 +347,13 @@
 										d="M13.19 8.688a4.5 4.5 0 0 1 1.242 7.244l-4.5 4.5a4.5 4.5 0 0 1-6.364-6.364l1.757-1.757m13.35-.622 1.757-1.757a4.5 4.5 0 0 0-6.364-6.364l-4.5 4.5a4.5 4.5 0 0 0 1.242 7.244"
 									/>
 								</svg>
-								<span class="flex-1 truncate text-sm font-bold text-slate-900">
+								<span class="flex-1 truncate text-sm font-bold text-ink">
 									{$resumeProcessing.portfolioPath}
 								</span>
 								<button
 									onclick={() => copyUrl($resumeProcessing.portfolioPath!)}
 									class="shrink-0 rounded-lg px-3 py-1.5 text-xs font-bold transition-all
-									{copied ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600 hover:bg-slate-200 hover:text-slate-900'}"
+									{copied ? 'bg-emerald-100 text-emerald-700' : 'bg-surface-muted text-ink-soft hover:bg-surface-muted hover:text-ink'}"
 								>
 									{copied ? 'Copied!' : 'Copy'}
 								</button>
@@ -363,7 +363,7 @@
 									href={$resumeProcessing.portfolioPath}
 									target="_blank"
 									rel="noopener noreferrer"
-									class="flex flex-1 items-center justify-center gap-2 rounded-xl bg-slate-900 py-3 text-sm font-bold text-white shadow-md transition-all hover:bg-slate-800 active:scale-95"
+									class="flex flex-1 items-center justify-center gap-2 rounded-xl bg-brand py-3 text-sm font-bold text-white shadow-md transition-all hover:bg-brand-dark active:scale-95"
 								>
 									Visit Portfolio
 									<svg
@@ -383,16 +383,16 @@
 								</a>
 								<a
 									href="/app/dashboard"
-									class="flex items-center justify-center rounded-xl border border-slate-200 bg-white px-6 py-3 text-sm font-bold text-slate-600 transition-colors hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900"
+									class="flex items-center justify-center rounded-xl border border-surface-muted bg-white px-6 py-3 text-sm font-bold text-ink-soft transition-colors hover:border-brand/30 hover:bg-surface-subtle hover:text-ink"
 								>
 									Dashboard
 								</a>
 							</div>
 						</div>
 					{:else if $resumeProcessing.polling}
-						<div class="mt-6 flex items-center justify-center gap-2 border-t border-slate-100 pt-6">
-							<Spinner size="xs" class="text-slate-400" />
-							<span class="text-xs font-bold text-slate-400">Checking for updates…</span>
+						<div class="mt-6 flex items-center justify-center gap-2 border-t border-surface-muted pt-6">
+							<Spinner size="xs" class="text-ink-muted" />
+							<span class="text-xs font-bold text-ink-muted">Checking for updates…</span>
 						</div>
 					{/if}
 				</div>

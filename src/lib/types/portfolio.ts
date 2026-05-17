@@ -115,6 +115,21 @@ export interface InvestmentPortfolioItem {
 	performance_return?: string;
 }
 
+export interface CustomSectionItem {
+	label?: string;
+	value?: string;
+	subtitle?: string;
+	tags?: string[];
+	url?: string;
+}
+
+export interface CustomSection {
+	section_id: string;
+	title: string;
+	display_type: 'cards' | 'list' | 'timeline';
+	items: CustomSectionItem[];
+}
+
 export interface ParsedData {
 	profile?: {
 		full_name?: string;
@@ -138,6 +153,7 @@ export interface ParsedData {
 	campaigns?: CampaignItem[];
 	financial_modeling?: FinancialModelItem[];
 	investment_portfolios?: InvestmentPortfolioItem[];
+	custom_sections?: CustomSection[];
 }
 
 export type EditableSection = Exclude<keyof ParsedData, 'profile'>;
@@ -168,5 +184,6 @@ export const DEFAULT_SECTION_ORDER: string[] = [
 	'financial_modeling',
 	'investment_portfolios',
 	'design_philosophy',
-	'software_proficiency'
+	'software_proficiency',
+	'custom_sections'
 ];

@@ -13,7 +13,7 @@
 </script>
 
 {#if $authStore.loading}
-	<div class="flex min-h-screen items-center justify-center bg-slate-50">
+	<div class="flex min-h-screen items-center justify-center bg-surface-subtle">
 		<div class="flex items-center gap-3">
 			<Spinner size="sm" class="text-brand" />
 			<span class="text-sm font-medium text-ink-soft">Loading…</span>

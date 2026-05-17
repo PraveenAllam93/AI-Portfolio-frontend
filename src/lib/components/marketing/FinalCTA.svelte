@@ -9,7 +9,7 @@
 
 <style>
 	section {
-		background: var(--color-warm-peach);
+		background: var(--color-warm-cream);
 		padding: 104px 48px;
 		text-align: center;
 	}
@@ -23,7 +23,7 @@
 		color: var(--color-warm-ink);
 	}
 	.coral {
-		color: var(--color-warm-coral);
+		color: #ff5c3a;
 	}
 	.final-sub {
 		font-size: 16px;

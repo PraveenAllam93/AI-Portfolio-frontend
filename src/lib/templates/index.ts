@@ -33,16 +33,28 @@ const TEMPLATES: Record<string, TemplateRenderer> = {
 /** Default template used when templateId is missing or unknown. */
 const DEFAULT_TEMPLATE = 'neon';
 
+function stripEditingUi(html: string): string {
+	return html
+		.replace(/<script data-editor>[\s\S]*?<\/script>/g, '')
+		.replace(/ contenteditable="true" data-path="[^"]*"( data-multiline="true")?/g, '')
+		.replace(/ data-list-path="[^"]*"/g, '')
+		.replace(/ data-item-wrap/g, '')
+		.replace(/<button\b[^>]*\bdata-del-section\b[^>]*>[\s\S]*?<\/button>/g, '')
+		.replace(/<button\b[^>]*\bdata-add-section\b[^>]*>[\s\S]*?<\/button>/g, '');
+}
+
 export function renderPortfolio(
 	templateId: string | undefined | null,
 	parsedData: ParsedData,
 	portfolioContent: PortfolioContent,
 	category: string,
 	sectionOrder?: string[],
-	hiddenSections?: string[]
+	hiddenSections?: string[],
+	publishMode?: boolean
 ): string {
 	const id = (templateId ?? '').toLowerCase().trim();
 	const renderer = TEMPLATES[id] ?? TEMPLATES[DEFAULT_TEMPLATE];
-	const v = normalize(parsedData, portfolioContent, category, sectionOrder, hiddenSections);
-	return renderer(v);
+	const v = normalize(parsedData, portfolioContent, category, sectionOrder, hiddenSections, !(publishMode ?? false));
+	const rendered = renderer(v);
+	return publishMode ? stripEditingUi(rendered) : rendered;
 }
