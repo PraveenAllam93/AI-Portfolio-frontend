@@ -5,6 +5,7 @@
  */
 import {
 	CognitoIdentityProviderClient,
+	AdminInitiateAuthCommand,
 	InitiateAuthCommand,
 	SignUpCommand,
 	ConfirmSignUpCommand,
@@ -30,13 +31,19 @@ function clientId(): string {
 	return env.COGNITO_CLIENT_ID;
 }
 
+function userPoolId(): string {
+	if (!env.COGNITO_USER_POOL_ID) throw new Error('COGNITO_USER_POOL_ID is not set');
+	return env.COGNITO_USER_POOL_ID;
+}
+
 // ─── Auth operations ──────────────────────────────────────────────────────────
 
 export async function cognitoLogin(email: string, password: string) {
 	return getClient().send(
-		new InitiateAuthCommand({
-			AuthFlow: 'USER_PASSWORD_AUTH',
+		new AdminInitiateAuthCommand({
+			AuthFlow: 'ADMIN_USER_PASSWORD_AUTH',
 			ClientId: clientId(),
+			UserPoolId: userPoolId(),
 			AuthParameters: { USERNAME: email, PASSWORD: password }
 		})
 	);
