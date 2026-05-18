@@ -5,7 +5,6 @@
  */
 import {
 	CognitoIdentityProviderClient,
-	AdminInitiateAuthCommand,
 	InitiateAuthCommand,
 	SignUpCommand,
 	ConfirmSignUpCommand,
@@ -14,7 +13,6 @@ import {
 	ConfirmForgotPasswordCommand,
 	type AuthenticationResultType
 } from '@aws-sdk/client-cognito-identity-provider';
-import { fromIni } from '@aws-sdk/credential-provider-ini';
 import { dev } from '$app/environment';
 import { env } from '$env/dynamic/private';
 import type { Cookies } from '@sveltejs/kit';
@@ -22,10 +20,8 @@ import type { Cookies } from '@sveltejs/kit';
 // ─── Cognito client ───────────────────────────────────────────────────────────
 
 function getClient() {
-	const profile = env.AWS_PROFILE;
 	return new CognitoIdentityProviderClient({
-		region: env.COGNITO_REGION ?? 'us-east-1',
-		...(profile && { credentials: fromIni({ profile }) })
+		region: env.COGNITO_REGION ?? 'us-east-1'
 	});
 }
 
@@ -34,19 +30,13 @@ function clientId(): string {
 	return env.COGNITO_CLIENT_ID;
 }
 
-function userPoolId(): string {
-	if (!env.COGNITO_USER_POOL_ID) throw new Error('COGNITO_USER_POOL_ID is not set');
-	return env.COGNITO_USER_POOL_ID;
-}
-
 // ─── Auth operations ──────────────────────────────────────────────────────────
 
 export async function cognitoLogin(email: string, password: string) {
 	return getClient().send(
-		new AdminInitiateAuthCommand({
-			AuthFlow: 'ADMIN_USER_PASSWORD_AUTH',
+		new InitiateAuthCommand({
+			AuthFlow: 'USER_PASSWORD_AUTH',
 			ClientId: clientId(),
-			UserPoolId: userPoolId(),
 			AuthParameters: { USERNAME: email, PASSWORD: password }
 		})
 	);
