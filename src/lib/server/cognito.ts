@@ -10,6 +10,8 @@ import {
 	SignUpCommand,
 	ConfirmSignUpCommand,
 	ResendConfirmationCodeCommand,
+	ForgotPasswordCommand,
+	ConfirmForgotPasswordCommand,
 	type AuthenticationResultType
 } from '@aws-sdk/client-cognito-identity-provider';
 import { fromIni } from '@aws-sdk/credential-provider-ini';
@@ -89,6 +91,26 @@ export async function cognitoResendCode(email: string) {
 		new ResendConfirmationCodeCommand({
 			ClientId: clientId(),
 			Username: email
+		})
+	);
+}
+
+export async function cognitoForgotPassword(email: string) {
+	return getClient().send(
+		new ForgotPasswordCommand({
+			ClientId: clientId(),
+			Username: email
+		})
+	);
+}
+
+export async function cognitoResetPassword(email: string, code: string, newPassword: string) {
+	return getClient().send(
+		new ConfirmForgotPasswordCommand({
+			ClientId: clientId(),
+			Username: email,
+			ConfirmationCode: code,
+			Password: newPassword
 		})
 	);
 }
@@ -205,6 +227,8 @@ export function parseCognitoError(err: unknown): string {
 				return 'Too many attempts. Please wait a few minutes.';
 			case 'TooManyRequestsException':
 				return 'Too many requests. Please slow down and try again.';
+			case 'InvalidParameterException':
+				return 'Invalid input. Please check your details and try again.';
 			default:
 				return err.message || 'An unexpected error occurred.';
 		}

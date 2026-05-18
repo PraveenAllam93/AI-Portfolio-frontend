@@ -15,30 +15,26 @@
 	);
 </script>
 
-<header class="sticky top-0 z-10 border-b border-slate-200 bg-white shadow-sm">
+<header class="sticky top-0 z-10 border-b border-surface-muted bg-white shadow-sm">
 	<div class="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
-		<a href="/" class="flex items-center gap-2 text-xl font-bold text-slate-900">
-			<div
-				class="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-900 text-white shadow-md transition-transform hover:rotate-12"
-			>
-				<span class="text-xs font-black">AI</span>
-			</div>
-			folio
+		<a href="/" class="flex items-center gap-1 font-display font-black text-[17px] tracking-tight text-ink" style="letter-spacing:-0.02em">
+			<div class="h-2 w-2 rounded-full bg-brand mr-0.5 shrink-0"></div>
+			Portfolio<span class="text-brand">.ai</span>
 		</a>
 
 		{#if $authStore.user}
 			<div class="flex items-center gap-4">
 				<div
 					class="flex items-center gap-3 {children
-						? 'border-r border-slate-200 pr-4'
+						? 'border-r border-surface-muted pr-4'
 						: ''}"
 				>
 					<div
-						class="flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-slate-100 text-sm font-bold text-slate-700 shadow-sm"
+						class="flex h-9 w-9 items-center justify-center rounded-full border border-surface-muted bg-surface-subtle text-sm font-bold text-ink-soft shadow-sm"
 					>
 						{userInitials}
 					</div>
-					<span class="hidden text-sm font-medium text-slate-700 sm:block">
+					<span class="hidden text-sm font-medium text-ink-soft sm:block">
 						{$authStore.user.name}
 					</span>
 				</div>

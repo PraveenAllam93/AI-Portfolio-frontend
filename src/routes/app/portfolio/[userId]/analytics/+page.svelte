@@ -262,7 +262,7 @@
 </script>
 
 <svelte:head>
-	<title>Analytics — AIfolio</title>
+	<title>Analytics — Portfolio.ai</title>
 </svelte:head>
 
 <!-- Expanded Chart Modal -->
@@ -278,10 +278,10 @@
 		<div class="relative w-full max-w-6xl rounded-[2.5rem] bg-white p-6 shadow-2xl sm:p-10" transition:scale={{ start: 0.95, duration: 250, easing: cubicOut }}>
 			<div class="mb-8 flex items-center justify-between">
 				<div>
-					<h2 id="chart-modal-title" class="font-serif text-3xl font-bold text-slate-900">Traffic Over Time</h2>
-					<p class="mt-1 text-slate-500">A detailed view of your portfolio's historical performance. Hover points for counts.</p>
+					<h2 id="chart-modal-title" class="font-display text-3xl font-bold text-ink">Traffic Over Time</h2>
+					<p class="mt-1 text-ink-soft">A detailed view of your portfolio's historical performance. Hover points for counts.</p>
 				</div>
-				<button use:focusOnMount onclick={() => isChartExpanded = false} aria-label="Close chart" class="flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 text-slate-500 transition-colors hover:bg-slate-200 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400/50">
+				<button use:focusOnMount onclick={() => isChartExpanded = false} aria-label="Close chart" class="flex h-12 w-12 items-center justify-center rounded-full bg-surface-muted text-ink-soft transition-colors hover:bg-surface-muted hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/15">
 					<svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
 						<path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
 					</svg>
@@ -355,22 +355,22 @@
 
 	<main class="mx-auto w-full max-w-7xl flex-1 px-6 py-8">
 		<div use:reveal class="mb-6">
-			<a href="/app/dashboard" class="mb-3 inline-flex items-center gap-1.5 text-sm font-bold text-slate-500 transition-colors hover:text-slate-900">
+			<a href="/app/dashboard" class="mb-3 inline-flex items-center gap-1.5 text-sm font-bold text-ink-soft transition-colors hover:text-ink">
 				<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="h-4 w-4">
 					<path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" />
 				</svg>
 				Back
 			</a>
-			<h1 class="font-serif text-3xl font-bold tracking-tight text-slate-900">Portfolio Analytics</h1>
+			<h1 class="font-display text-3xl font-bold tracking-tight text-ink">Portfolio Analytics</h1>
 		</div>
 
 		{#if loadingStatus === 'loading'}
 			<LoadingState size="lg" message="Loading metrics…" />
 		{:else if loadingStatus === 'error'}
 			<div class="rounded-3xl border border-red-100 bg-white p-10 text-center shadow-xl">
-				<p class="text-xl font-serif font-bold text-slate-900">Failed to load analytics</p>
-				<p class="mt-2 text-slate-500">{errorMsg}</p>
-				<button onclick={loadAnalytics} class="mt-6 rounded-full bg-slate-900 px-8 py-3 text-sm font-bold text-white transition-all hover:bg-slate-800 shadow-lg">Retry</button>
+				<p class="text-xl font-display font-bold text-ink">Failed to load analytics</p>
+				<p class="mt-2 text-ink-soft">{errorMsg}</p>
+				<button onclick={loadAnalytics} class="mt-6 rounded-full bg-brand px-8 py-3 text-sm font-bold text-white transition-all hover:bg-brand-dark shadow-lg">Retry</button>
 			</div>
 		{:else if analytics}
 			<!-- Primary Stats -->
@@ -383,15 +383,15 @@
                     { label: 'Speed (TTFB)', value: analytics.avgTtfb ? `${Math.round(analytics.avgTtfb * 1000)}ms` : '–', icon: 'M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z' },
                     { label: 'Cache Hit', value: analytics.cacheHitRate ? `${analytics.cacheHitRate}%` : '–', icon: 'M20.25 14.15v4.25c0 1.094-.787 2.036-1.872 2.18-2.087.277-4.216.42-6.378.42s-4.291-.143-6.378-.42c-1.085-.144-1.872-1.086-1.872-2.18v-4.25m16.5 0a2.18 2.18 0 0 0 .75-1.661V8.706c0-1.081-.768-2.015-1.837-2.175a48.114 48.114 0 0 0-3.413-.387' }
 				] as stat}
-					<div class="flex flex-col items-start gap-2 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-						<div class="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-50 border border-slate-100">
-							<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="h-4 w-4 text-slate-900" aria-hidden="true">
+					<div class="flex flex-col items-start gap-2 rounded-2xl border border-surface-muted bg-white p-4 shadow-sm">
+						<div class="flex h-8 w-8 items-center justify-center rounded-lg bg-surface-subtle border border-surface-muted">
+							<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="h-4 w-4 text-ink" aria-hidden="true">
 								<path stroke-linecap="round" stroke-linejoin="round" d={stat.icon} />
 							</svg>
 						</div>
 						<div>
-							<p class="text-[10px] font-bold tracking-widest text-slate-400 uppercase">{stat.label}</p>
-							<p class="font-serif text-xl font-bold text-slate-900">{stat.value}</p>
+							<p class="text-[10px] font-bold tracking-widest text-ink-muted uppercase">{stat.label}</p>
+							<p class="font-display text-xl font-bold text-ink">{stat.value}</p>
 						</div>
 					</div>
 				{/each}
@@ -399,21 +399,21 @@
 
 			<div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
                 <!-- Main Timeline -->
-                <div use:reveal={{ delay: 120 }} class="lg:col-span-2 overflow-hidden rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm flex flex-col">
-                    <div class="flex items-center justify-between mb-6 border-b border-slate-50 pb-4">
+                <div use:reveal={{ delay: 120 }} class="lg:col-span-2 overflow-hidden rounded-[2rem] border border-surface-muted bg-white p-6 shadow-sm flex flex-col">
+                    <div class="flex items-center justify-between mb-6 border-b border-surface-muted pb-4">
 						<div>
-							<h2 class="font-serif text-xl font-bold text-slate-900">Traffic Over Time</h2>
-							<p class="text-xs text-slate-500 mt-0.5">Daily view trends.</p>
+							<h2 class="font-display text-xl font-bold text-ink">Traffic Over Time</h2>
+							<p class="text-xs text-ink-soft mt-0.5">Daily view trends.</p>
 						</div>
-						<button onclick={() => isChartExpanded = true} aria-label="Expand chart" class="h-11 w-11 flex items-center justify-center rounded-lg bg-slate-50 border border-slate-200 hover:bg-slate-100 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400/50">
-							<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="h-4 w-4 text-slate-400">
+						<button onclick={() => isChartExpanded = true} aria-label="Expand chart" class="h-11 w-11 flex items-center justify-center rounded-lg bg-surface-subtle border border-surface-muted hover:bg-surface-muted transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/15">
+							<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="h-4 w-4 text-ink-muted">
 								<path stroke-linecap="round" stroke-linejoin="round" d="M3.75 3.75v4.5m0-4.5h4.5m-4.5 0L9 9M3.75 20.25v-4.5m0 4.5h4.5m-4.5 0L9 15M20.25 3.75h-4.5m4.5 0v4.5m0-4.5L15 9m5.25 11.25h-4.5m4.5 0v-4.5m0 4.5L15 15" />
 							</svg>
 						</button>
                     </div>
                     <div class="flex-1 min-h-[200px] flex flex-col justify-center">
                         {#if timeline.length === 0}
-                            <p class="text-slate-400 text-sm italic text-center">No data available for timeline.</p>
+                            <p class="text-ink-muted text-sm italic text-center">No data available for timeline.</p>
                         {:else}
 							{@render chartSvg("max-h-64")}
                         {/if}
@@ -421,11 +421,11 @@
                 </div>
 
                 <!-- Engagement -->
-                <div use:reveal={{ delay: 150 }} class="rounded-[2rem] bg-slate-900 p-6 shadow-xl flex flex-col text-white justify-between relative overflow-hidden">
+                <div use:reveal={{ delay: 150 }} class="rounded-[2rem] bg-brand p-6 shadow-xl flex flex-col text-white justify-between relative overflow-hidden">
 					<div class="absolute right-0 top-0 w-32 h-32 bg-white/5 rounded-full blur-3xl pointer-events-none"></div>
                     <div class="relative z-10 mb-6">
-                        <h2 class="font-serif text-xl font-bold">Engagement</h2>
-                        <p class="text-slate-400 text-xs">Peak activity periods.</p>
+                        <h2 class="font-display text-xl font-bold">Engagement</h2>
+                        <p class="text-ink-muted text-xs">Peak activity periods.</p>
                     </div>
 
                     <div class="space-y-4 relative z-10">
@@ -451,7 +451,7 @@
 
                             <div class="bg-white/5 rounded-xl p-4 border border-white/10">
                                 <div class="flex items-center justify-between mb-3">
-                                    <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Weekly Activity</p>
+                                    <p class="text-[10px] font-bold text-ink-muted uppercase tracking-widest">Weekly Activity</p>
                                     <span class="text-[10px] font-bold text-emerald-400 uppercase">Trends</span>
                                 </div>
                                 
@@ -476,7 +476,7 @@
                                     </svg>
                                 </div>
                                 
-                                <div class="flex justify-between mt-2 text-[9px] font-bold text-slate-500 uppercase tracking-tighter">
+                                <div class="flex justify-between mt-2 text-[9px] font-bold text-ink-soft uppercase tracking-tighter">
                                     {#each weekDays as day}
                                         <span>{day.charAt(0)}</span>
                                     {/each}
@@ -488,13 +488,13 @@
                             {@const hourVals = Object.values(analytics.byHour)}
                             {@const peakHVal = Math.max(...hourVals, 1)}
                             <div class="bg-white/5 rounded-xl p-4 border border-white/10">
-                                <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">Daily Pulse (24h)</p>
+                                <p class="text-[10px] font-bold text-ink-muted uppercase tracking-widest mb-3">Daily Pulse (24h)</p>
                                 <div class="flex items-end justify-between gap-[1px] h-12">
                                     {#each Array.from({length: 24}, (_, i) => i.toString()) as hour}
                                         {@const count = analytics?.byHour?.[hour] ?? 0}
                                         {@const isPeak = count === peakHVal && count > 0}
-                                        <div class="flex-1 {isPeak ? 'bg-emerald-400' : 'bg-slate-700/50'} rounded-t-[1px] relative group transition-all hover:bg-emerald-400" style="height: {Math.max((count / peakHVal) * 100, 5)}%">
-                                            <div class="absolute -top-7 left-1/2 -translate-x-1/2 bg-white text-slate-900 text-[10px] font-bold px-1.5 py-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity z-20 pointer-events-none">{formatHour(hour)}: {count}</div>
+                                        <div class="flex-1 {isPeak ? 'bg-emerald-400' : 'bg-surface-muted/50'} rounded-t-[1px] relative group transition-all hover:bg-emerald-400" style="height: {Math.max((count / peakHVal) * 100, 5)}%">
+                                            <div class="absolute -top-7 left-1/2 -translate-x-1/2 bg-white text-ink text-[10px] font-bold px-1.5 py-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity z-20 pointer-events-none">{formatHour(hour)}: {count}</div>
                                         </div>
                                     {/each}
                                 </div>
@@ -506,31 +506,31 @@
 
             <!-- Versions Insights -->
             <div use:reveal={{ delay: 160 }} class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-                <div class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm text-center flex flex-col justify-center">
-                    <p class="text-[10px] font-bold tracking-widest text-slate-400 uppercase mb-2">Total Versions</p>
-                    <p class="font-serif text-5xl font-bold text-slate-900">{Object.keys(analytics.byVersion ?? {}).length}</p>
+                <div class="rounded-3xl border border-surface-muted bg-white p-6 shadow-sm text-center flex flex-col justify-center">
+                    <p class="text-[10px] font-bold tracking-widest text-ink-muted uppercase mb-2">Total Versions</p>
+                    <p class="font-display text-5xl font-bold text-ink">{Object.keys(analytics.byVersion ?? {}).length}</p>
                 </div>
 
-                <div class="md:col-span-3 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm overflow-hidden flex flex-col">
-                    <div class="flex items-center justify-between mb-4 border-b border-slate-50 pb-3">
-                        <h2 class="font-serif text-xl font-bold text-slate-900">Version Performance</h2>
-                        <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Efficiency</span>
+                <div class="md:col-span-3 rounded-3xl border border-surface-muted bg-white p-6 shadow-sm overflow-hidden flex flex-col">
+                    <div class="flex items-center justify-between mb-4 border-b border-surface-muted pb-3">
+                        <h2 class="font-display text-xl font-bold text-ink">Version Performance</h2>
+                        <span class="text-[10px] font-bold text-ink-muted uppercase tracking-widest">Efficiency</span>
                     </div>
                     {#if analytics.byVersion && Object.keys(analytics.byVersion).length > 0}
                         <div class="space-y-4 max-h-[160px] md:max-h-[200px] overflow-y-auto custom-scrollbar pr-2">
                             {#each Object.entries(analytics.byVersion).sort((a, b) => b[1] - a[1]) as [version, count]}
                                 <div class="flex items-center gap-4 group">
-                                    <span class="w-12 text-xs font-bold text-slate-900 uppercase group-hover:text-emerald-600 transition-colors">{version}</span>
-                                    <div class="flex-1 h-2 bg-slate-50 rounded-full overflow-hidden">
-                                        <div class="h-full bg-slate-900 group-hover:bg-emerald-500 transition-all duration-1000" style="width: {pct(count, analytics.totalViews)}%"></div>
+                                    <span class="w-12 text-xs font-bold text-ink uppercase group-hover:text-emerald-600 transition-colors">{version}</span>
+                                    <div class="flex-1 h-2 bg-surface-subtle rounded-full overflow-hidden">
+                                        <div class="h-full bg-brand group-hover:bg-emerald-500 transition-all duration-1000" style="width: {pct(count, analytics.totalViews)}%"></div>
                                     </div>
-                                    <span class="w-24 text-right text-xs font-bold text-slate-500">{count.toLocaleString()} views</span>
-                                    <span class="w-12 text-right text-xs font-bold text-slate-400">{pct(count, analytics.totalViews)}%</span>
+                                    <span class="w-24 text-right text-xs font-bold text-ink-soft">{count.toLocaleString()} views</span>
+                                    <span class="w-12 text-right text-xs font-bold text-ink-muted">{pct(count, analytics.totalViews)}%</span>
                                 </div>
                             {/each}
                         </div>
                     {:else}
-                        <p class="text-sm font-medium text-slate-400 text-center py-4 italic">No version data yet.</p>
+                        <p class="text-sm font-medium text-ink-muted text-center py-4 italic">No version data yet.</p>
                     {/if}
                 </div>
             </div>
@@ -538,23 +538,23 @@
             <!-- Detailed Breakdowns -->
 			<div use:reveal={{ delay: 180 }} class="grid grid-cols-1 sm:grid-cols-2 gap-6 md:grid-cols-3">
 				<!-- By Country -->
-				<div class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm hover:shadow-md transition-shadow">
-					<h2 class="mb-6 font-serif text-xl font-bold text-slate-900 border-b border-slate-100 pb-3">By Country</h2>
+				<div class="rounded-3xl border border-surface-muted bg-white p-6 shadow-sm hover:shadow-md transition-shadow">
+					<h2 class="mb-6 font-display text-xl font-bold text-ink border-b border-surface-muted pb-3">By Country</h2>
 					{#if countryTotal === 0}
-						<p class="text-sm font-medium text-slate-400 py-4 text-center">No data yet.</p>
+						<p class="text-sm font-medium text-ink-muted py-4 text-center">No data yet.</p>
 					{:else}
 						<ul class="space-y-4">
 							{#each topEntries(analytics.byCountry) as [code, count]}
 								<li>
 									<div class="mb-2 flex items-center justify-between text-sm">
-										<span class="font-bold text-slate-900 flex items-center gap-2">
+										<span class="font-bold text-ink flex items-center gap-2">
 											<span class="text-lg leading-none">{new Intl.DisplayNames(['en'], {type: 'region'}).of(code) !== code ? String.fromCodePoint(...code.toUpperCase().split('').map(char => 127397 + char.charCodeAt(0))) : '🌐'}</span>
 											{countryDisplayName(code)}
 										</span>
-										<span class="font-bold text-slate-500">{pct(count, countryTotal)}%</span>
+										<span class="font-bold text-ink-soft">{pct(count, countryTotal)}%</span>
 									</div>
-									<div class="h-2 overflow-hidden rounded-full bg-slate-100">
-										<div class="h-full rounded-full bg-slate-900 transition-all duration-1000" style="width: {pct(count, countryTotal)}%"></div>
+									<div class="h-2 overflow-hidden rounded-full bg-surface-muted">
+										<div class="h-full rounded-full bg-brand transition-all duration-1000" style="width: {pct(count, countryTotal)}%"></div>
 									</div>
 								</li>
 							{/each}
@@ -563,22 +563,22 @@
 				</div>
 
 				<!-- By Source -->
-				<div class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm hover:shadow-md transition-shadow">
-					<h2 class="mb-6 font-serif text-xl font-bold text-slate-900 border-b border-slate-100 pb-3">By Source</h2>
+				<div class="rounded-3xl border border-surface-muted bg-white p-6 shadow-sm hover:shadow-md transition-shadow">
+					<h2 class="mb-6 font-display text-xl font-bold text-ink border-b border-surface-muted pb-3">By Source</h2>
 					{#if sourceTotal === 0}
-						<p class="text-sm font-medium text-slate-400 py-4 text-center">No data yet.</p>
+						<p class="text-sm font-medium text-ink-muted py-4 text-center">No data yet.</p>
 					{:else}
 						<ul class="space-y-4">
 							{#each topEntries(analytics.bySource) as [key, count]}
 								<li>
 									<div class="mb-2 flex items-center justify-between text-sm">
-										<span class="font-bold text-slate-900 capitalize">
+										<span class="font-bold text-ink capitalize">
 											{sourceLabels[key] ?? key}
 										</span>
-										<span class="font-bold text-slate-500">{pct(count, sourceTotal)}%</span>
+										<span class="font-bold text-ink-soft">{pct(count, sourceTotal)}%</span>
 									</div>
-									<div class="h-2 overflow-hidden rounded-full bg-slate-100">
-										<div class="h-full rounded-full bg-slate-900 transition-all duration-1000" style="width: {pct(count, sourceTotal)}%"></div>
+									<div class="h-2 overflow-hidden rounded-full bg-surface-muted">
+										<div class="h-full rounded-full bg-brand transition-all duration-1000" style="width: {pct(count, sourceTotal)}%"></div>
 									</div>
 								</li>
 							{/each}
@@ -587,29 +587,29 @@
 				</div>
 
 				<!-- By Device -->
-				<div class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm hover:shadow-md transition-shadow">
-					<h2 class="mb-6 font-serif text-xl font-bold text-slate-900 border-b border-slate-100 pb-3">By Device</h2>
+				<div class="rounded-3xl border border-surface-muted bg-white p-6 shadow-sm hover:shadow-md transition-shadow">
+					<h2 class="mb-6 font-display text-xl font-bold text-ink border-b border-surface-muted pb-3">By Device</h2>
 					{#if deviceTotal === 0}
-						<p class="text-sm font-medium text-slate-400 py-4 text-center">No data yet.</p>
+						<p class="text-sm font-medium text-ink-muted py-4 text-center">No data yet.</p>
 					{:else}
 						<ul class="space-y-4">
 							{#each topEntries(analytics.byDevice) as [key, count]}
 								<li>
 									<div class="mb-2 flex items-center justify-between text-sm">
-										<span class="font-bold text-slate-900 flex items-center gap-2">
+										<span class="font-bold text-ink flex items-center gap-2">
 											{#if key === 'mobile'}
-												<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="size-4 text-slate-400"><path stroke-linecap="round" stroke-linejoin="round" d="M10.5 1.5H8.25A2.25 2.25 0 0 0 6 3.75v16.5a2.25 2.25 0 0 0 2.25 2.25h7.5A2.25 2.25 0 0 0 18 20.25V3.75a2.25 2.25 0 0 0-2.25-2.25H13.5m-3 0V3h3V1.5m-3 0h3m-3 18.75h3" /></svg>
+												<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="size-4 text-ink-muted"><path stroke-linecap="round" stroke-linejoin="round" d="M10.5 1.5H8.25A2.25 2.25 0 0 0 6 3.75v16.5a2.25 2.25 0 0 0 2.25 2.25h7.5A2.25 2.25 0 0 0 18 20.25V3.75a2.25 2.25 0 0 0-2.25-2.25H13.5m-3 0V3h3V1.5m-3 0h3m-3 18.75h3" /></svg>
 											{:else if key === 'desktop'}
-												<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="size-4 text-slate-400"><path stroke-linecap="round" stroke-linejoin="round" d="M9 17.25v1.007a3 3 0 0 1-.879 2.122L7.5 21h9l-.621-.621A3 3 0 0 1 15 18.257V17.25m6-12V15a2.25 2.25 0 0 1-2.25 2.25H5.25A2.25 2.25 0 0 1 3 15V5.25m18 0A2.25 2.25 0 0 0 18.75 3H5.25A2.25 2.25 0 0 0 3 5.25m18 0V12a2.25 2.25 0 0 1-2.25 2.25H5.25A2.25 2.25 0 0 1 3 12V5.25" /></svg>
+												<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="size-4 text-ink-muted"><path stroke-linecap="round" stroke-linejoin="round" d="M9 17.25v1.007a3 3 0 0 1-.879 2.122L7.5 21h9l-.621-.621A3 3 0 0 1 15 18.257V17.25m6-12V15a2.25 2.25 0 0 1-2.25 2.25H5.25A2.25 2.25 0 0 1 3 15V5.25m18 0A2.25 2.25 0 0 0 18.75 3H5.25A2.25 2.25 0 0 0 3 5.25m18 0V12a2.25 2.25 0 0 1-2.25 2.25H5.25A2.25 2.25 0 0 1 3 12V5.25" /></svg>
 											{:else}
-												<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="size-4 text-slate-400"><path stroke-linecap="round" stroke-linejoin="round" d="M10.5 1.5H8.25A2.25 2.25 0 0 0 6 3.75v16.5a2.25 2.25 0 0 0 2.25 2.25h7.5A2.25 2.25 0 0 0 18 20.25V3.75a2.25 2.25 0 0 0-2.25-2.25H13.5m-3 0V3h3V1.5m-3 0h3m-3 18.75h3" /></svg>
+												<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="size-4 text-ink-muted"><path stroke-linecap="round" stroke-linejoin="round" d="M10.5 1.5H8.25A2.25 2.25 0 0 0 6 3.75v16.5a2.25 2.25 0 0 0 2.25 2.25h7.5A2.25 2.25 0 0 0 18 20.25V3.75a2.25 2.25 0 0 0-2.25-2.25H13.5m-3 0V3h3V1.5m-3 0h3m-3 18.75h3" /></svg>
 											{/if}
 											{deviceLabels[key] ?? key}
 										</span>
-										<span class="font-bold text-slate-500">{pct(count, deviceTotal)}%</span>
+										<span class="font-bold text-ink-soft">{pct(count, deviceTotal)}%</span>
 									</div>
-									<div class="h-2 overflow-hidden rounded-full bg-slate-100">
-										<div class="h-full rounded-full bg-slate-900 transition-all duration-1000" style="width: {pct(count, deviceTotal)}%"></div>
+									<div class="h-2 overflow-hidden rounded-full bg-surface-muted">
+										<div class="h-full rounded-full bg-brand transition-all duration-1000" style="width: {pct(count, deviceTotal)}%"></div>
 									</div>
 								</li>
 							{/each}

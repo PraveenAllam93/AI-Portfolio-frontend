@@ -2,7 +2,7 @@
 	import { goto } from '$app/navigation';
 	import { register, confirmEmail, resendConfirmationCode } from '$lib/services/auth';
 	import { reveal } from '$lib/actions/animate';
-import Spinner from '$lib/components/common/Spinner.svelte';
+	import Spinner from '$lib/components/common/Spinner.svelte';
 
 	let step: 'register' | 'confirm' = $state('register');
 	let name = $state('');
@@ -72,15 +72,15 @@ import Spinner from '$lib/components/common/Spinner.svelte';
 </script>
 
 <svelte:head>
-	<title>Sign Up — AIfolio</title>
+	<title>Sign Up — Portfolio.ai</title>
 </svelte:head>
 
 <div class="flex min-h-screen bg-surface-subtle">
-	<!-- Left panel — Clean Brand Side -->
+	<!-- Left panel — Brand Side -->
 	<div
-		class="relative hidden flex-col items-center justify-center overflow-hidden border-r border-slate-200 bg-surface-subtle p-12 lg:flex lg:w-[45%]"
+		class="relative hidden flex-col items-center justify-center overflow-hidden border-r border-surface-muted bg-surface-subtle p-12 lg:flex lg:w-[45%]"
 	>
-		<!-- Background decoration -->
+		<!-- Background dot grid -->
 		<div
 			class="pointer-events-none absolute inset-0 opacity-[0.03]"
 			style="background-image: radial-gradient(circle, #000 1px, transparent 1px); background-size: 40px 40px;"
@@ -90,49 +90,40 @@ import Spinner from '$lib/components/common/Spinner.svelte';
 			<div class="relative z-10 text-center">
 				<a
 					href="/"
-					class="group mb-8 inline-flex items-center gap-2 text-4xl font-bold tracking-tight text-slate-900"
+					class="group mb-8 inline-flex items-center gap-1.5 font-display text-4xl font-black tracking-tight text-ink"
+					style="letter-spacing:-0.03em"
 				>
-					<div
-						class="flex h-12 w-14 items-center justify-center rounded-2xl bg-slate-900 text-white shadow-lg transition-transform group-hover:rotate-12"
-					>
-						<span class="text-lg font-black tracking-tighter">AI</span>
-					</div>
-					<span>folio</span>
+					<div class="h-3 w-3 rounded-full bg-brand mr-1 shrink-0 transition-transform group-hover:scale-125"></div>
+					Portfolio<span class="text-brand">.ai</span>
 				</a>
-				<p class="mt-6 text-xl leading-relaxed text-slate-600">
+				<p class="mt-4 text-lg leading-relaxed text-ink-soft">
 					Create your professional online<br />presence in seconds.
 				</p>
 			</div>
 
-			<div class="relative z-10 mt-16 flex flex-col gap-4">
+			<div class="relative z-10 mt-14 flex flex-col gap-3">
 				{#each [{ icon: '01', label: 'Upload your resume', desc: 'PDF or Word file' }, { icon: '02', label: 'Pick a template', desc: 'Tailored for your role' }, { icon: '03', label: 'Go live instantly', desc: 'Hosted on our fast edge network' }] as item}
-					<div
-						class="flex items-center gap-5 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"
-					>
-						<div
-							class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-xs font-bold text-slate-500"
-						>
+					<div class="flex items-center gap-5 rounded-2xl border border-surface-muted bg-white p-5 shadow-sm">
+						<div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand/10 text-xs font-bold text-brand">
 							{item.icon}
 						</div>
 						<div>
-							<p class="text-sm font-bold text-slate-900">{item.label}</p>
-							<p class="text-xs text-slate-500">{item.desc}</p>
+							<p class="text-sm font-bold text-ink">{item.label}</p>
+							<p class="text-xs text-ink-soft">{item.desc}</p>
 						</div>
 					</div>
 				{/each}
 			</div>
 		{:else}
 			<div class="relative z-10 text-center">
-				<div
-					class="mx-auto mb-8 flex h-24 w-24 items-center justify-center rounded-3xl bg-slate-100 border border-slate-200"
-				>
+				<div class="mx-auto mb-8 flex h-24 w-24 items-center justify-center rounded-3xl bg-brand/10 border border-brand/20">
 					<svg
 						xmlns="http://www.w3.org/2000/svg"
 						fill="none"
 						viewBox="0 0 24 24"
 						stroke-width="1.5"
 						stroke="currentColor"
-						class="h-10 w-10 text-slate-900"
+						class="h-10 w-10 text-brand"
 					>
 						<path
 							stroke-linecap="round"
@@ -141,35 +132,31 @@ import Spinner from '$lib/components/common/Spinner.svelte';
 						/>
 					</svg>
 				</div>
-				<p class="font-serif text-4xl font-bold text-slate-900">Verify Email</p>
-				<p class="mt-4 text-lg text-slate-600">
+				<p class="font-display text-4xl font-bold text-ink" style="letter-spacing:-0.02em">Verify Email</p>
+				<p class="mt-4 text-lg text-ink-soft">
 					A 6-digit verification code<br />
-					was sent to <span class="font-bold text-slate-900">{email}</span>
+					was sent to <span class="font-bold text-ink">{email}</span>
 				</p>
 			</div>
 		{/if}
 	</div>
 
 	<!-- Right panel — Form -->
-	<div class="relative flex flex-1 flex-col items-center justify-center bg-white px-6 py-12">
+	<div class="relative flex flex-1 flex-col items-center justify-center bg-surface-subtle px-6 py-12">
 		<div class="relative w-full max-w-md" use:reveal={{ y: 24, delay: 100 }}>
 			<!-- Mobile logo -->
 			<div class="mb-10 text-center lg:hidden">
-				<a href="/" class="inline-flex items-center gap-2 text-3xl font-bold tracking-tight text-slate-900">
-					<div
-						class="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-900 text-white shadow-md"
-					>
-						<span class="text-sm font-black">AI</span>
-					</div>
-					<span>folio</span>
+				<a href="/" class="inline-flex items-center gap-1 font-display text-2xl font-black tracking-tight text-ink" style="letter-spacing:-0.03em">
+					<div class="h-2.5 w-2.5 rounded-full bg-brand mr-0.5 shrink-0"></div>
+					Portfolio<span class="text-brand">.ai</span>
 				</a>
 			</div>
 
-			<div class="overflow-hidden rounded-[2.5rem] border border-slate-100 bg-white p-10 shadow-xl sm:p-12">
+			<div class="overflow-hidden rounded-[2.5rem] border border-surface-muted bg-white p-10 shadow-xl sm:p-12">
 				{#if step === 'register'}
 					<div class="mb-10">
-						<h1 class="font-serif text-4xl font-bold tracking-tight text-slate-900">Get Started</h1>
-						<p class="mt-3 text-lg text-slate-500">Create your account for free.</p>
+						<h1 class="font-display text-4xl font-bold tracking-tight text-ink" style="letter-spacing:-0.02em">Get Started</h1>
+						<p class="mt-3 text-lg text-ink-soft">Create your account for free.</p>
 					</div>
 
 					{#if errorMessage}
@@ -186,11 +173,9 @@ import Spinner from '$lib/components/common/Spinner.svelte';
 
 					<form class="space-y-5" onsubmit={handleRegister} aria-label="Create your account">
 						<div class="space-y-2">
-							<label
-								for="name"
-								class="ml-1 text-xs font-bold tracking-widest text-slate-500 uppercase"
-								>Full Name</label
-							>
+							<label for="name" class="ml-1 text-xs font-bold tracking-widest text-ink-muted uppercase">
+								Full Name
+							</label>
 							<input
 								id="name"
 								type="text"
@@ -199,17 +184,15 @@ import Spinner from '$lib/components/common/Spinner.svelte';
 								bind:value={name}
 								disabled={isLoading}
 								aria-describedby={errorMessage ? 'register-error' : undefined}
-								class="w-full rounded-2xl border border-slate-200 bg-slate-50/50 px-6 py-4 text-base font-medium text-slate-900 transition-all outline-none focus:border-slate-400 focus:bg-white focus:ring-2 focus:ring-slate-400/50 disabled:opacity-60"
+								class="w-full rounded-2xl border border-surface-muted bg-surface-subtle/50 px-6 py-4 text-base font-medium text-ink transition-all outline-none focus:border-brand/60 focus:bg-white focus:ring-2 focus:ring-brand/15 disabled:opacity-60"
 								placeholder="Jane Doe"
 							/>
 						</div>
 
 						<div class="space-y-2">
-							<label
-								for="signup-email"
-								class="ml-1 text-xs font-bold tracking-widest text-slate-500 uppercase"
-								>Email Address</label
-							>
+							<label for="signup-email" class="ml-1 text-xs font-bold tracking-widest text-ink-muted uppercase">
+								Email Address
+							</label>
 							<input
 								id="signup-email"
 								type="email"
@@ -218,17 +201,15 @@ import Spinner from '$lib/components/common/Spinner.svelte';
 								bind:value={email}
 								disabled={isLoading}
 								aria-describedby={errorMessage ? 'register-error' : undefined}
-								class="w-full rounded-2xl border border-slate-200 bg-slate-50/50 px-6 py-4 text-base font-medium text-slate-900 transition-all outline-none focus:border-slate-400 focus:bg-white focus:ring-2 focus:ring-slate-400/50 disabled:opacity-60"
+								class="w-full rounded-2xl border border-surface-muted bg-surface-subtle/50 px-6 py-4 text-base font-medium text-ink transition-all outline-none focus:border-brand/60 focus:bg-white focus:ring-2 focus:ring-brand/15 disabled:opacity-60"
 								placeholder="you@example.com"
 							/>
 						</div>
 
 						<div class="space-y-2">
-							<label
-								for="signup-password"
-								class="ml-1 text-xs font-bold tracking-widest text-slate-500 uppercase"
-								>Password</label
-							>
+							<label for="signup-password" class="ml-1 text-xs font-bold tracking-widest text-ink-muted uppercase">
+								Password
+							</label>
 							<input
 								id="signup-password"
 								type="password"
@@ -238,17 +219,17 @@ import Spinner from '$lib/components/common/Spinner.svelte';
 								bind:value={password}
 								disabled={isLoading}
 								aria-describedby={errorMessage ? 'register-error' : 'password-hint'}
-								class="w-full rounded-2xl border border-slate-200 bg-slate-50/50 px-6 py-4 text-base font-medium text-slate-900 transition-all outline-none focus:border-slate-400 focus:bg-white focus:ring-2 focus:ring-slate-400/50 disabled:opacity-60"
+								class="w-full rounded-2xl border border-surface-muted bg-surface-subtle/50 px-6 py-4 text-base font-medium text-ink transition-all outline-none focus:border-brand/60 focus:bg-white focus:ring-2 focus:ring-brand/15 disabled:opacity-60"
 								placeholder="Create password"
 							/>
-							<p id="password-hint" class="ml-1 text-xs text-slate-400">Minimum 8 characters</p>
+							<p id="password-hint" class="ml-1 text-xs text-ink-muted">Minimum 8 characters</p>
 						</div>
 
 						<button
 							type="submit"
 							disabled={isLoading}
 							aria-busy={isLoading}
-							class="group relative mt-2 flex w-full items-center justify-center overflow-hidden rounded-2xl bg-slate-900 py-5 text-base font-bold text-white shadow-xl transition-all hover:scale-[1.02] hover:bg-slate-800 active:scale-95 disabled:opacity-50"
+							class="group relative mt-2 flex w-full items-center justify-center overflow-hidden rounded-2xl bg-brand py-5 text-base font-bold text-white shadow-xl transition-all hover:bg-brand-dark hover:scale-[1.02] active:scale-95 disabled:opacity-50"
 						>
 							<span class="relative z-10 flex items-center gap-2">
 								{#if isLoading}
@@ -261,20 +242,16 @@ import Spinner from '$lib/components/common/Spinner.svelte';
 						</button>
 					</form>
 
-					<div class="mt-10 border-t border-slate-100 pt-8 text-center">
-						<p class="text-sm text-slate-500">
+					<div class="mt-10 border-t border-surface-muted pt-8 text-center">
+						<p class="text-sm text-ink-soft">
 							Already have an account?
-							<a
-								href="/login"
-								class="ml-1 font-bold text-slate-900 transition-colors hover:underline"
-								>Log in</a
-							>
+							<a href="/login" class="ml-1 font-bold text-ink transition-colors hover:underline">Log in</a>
 						</p>
 					</div>
 				{:else}
 					<div class="mb-10">
-						<h1 class="font-serif text-4xl font-bold tracking-tight text-slate-900">Enter Code</h1>
-						<p class="mt-3 text-lg text-slate-500">
+						<h1 class="font-display text-4xl font-bold tracking-tight text-ink" style="letter-spacing:-0.02em">Enter Code</h1>
+						<p class="mt-3 text-lg text-ink-soft">
 							Please enter the 6-digit code sent to your email.
 						</p>
 					</div>
@@ -304,7 +281,7 @@ import Spinner from '$lib/components/common/Spinner.svelte';
 
 					<form class="space-y-8" onsubmit={handleConfirm} aria-label="Verify your email">
 						<div class="space-y-2">
-							<label for="code" class="ml-1 text-xs font-bold tracking-widest text-slate-500 uppercase">
+							<label for="code" class="ml-1 text-xs font-bold tracking-widest text-ink-muted uppercase">
 								Verification Code
 							</label>
 							<input
@@ -317,7 +294,7 @@ import Spinner from '$lib/components/common/Spinner.svelte';
 								bind:value={confirmationCode}
 								disabled={isLoading}
 								aria-describedby={errorMessage ? 'confirm-error' : successMessage ? 'confirm-success' : undefined}
-								class="w-full rounded-2xl border border-slate-200 bg-slate-50/50 px-6 py-6 text-center font-mono text-3xl tracking-[0.6em] text-slate-900 transition-all outline-none focus:border-slate-400 focus:bg-white focus:ring-2 focus:ring-slate-400/50 disabled:opacity-60"
+								class="w-full rounded-2xl border border-surface-muted bg-surface-subtle/50 px-6 py-6 text-center font-mono text-3xl tracking-[0.6em] text-ink transition-all outline-none focus:border-brand/60 focus:bg-white focus:ring-2 focus:ring-brand/15 disabled:opacity-60"
 								placeholder="000000"
 							/>
 						</div>
@@ -326,7 +303,7 @@ import Spinner from '$lib/components/common/Spinner.svelte';
 							type="submit"
 							disabled={isLoading}
 							aria-busy={isLoading}
-							class="group relative flex w-full items-center justify-center overflow-hidden rounded-2xl bg-slate-900 py-5 text-base font-bold text-white shadow-xl transition-all hover:scale-[1.02] hover:bg-slate-800 active:scale-95 disabled:opacity-50"
+							class="group relative flex w-full items-center justify-center overflow-hidden rounded-2xl bg-brand py-5 text-base font-bold text-white shadow-xl transition-all hover:bg-brand-dark hover:scale-[1.02] active:scale-95 disabled:opacity-50"
 						>
 							<span class="relative z-10 flex items-center gap-2">
 								{#if isLoading}
@@ -339,12 +316,12 @@ import Spinner from '$lib/components/common/Spinner.svelte';
 						</button>
 					</form>
 
-					<div class="mt-10 border-t border-slate-100 pt-8 text-center">
+					<div class="mt-10 border-t border-surface-muted pt-8 text-center">
 						<button
 							onclick={handleResend}
 							disabled={resendCooldown > 0}
 							aria-label={resendCooldown > 0 ? `Resend available in ${resendCooldown} seconds` : 'Resend verification code'}
-							class="text-sm font-bold text-slate-500 transition-colors hover:text-slate-900 disabled:opacity-50 disabled:hover:text-slate-500"
+							class="text-sm font-bold text-ink-soft transition-colors hover:text-ink disabled:opacity-50 disabled:hover:text-ink-soft"
 						>
 							{resendCooldown > 0 ? `Resend code in ${resendCooldown}s` : 'Resend verification code'}
 						</button>

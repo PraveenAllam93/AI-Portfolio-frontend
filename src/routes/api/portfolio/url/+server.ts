@@ -18,5 +18,9 @@ export const GET: RequestHandler = async ({ cookies }) => {
 		? rawCloudfront
 		: `https://${rawCloudfront}`;
 
-	return json({ url: `${cloudfrontBase}/${user.userId}/v1/index.html` });
+	return json({
+		url: `${cloudfrontBase}/${user.userId}/v1/index.html`,
+		draftUrl: `${cloudfrontBase}/${user.userId}/draft/index.html`,
+		userId: user.userId
+	});
 };

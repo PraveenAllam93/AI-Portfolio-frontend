@@ -40,6 +40,7 @@
 	},
 	"dependencies": {
 		"@aws-sdk/client-cognito-identity-provider": "^3.997.0",
-		"aws-amplify": "^6.16.2"
+		"aws-amplify": "^6.16.2",
+		"svelte-dnd-action": "^0.9.69"
 	}
 }

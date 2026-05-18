@@ -3,9 +3,13 @@
  * Auth is handled server-side via HttpOnly cookies — no token handling here.
  */
 
+export type ResumeCategory = 'software_engineer' | 'designer' | 'marketing' | 'finance';
+
 export interface PresignedUrlRequest {
 	filename: string;
 	contentType: string;
+	category: ResumeCategory;
+	templateId: string;
 }
 
 export interface UploadResult {
@@ -59,6 +63,8 @@ async function getPresignedUrl(request: PresignedUrlRequest): Promise<PresignedU
 
 export async function uploadResume(
 	file: File,
+	category: ResumeCategory,
+	templateId: string,
 	onProgress?: (percent: number) => void
 ): Promise<UploadResult> {
 	try {
@@ -73,7 +79,9 @@ export async function uploadResume(
 		onProgress?.(10);
 		const { uploadUrl, uploadId } = await getPresignedUrl({
 			filename: file.name,
-			contentType: file.type
+			contentType: file.type,
+			category,
+			templateId
 		});
 
 		// 2. Upload file directly to S3 via the presigned URL
