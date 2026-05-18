@@ -9,18 +9,24 @@
 
 	const sessionId = $derived($page.params.sessionId);
 
+	import type { HistoryEntry } from '$lib/services/interview';
+
 	let report = $state<InterviewReport | null>(null);
-	let sessionMeta = $state<{ mode: string; difficulty: string; createdAt: string } | null>(null);
+	let history = $state<HistoryEntry[]>([]);
+	let sessionMeta = $state<{ mode: string; difficulty: string; roleInfo: string; createdAt: string } | null>(null);
 	let isLoading = $state(true);
 	let errorMessage = $state('');
+	let expandedIndex = $state<number | null>(null);
 
 	onMount(async () => {
 		const result = await getReport(sessionId);
 		if (result.success && result.data) {
 			report = result.data.report;
+			history = result.data.history ?? [];
 			sessionMeta = {
 				mode: result.data.mode,
 				difficulty: result.data.difficulty,
+				roleInfo: result.data.roleInfo ?? '',
 				createdAt: result.data.createdAt,
 			};
 		} else {
@@ -28,6 +34,10 @@
 		}
 		isLoading = false;
 	});
+
+	function toggleExpand(i: number) {
+		expandedIndex = expandedIndex === i ? null : i;
+	}
 
 	function formatDate(iso: string): string {
 		try {
@@ -75,6 +85,7 @@
 					<p class="mt-0.5 text-sm text-ink-muted">
 						{sessionMeta.mode === 'follow-up' ? 'Adaptive' : 'Standard'} ·
 						{sessionMeta.difficulty.charAt(0).toUpperCase() + sessionMeta.difficulty.slice(1)} ·
+						{sessionMeta.roleInfo || 'Resume-based'} ·
 						{formatDate(sessionMeta.createdAt)}
 					</p>
 				{/if}
@@ -258,6 +269,91 @@
 								</li>
 							{/each}
 						</ul>
+					</div>
+				{/if}
+
+				<!-- ── Question-by-question breakdown ── -->
+				{#if history.length > 0}
+					<div>
+						<div class="mb-4 flex items-baseline gap-2">
+							<h2 class="text-xs font-bold tracking-widest text-ink-muted uppercase">Question Breakdown</h2>
+							<span class="text-xs text-ink-muted">· {history.length} {history.length === 1 ? 'question' : 'questions'}</span>
+						</div>
+						<div class="space-y-3">
+							{#each history as entry, i (i)}
+								{@const isOpen = expandedIndex === i}
+								<div class="rounded-2xl border border-surface-muted bg-white overflow-hidden shadow-sm">
+									<!-- Collapsed header — always visible -->
+									<button
+										onclick={() => toggleExpand(i)}
+										class="flex w-full items-center gap-4 px-6 py-4 text-left transition-colors hover:bg-surface-subtle/60"
+									>
+										<!-- Q number -->
+										<span class="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg bg-surface-subtle text-xs font-black text-ink-muted border border-surface-muted">
+											{i + 1}
+										</span>
+										<!-- Topic chip -->
+										<span class="rounded-full bg-surface-muted px-2.5 py-0.5 text-[10px] font-bold text-ink-soft uppercase tracking-wide flex-shrink-0">
+											{entry.topic}
+										</span>
+										<!-- Question preview -->
+										<p class="flex-1 truncate text-sm font-medium text-ink">{entry.question}</p>
+										<!-- Score badge -->
+										<span class="flex-shrink-0 rounded-xl px-3 py-1 text-sm font-black {entry.score >= 7 ? 'bg-emerald-50 text-emerald-700' : entry.score >= 4 ? 'bg-amber-50 text-amber-700' : 'bg-red-50 text-red-600'}">
+											{entry.score}/10
+										</span>
+										<!-- Chevron -->
+										<span class="flex-shrink-0 text-ink-muted transition-transform duration-200 {isOpen ? 'rotate-180' : ''}">▾</span>
+									</button>
+
+									<!-- Expanded detail -->
+									{#if isOpen}
+										<div class="border-t border-surface-muted px-6 pb-6 pt-5 space-y-5">
+											<!-- Question -->
+											<div>
+												<p class="mb-1.5 text-[10px] font-bold tracking-widest text-ink-muted uppercase">Question</p>
+												<p class="text-sm leading-relaxed text-ink">{entry.question}</p>
+											</div>
+											<!-- Answer -->
+											<div>
+												<p class="mb-1.5 text-[10px] font-bold tracking-widest text-ink-muted uppercase">Your Answer</p>
+												<p class="text-sm leading-relaxed text-ink-soft whitespace-pre-wrap">{entry.answer || '(no answer given)'}</p>
+											</div>
+											<!-- Strengths + Weaknesses -->
+											{#if entry.strengths.length > 0 || entry.weaknesses.length > 0}
+												<div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+													{#if entry.strengths.length > 0}
+														<div class="rounded-xl border border-emerald-100 bg-emerald-50/50 p-4">
+															<p class="mb-2 text-[10px] font-bold tracking-widest text-emerald-700 uppercase">What you got right</p>
+															<ul class="space-y-1.5">
+																{#each entry.strengths as s}
+																	<li class="text-xs leading-relaxed text-emerald-800">· {s}</li>
+																{/each}
+															</ul>
+														</div>
+													{/if}
+													{#if entry.weaknesses.length > 0}
+														<div class="rounded-xl border border-amber-100 bg-amber-50/50 p-4">
+															<p class="mb-2 text-[10px] font-bold tracking-widest text-amber-700 uppercase">Could be stronger</p>
+															<ul class="space-y-1.5">
+																{#each entry.weaknesses as w}
+																	<li class="text-xs leading-relaxed text-amber-800">· {w}</li>
+																{/each}
+															</ul>
+														</div>
+													{/if}
+												</div>
+											{/if}
+											<!-- Ideal answer -->
+											<div class="rounded-xl border-l-4 border-brand bg-surface-subtle/60 p-4">
+												<p class="mb-1.5 text-[10px] font-bold tracking-widest text-ink-muted uppercase">Model Answer</p>
+												<p class="text-xs leading-relaxed text-ink-soft">{entry.idealAnswer}</p>
+											</div>
+										</div>
+									{/if}
+								</div>
+							{/each}
+						</div>
 					</div>
 				{/if}
 

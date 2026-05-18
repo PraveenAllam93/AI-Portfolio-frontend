@@ -88,6 +88,15 @@
 			</div>
 			<div class="flex items-center gap-3">
 				<a
+					href="/app/interview/history"
+					class="inline-flex items-center gap-2 rounded-full border border-surface-muted bg-white px-5 py-3 text-sm font-bold text-ink-soft shadow-sm transition-all hover:border-brand/40 hover:text-ink active:scale-95"
+				>
+					<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="h-4 w-4" aria-hidden="true">
+						<path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25H12" />
+					</svg>
+					Interview History
+				</a>
+				<a
 					href="/app/interview/setup"
 					class="inline-flex items-center gap-2 rounded-full border border-surface-muted bg-white px-5 py-3 text-sm font-bold text-ink-soft shadow-sm transition-all hover:border-brand/40 hover:text-ink active:scale-95"
 				>
