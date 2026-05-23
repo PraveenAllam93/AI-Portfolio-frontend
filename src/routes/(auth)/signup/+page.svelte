@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import { register, confirmEmail, resendConfirmationCode } from '$lib/services/auth';
+	import { register, confirmEmail, resendConfirmationCode, login } from '$lib/services/auth';
+	import { authStore } from '$lib/stores/auth';
 	import { reveal } from '$lib/actions/animate';
 	import Spinner from '$lib/components/common/Spinner.svelte';
 
@@ -40,12 +41,22 @@
 		errorMessage = '';
 		isLoading = true;
 
-		const result = await confirmEmail(email, confirmationCode);
+		const confirmResult = await confirmEmail(email, confirmationCode);
 
-		if (result.success) {
-			await goto('/login?confirmed=true');
+		if (!confirmResult.success) {
+			errorMessage = confirmResult.error ?? 'Confirmation failed.';
+			isLoading = false;
+			return;
+		}
+
+		// Auto-login after successful confirmation so the user lands on dashboard.
+		const loginResult = await login({ email, password });
+		if (loginResult.success) {
+			authStore.setUser(loginResult.data ?? null);
+			await goto('/app/dashboard');
 		} else {
-			errorMessage = result.error ?? 'Confirmation failed.';
+			// Login failed (e.g. password changed mid-flow) — fall back to login page.
+			await goto('/login?confirmed=true');
 		}
 
 		isLoading = false;

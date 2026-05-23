@@ -44,8 +44,21 @@ async function getPresignedUrl(request: PresignedUrlRequest): Promise<PresignedU
 	});
 
 	if (!response.ok) {
-		const text = await response.text();
-		throw new Error(`Failed to get upload URL (${response.status}): ${text}`);
+		let message = 'Could not prepare your upload. Please try again.';
+		try {
+			const data = await response.json();
+			const key = (data.error || data.message || '') as string;
+			if (key.includes('templateId') || key.includes('template')) {
+				message = 'The selected template is not available. Please choose a different one.';
+			} else if (key.includes('quota') || key.includes('limit') || key.includes('upload')) {
+				message = 'You have too many uploads in progress. Please wait for one to finish.';
+			} else if (key.includes('content') || key.includes('mime') || key.includes('file')) {
+				message = 'Unsupported file type. Please upload a PDF or DOCX resume.';
+			} else if (key.includes('category')) {
+				message = 'Invalid job category selected. Please go back and choose again.';
+			}
+		} catch { /* ignore parse errors */ }
+		throw new Error(message);
 	}
 
 	const data = await response.json();

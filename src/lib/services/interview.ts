@@ -85,7 +85,16 @@ export interface ServiceResult<T> {
 	error?: string;
 }
 
-async function post<T>(url: string, body: unknown): Promise<ServiceResult<T>> {
+async function _parseError(res: Response, fallback: string): Promise<string> {
+	try {
+		const data = await res.json();
+		return data.message || data.error || fallback;
+	} catch {
+		return fallback;
+	}
+}
+
+async function post<T>(url: string, body: unknown, fallback = 'Something went wrong. Please try again.'): Promise<ServiceResult<T>> {
 	try {
 		const res = await fetch(url, {
 			method: 'POST',
@@ -93,8 +102,7 @@ async function post<T>(url: string, body: unknown): Promise<ServiceResult<T>> {
 			body: JSON.stringify(body),
 		});
 		if (!res.ok) {
-			const text = await res.text();
-			return { success: false, error: text || 'Request failed.' };
+			return { success: false, error: await _parseError(res, fallback) };
 		}
 		return { success: true, data: await res.json() };
 	} catch {
@@ -105,27 +113,24 @@ async function post<T>(url: string, body: unknown): Promise<ServiceResult<T>> {
 export async function startInterview(
 	params: StartInterviewParams
 ): Promise<ServiceResult<StartInterviewResult>> {
-	return post('/api/interview/start', params);
+	return post('/api/interview/start', params, 'Could not start interview. Please try again.');
 }
 
 export async function submitAnswer(
 	sessionId: string,
 	answer: string
 ): Promise<ServiceResult<AnswerResult>> {
-	return post('/api/interview/answer', { sessionId, answer });
+	return post('/api/interview/answer', { sessionId, answer }, 'Could not submit your answer. Please try again.');
 }
 
 export async function exitInterview(sessionId: string): Promise<ServiceResult<{ sessionId: string; report: InterviewReport }>> {
-	return post('/api/interview/exit', { sessionId });
+	return post('/api/interview/exit', { sessionId }, 'Could not end the interview. Please try again.');
 }
 
 export async function getReport(sessionId: string): Promise<ServiceResult<ReportResult>> {
 	try {
 		const res = await fetch(`/api/interview/${sessionId}/report`);
-		if (!res.ok) {
-			const text = await res.text();
-			return { success: false, error: text || 'Failed to load report.' };
-		}
+		if (!res.ok) return { success: false, error: await _parseError(res, 'Could not load your report. Please try again.') };
 		return { success: true, data: await res.json() };
 	} catch {
 		return { success: false, error: 'Network error. Please check your connection.' };
@@ -135,10 +140,7 @@ export async function getReport(sessionId: string): Promise<ServiceResult<Report
 export async function listSessions(): Promise<ServiceResult<{ sessions: SessionSummary[] }>> {
 	try {
 		const res = await fetch('/api/interview/sessions');
-		if (!res.ok) {
-			const text = await res.text();
-			return { success: false, error: text || 'Failed to load sessions.' };
-		}
+		if (!res.ok) return { success: false, error: await _parseError(res, 'Could not load your interview history. Please try again.') };
 		return { success: true, data: await res.json() };
 	} catch {
 		return { success: false, error: 'Network error. Please check your connection.' };

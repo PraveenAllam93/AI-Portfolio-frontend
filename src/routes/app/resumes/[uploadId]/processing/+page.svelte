@@ -88,6 +88,12 @@
 		}
 	}
 
+	// ─── Cancel ──────────────────────────────────────────────────────────────────
+	async function handleCancel() {
+		const ok = await resumeProcessing.cancel();
+		if (ok) goto('/app/dashboard');
+	}
+
 	// ─── Lifecycle ───────────────────────────────────────────────────────────────
 	onMount(() => resumeProcessing.start(uploadId));
 	onDestroy(() => resumeProcessing.stop());
@@ -390,9 +396,26 @@
 							</div>
 						</div>
 					{:else if $resumeProcessing.polling}
-						<div class="mt-6 flex items-center justify-center gap-2 border-t border-surface-muted pt-6">
-							<Spinner size="xs" class="text-ink-muted" />
-							<span class="text-xs font-bold text-ink-muted">Checking for updates…</span>
+						<div class="mt-6 flex items-center justify-between border-t border-surface-muted pt-6">
+							<div class="flex items-center gap-2">
+								<Spinner size="xs" class="text-ink-muted" />
+								<span class="text-xs font-bold text-ink-muted">Checking for updates…</span>
+							</div>
+							<button
+								onclick={handleCancel}
+								disabled={$resumeProcessing.cancelling}
+								class="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold text-ink-muted transition-colors hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
+							>
+								{#if $resumeProcessing.cancelling}
+									<Spinner size="xs" />
+									Cancelling…
+								{:else}
+									<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="h-3.5 w-3.5">
+										<path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" />
+									</svg>
+									Cancel
+								{/if}
+							</button>
 						</div>
 					{/if}
 				</div>

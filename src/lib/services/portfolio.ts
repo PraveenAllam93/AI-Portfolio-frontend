@@ -325,6 +325,61 @@ export async function addCustomSection(
 	}
 }
 
+// Portfolio versions
+
+export interface PortfolioVersion {
+	versionId: string;
+	version: number;
+	portfolioPath: string;
+	portfolioUrl?: string;
+	templateId: string;
+	createdAt: string;
+	isActive: boolean;
+}
+
+export async function listVersions(
+	userId: string
+): Promise<ServiceResult<{ versions: PortfolioVersion[]; activeVersion: string | null; total: number }>> {
+	try {
+		const res = await fetch(`/api/portfolio/${userId}/versions`);
+		if (!res.ok) return { ok: false, error: 'Could not load your portfolio versions.' };
+		return { ok: true, data: await res.json() };
+	} catch {
+		return { ok: false, error: 'Network error' };
+	}
+}
+
+export async function activateVersion(userId: string, versionId: string): Promise<ServiceResult> {
+	try {
+		const res = await fetch(`/api/portfolio/${userId}/versions/${versionId}/activate`, {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' }
+		});
+		if (!res.ok) {
+			const err = await res.json().catch(() => ({}));
+			return { ok: false, error: (err as { message?: string }).message ?? 'Could not activate version.' };
+		}
+		return { ok: true };
+	} catch {
+		return { ok: false, error: 'Network error' };
+	}
+}
+
+export async function deleteVersion(userId: string, versionId: string): Promise<ServiceResult> {
+	try {
+		const res = await fetch(`/api/portfolio/${userId}/versions/${versionId}`, {
+			method: 'DELETE'
+		});
+		if (!res.ok) {
+			const err = await res.json().catch(() => ({}));
+			return { ok: false, error: (err as { message?: string }).message ?? 'Could not delete version.' };
+		}
+		return { ok: true };
+	} catch {
+		return { ok: false, error: 'Network error' };
+	}
+}
+
 // URL helpers
 
 export function getPortfolioDraftUrl(userId: string, cloudFrontDomain: string): string {

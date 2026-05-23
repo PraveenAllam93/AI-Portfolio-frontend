@@ -55,3 +55,29 @@ export const GET: RequestHandler = async ({ params, cookies }) => {
 
 	return json(data);
 };
+
+export const DELETE: RequestHandler = async ({ params, cookies }) => {
+	if (!UUID_REGEX.test(params.uploadId)) {
+		throw error(400, 'Invalid uploadId');
+	}
+
+	const user = await getSessionUser(cookies);
+	if (!user) throw error(401, 'Not authenticated');
+
+	const apiBase = env.API_BASE_URL;
+	if (!apiBase) throw error(500, 'API_BASE_URL is not configured');
+
+	const idToken = cookies.get('id_token') ?? '';
+
+	const upstream = await fetch(`${apiBase}/status/${params.uploadId}`, {
+		method: 'DELETE',
+		headers: { Authorization: idToken }
+	});
+
+	if (!upstream.ok) {
+		const body = await upstream.json().catch(() => ({})) as Record<string, string>;
+		throw error(upstream.status, body.error ?? 'Failed to cancel upload');
+	}
+
+	return json(await upstream.json());
+};

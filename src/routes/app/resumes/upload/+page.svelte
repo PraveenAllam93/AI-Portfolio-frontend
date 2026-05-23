@@ -12,12 +12,6 @@
 		description: string;
 	}
 
-	interface Template {
-		id: string;
-		name: string;
-		tag: string;
-	}
-
 	let wizardStep: WizardStep = $state(1);
 	let uploadStatus: UploadStatus = $state('idle');
 	let progress = $state(0);
@@ -34,14 +28,63 @@
 		{ id: 'finance', label: 'Finance', description: 'Analyst, banking & consulting' }
 	];
 
+	interface Template {
+		id: string;
+		name: string;
+		tag: string;
+		preview: {
+			bg: string;
+			accent: string;
+			bar: string;
+			lines: string[];
+		};
+	}
+
 	const templates: Template[] = [
-		{ id: 'nebula', name: 'Nebula', tag: 'Cyberpunk' },
-		{ id: 'galaxy', name: 'Galaxy', tag: 'Dark Purple' },
-		{ id: 'codex', name: 'Codex', tag: 'Light Tech' },
-		{ id: 'neon', name: 'Neon', tag: 'Cyber Green' },
-		{ id: 'circuit', name: 'Circuit', tag: 'Dark Tech' },
-		{ id: 'navy-gold', name: 'Navy Gold', tag: 'Elegant' },
-		{ id: 'cosmos', name: 'Cosmos', tag: 'Space' }
+		{
+			id: 'nebula', name: 'Nebula', tag: 'Cyberpunk',
+			preview: { bg: '#07070f', accent: '#a855f7', bar: '#22d3ee', lines: ['#1a1a2e', '#1a1a2e', '#111122'] }
+		},
+		{
+			id: 'galaxy', name: 'Galaxy', tag: 'Dark Purple',
+			preview: { bg: '#0f172a', accent: '#c084fc', bar: '#ec4899', lines: ['#1e1b4b', '#1e1b4b', '#1a1a3e'] }
+		},
+		{
+			id: 'codex', name: 'Codex', tag: 'Light Tech',
+			preview: { bg: '#f0f9ff', accent: '#0ea5e9', bar: '#6366f1', lines: ['#ffffff', '#ffffff', '#f8fafc'] }
+		},
+		{
+			id: 'neon', name: 'Neon', tag: 'Cyber Green',
+			preview: { bg: '#0a0e27', accent: '#39ff14', bar: '#00e5ff', lines: ['#0d1137', '#0d1137', '#0a0e27'] }
+		},
+		{
+			id: 'circuit', name: 'Circuit', tag: 'Dark Tech',
+			preview: { bg: '#0a0d14', accent: '#00d4ff', bar: '#7c3aed', lines: ['#0f1320', '#0f1320', '#141926'] }
+		},
+		{
+			id: 'navy-gold', name: 'Navy Gold', tag: 'Elegant',
+			preview: { bg: '#0c1f3f', accent: '#c8a96e', bar: '#e8c97d', lines: ['#0f2550', '#0f2550', '#0c1f3f'] }
+		},
+		{
+			id: 'cosmos', name: 'Cosmos', tag: 'Space',
+			preview: { bg: '#020510', accent: '#00f5ff', bar: '#8b5cf6', lines: ['#060d1f', '#060d1f', '#020510'] }
+		},
+		{
+			id: 'retro', name: 'Retro', tag: 'Vintage',
+			preview: { bg: '#f5f0e8', accent: '#c85a1e', bar: '#c48b14', lines: ['#1c1410', '#ede7db', '#1c1410'] }
+		},
+		{
+			id: 'luxe', name: 'Luxe', tag: 'Classy',
+			preview: { bg: '#0a0a0a', accent: '#c9a84c', bar: '#e8c97d', lines: ['#111111', '#111111', '#0a0a0a'] }
+		},
+		{
+			id: 'aurora', name: 'Aurora', tag: 'Modern',
+			preview: { bg: '#f8f9fa', accent: '#ff6b6b', bar: '#1a1f36', lines: ['#ffffff', '#ffffff', '#f8f9fa'] }
+		},
+		{
+			id: 'quantum', name: 'Quantum', tag: 'Futuristic',
+			preview: { bg: '#030712', accent: '#06b6d4', bar: '#8b5cf6', lines: ['#060d1f', '#060d1f', '#030712'] }
+		},
 	];
 
 	const stepLabels = ['File', 'Role', 'Theme'];
@@ -231,13 +274,34 @@
 					<div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
 						{#each templates as tmpl}
 							<button onclick={() => (selectedTemplateId = tmpl.id)} class="group flex flex-col items-start rounded-2xl border-2 p-1 text-left transition-all duration-200 {selectedTemplateId === tmpl.id ? 'border-brand shadow-md' : 'border-surface-muted hover:border-brand/30'}">
-								<div class="h-24 w-full rounded-xl bg-surface-subtle mb-3 border border-surface-muted overflow-hidden relative">
-									<div class="absolute inset-0 opacity-50 bg-gradient-to-br from-surface-muted to-transparent"></div>
-								</div>
-								<div class="px-3 pb-3 w-full flex justify-between items-center">
-									<span class="font-bold text-ink">{tmpl.name}</span>
+								<!-- Mini color preview -->
+								<div class="h-24 w-full rounded-xl overflow-hidden relative" style="background:{tmpl.preview.bg}">
+									<!-- Nav bar -->
+									<div class="absolute top-0 left-0 right-0 h-5 flex items-center px-2 gap-1" style="background:{tmpl.preview.lines[0]}">
+										<div class="w-3 h-1.5 rounded-full" style="background:{tmpl.preview.accent}"></div>
+										<div class="flex-1 h-1 rounded-full ml-1 opacity-40" style="background:{tmpl.preview.lines[2]}"></div>
+										<div class="w-5 h-1 rounded-full opacity-60" style="background:{tmpl.preview.bar}"></div>
+									</div>
+									<!-- Content lines -->
+									<div class="absolute top-7 left-3 right-3 flex flex-col gap-1.5">
+										<div class="h-2 rounded-full w-3/4" style="background:{tmpl.preview.accent};opacity:0.85"></div>
+										<div class="h-1 rounded-full w-1/2" style="background:{tmpl.preview.bar};opacity:0.45"></div>
+										<div class="mt-0.5 h-1 rounded-full w-full" style="background:{tmpl.preview.lines[1]};opacity:0.3"></div>
+										<div class="h-1 rounded-full w-4/5" style="background:{tmpl.preview.lines[1]};opacity:0.2"></div>
+									</div>
+									<!-- Accent glow -->
+									<div class="absolute bottom-2 right-2 w-5 h-5 rounded-full opacity-25" style="background:{tmpl.preview.accent}"></div>
 									{#if selectedTemplateId === tmpl.id}
-										<div class="w-2 h-2 rounded-full bg-brand"></div>
+										<div class="absolute inset-0 rounded-xl ring-2 ring-brand"></div>
+									{/if}
+								</div>
+								<div class="px-3 pt-2 pb-3 w-full flex justify-between items-center">
+									<div>
+										<span class="font-bold text-ink text-sm">{tmpl.name}</span>
+										<span class="ml-1.5 text-xs text-ink-muted">{tmpl.tag}</span>
+									</div>
+									{#if selectedTemplateId === tmpl.id}
+										<div class="w-2 h-2 rounded-full bg-brand shrink-0"></div>
 									{/if}
 								</div>
 							</button>

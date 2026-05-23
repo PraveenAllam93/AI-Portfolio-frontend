@@ -27,6 +27,16 @@ export interface AuthResult<T = void> {
 	error?: string;
 }
 
+/** Extract a human-readable message from a failed SvelteKit API response. */
+async function _errorMessage(res: Response, fallback: string): Promise<string> {
+	try {
+		const data = await res.json();
+		return data.message || data.error || fallback;
+	} catch {
+		return fallback;
+	}
+}
+
 export async function login({ email, password }: LoginParams): Promise<AuthResult<AuthUser>> {
 	const res = await fetch('/api/auth/login', {
 		method: 'POST',
@@ -35,8 +45,7 @@ export async function login({ email, password }: LoginParams): Promise<AuthResul
 	});
 
 	if (!res.ok) {
-		const text = await res.text();
-		return { success: false, error: text || 'Login failed.' };
+		return { success: false, error: await _errorMessage(res, 'Login failed.') };
 	}
 
 	const data = await res.json();
@@ -55,8 +64,7 @@ export async function register({
 	});
 
 	if (!res.ok) {
-		const text = await res.text();
-		return { success: false, error: text || 'Sign up failed.' };
+		return { success: false, error: await _errorMessage(res, 'Sign up failed.') };
 	}
 
 	const data = await res.json();
@@ -71,8 +79,7 @@ export async function confirmEmail(email: string, code: string): Promise<AuthRes
 	});
 
 	if (!res.ok) {
-		const text = await res.text();
-		return { success: false, error: text || 'Confirmation failed.' };
+		return { success: false, error: await _errorMessage(res, 'Confirmation failed.') };
 	}
 
 	return { success: true };
@@ -86,8 +93,7 @@ export async function resendConfirmationCode(email: string): Promise<AuthResult>
 	});
 
 	if (!res.ok) {
-		const text = await res.text();
-		return { success: false, error: text || 'Could not resend code.' };
+		return { success: false, error: await _errorMessage(res, 'Could not resend code.') };
 	}
 
 	return { success: true };
@@ -101,8 +107,7 @@ export async function forgotPassword(email: string): Promise<AuthResult> {
 	});
 
 	if (!res.ok) {
-		const text = await res.text();
-		return { success: false, error: text || 'Could not send reset email.' };
+		return { success: false, error: await _errorMessage(res, 'Could not send reset email.') };
 	}
 
 	return { success: true };
@@ -120,8 +125,7 @@ export async function resetPassword(
 	});
 
 	if (!res.ok) {
-		const text = await res.text();
-		return { success: false, error: text || 'Password reset failed.' };
+		return { success: false, error: await _errorMessage(res, 'Password reset failed.') };
 	}
 
 	return { success: true };

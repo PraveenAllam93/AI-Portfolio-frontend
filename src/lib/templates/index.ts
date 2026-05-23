@@ -17,6 +17,10 @@ import { html as neonHtml }     from './neon';
 import { html as circuitHtml }  from './circuit';
 import { html as navyGoldHtml } from './navy-gold';
 import { html as cosmosHtml }   from './cosmos';
+import { html as retroHtml }    from './retro';
+import { html as luxeHtml }     from './luxe';
+import { html as auroraHtml }   from './aurora';
+import { html as quantumHtml }  from './quantum';
 
 type TemplateRenderer = (v: ReturnType<typeof normalize>) => string;
 
@@ -28,6 +32,10 @@ const TEMPLATES: Record<string, TemplateRenderer> = {
 	circuit:     circuitHtml,
 	'navy-gold': navyGoldHtml,
 	cosmos:      cosmosHtml,
+	retro:       retroHtml,
+	luxe:        luxeHtml,
+	aurora:      auroraHtml,
+	quantum:     quantumHtml,
 };
 
 /** Default template used when templateId is missing or unknown. */

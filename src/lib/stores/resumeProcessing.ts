@@ -21,6 +21,7 @@ export interface ResumeProcessingState {
 	canRetry: boolean;
 	polling: boolean;
 	networkError: boolean;
+	cancelling: boolean;
 }
 
 const initial: ResumeProcessingState = {
@@ -33,7 +34,8 @@ const initial: ResumeProcessingState = {
 	failureStage: null,
 	canRetry: false,
 	polling: false,
-	networkError: false
+	networkError: false,
+	cancelling: false
 };
 
 function createResumeProcessingStore() {
@@ -92,6 +94,21 @@ function createResumeProcessingStore() {
 		}
 	}
 
+	async function cancel(): Promise<boolean> {
+		if (!currentUploadId) return false;
+		update((s) => ({ ...s, cancelling: true }));
+		try {
+			const res = await fetch(`/api/resume/status/${currentUploadId}`, { method: 'DELETE' });
+			if (res.ok) {
+				stopPoll?.();
+				stopPoll = null;
+				return true;
+			}
+		} catch { /* network error — let caller handle */ }
+		update((s) => ({ ...s, cancelling: false }));
+		return false;
+	}
+
 	function stop() {
 		stopPoll?.();
 		stopPoll = null;
@@ -99,7 +116,7 @@ function createResumeProcessingStore() {
 		set(initial);
 	}
 
-	return { subscribe, start, retry, stop };
+	return { subscribe, start, retry, cancel, stop };
 }
 
 export const resumeProcessing = createResumeProcessingStore();

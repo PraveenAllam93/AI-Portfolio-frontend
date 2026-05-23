@@ -164,6 +164,7 @@
 						{#if $authStore.user}
 							<a href="/app/portfolio/{$authStore.user.userId}/analytics" class="inline-flex w-full items-center justify-center rounded-full border border-surface-muted bg-white px-5 py-3 text-sm font-bold text-ink-soft transition-all hover:bg-surface-subtle hover:text-ink sm:w-auto sm:py-2.5">Analytics</a>
 							<a href="/app/portfolio/{$authStore.user.userId}/edit" class="inline-flex w-full items-center justify-center rounded-full border border-surface-muted bg-white px-5 py-3 text-sm font-bold text-ink-soft transition-all hover:bg-surface-subtle hover:text-ink sm:w-auto sm:py-2.5">Edit Content</a>
+							<a href="/app/portfolio/{$authStore.user.userId}/versions" class="inline-flex w-full items-center justify-center rounded-full border border-surface-muted bg-white px-5 py-3 text-sm font-bold text-ink-soft transition-all hover:bg-surface-subtle hover:text-ink sm:w-auto sm:py-2.5">Versions</a>
 						{/if}
 						<a href={portfolioUrl} target="_blank" rel="noopener noreferrer" class="inline-flex w-full items-center justify-center gap-2 rounded-full bg-brand px-6 py-3 text-sm font-bold text-white shadow-lg transition-all hover:bg-brand-dark active:scale-95 sm:w-auto sm:py-2.5">
 							Open Link
