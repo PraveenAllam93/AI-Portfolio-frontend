@@ -7,7 +7,7 @@
  */
 
 import type { NormalizedData } from './base';
-import { DEFAULT_SECTION_ORDER, _editable, _listEditable, EDITOR_SCRIPT } from './base';
+import { DEFAULT_SECTION_ORDER, _editable, _listEditable, _rangeEditable, _pairEditable, _imgUpload, EDITOR_SCRIPT } from './base';
 
 const FONTS_URL =
 	'https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400&display=swap';
@@ -73,16 +73,6 @@ const NAVY_GOLD_SCRIPT = `<script>
       });
     },{threshold:0.12});
     document.querySelectorAll('.reveal,.reveal-up').forEach(function(el){ro.observe(el);});
-    // Skill bar animation
-    var so=new IntersectionObserver(function(entries){
-      entries.forEach(function(e){
-        if(e.isIntersecting){
-          e.target.querySelectorAll('.skill-fill[data-width]').forEach(function(b){b.style.width=b.getAttribute('data-width')+'%';});
-          so.unobserve(e.target);
-        }
-      });
-    },{threshold:0.2});
-    document.querySelectorAll('.skill-group-card').forEach(function(el){so.observe(el);});
   }
   // Stagger delays
   document.querySelectorAll('.tl-item').forEach(function(el,i){el.style.transitionDelay=(i*.12)+'s';});
@@ -215,10 +205,8 @@ section{padding:90px 0}
 .skills-layout{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:32px}
 .skill-group-card{margin-bottom:4px}
 .skill-cat{font-size:.8rem;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--navy);border-bottom:1px solid rgba(12,31,63,.1);padding-bottom:12px;margin-bottom:18px}
-.skill-bar-item{margin-bottom:14px}
-.skill-bar-label{font-size:.85rem;font-weight:400;color:var(--text2);margin-bottom:6px}
-.skill-track{height:4px;background:rgba(12,31,63,.08);border-radius:2px;overflow:hidden}
-.skill-fill{height:100%;width:0;background:linear-gradient(90deg,var(--gold),var(--gold-light));border-radius:2px;transition:width 1.2s ease}
+.skill-tags{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px}
+.skill-tag{font-size:.78rem;font-weight:400;color:var(--text2);background:rgba(12,31,63,.05);border:1px solid rgba(12,31,63,.1);border-radius:2px;padding:5px 12px}
 
 #projects{background:var(--cream)}
 .proj-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:24px}
@@ -355,15 +343,16 @@ export function html(v: NormalizedData): string {
 		v.portfolio_url ? `<a href="${v.portfolio_url}" target="_blank" rel="noopener noreferrer" class="hero-link">Portfolio</a>` : '',
 	].filter(Boolean).join('');
 
-	// Hero stats
-	const yrs = yearsExperience(v.experience);
-	const projCount = v.projects?.length ?? 0;
-	const certCount = v.certifications?.length ?? 0;
+	// Hero stats — use manual override if set, fall back to auto-computed value
+	const yrs = v.template_overrides?.years_experience ?? yearsExperience(v.experience);
+	const projCount = v.template_overrides?.projects_count ?? (v.projects?.length ?? 0);
+	const certCount = v.template_overrides?.certifications_count ?? (v.certifications?.length ?? 0);
+	const ted = (key: string) => v.edit_mode ? `contenteditable="true" data-path="template_overrides.${key}"` : '';
 	const heroStats = (yrs > 0 || projCount > 0 || certCount > 0)
 		? `<div class="hero-stats">
-${yrs > 0 ? `<div class="hero-stat"><span class="hero-stat-num">${yrs}+</span><span class="hero-stat-lbl">Years Exp</span></div>` : ''}
-${projCount > 0 ? `<div class="hero-stat"><span class="hero-stat-num">${projCount}+</span><span class="hero-stat-lbl">Projects</span></div>` : ''}
-${certCount > 0 ? `<div class="hero-stat"><span class="hero-stat-num">${certCount}</span><span class="hero-stat-lbl">Certifications</span></div>` : ''}
+${yrs > 0 ? `<div class="hero-stat"><span class="hero-stat-num"><span ${ted('years_experience')}>${yrs}</span>+</span><span class="hero-stat-lbl">Years Exp</span></div>` : ''}
+${projCount > 0 ? `<div class="hero-stat"><span class="hero-stat-num"><span ${ted('projects_count')}>${projCount}</span>+</span><span class="hero-stat-lbl">Projects</span></div>` : ''}
+${certCount > 0 ? `<div class="hero-stat"><span class="hero-stat-num"><span ${ted('certifications_count')}>${certCount}</span></span><span class="hero-stat-lbl">Certifications</span></div>` : ''}
 </div>` : '';
 
 	// Experience
@@ -376,10 +365,10 @@ ${v.experience.map((exp, i) => `<div class="tl-item reveal" data-item-wrap>
 <button class="del-btn ce-del-btn" data-del-section="experience" data-del-index="${i}">&#x2715;</button>
 <div class="tl-header">
 <span class="tl-role" ${_editable(`experience.${i}.role`)}>${exp.role}</span>
-${exp.duration ? `<span class="tl-period" ${_editable(`experience.${i}.duration`)}>${exp.duration}</span>` : ''}
+${_rangeEditable(`experience.${i}.start_date`, exp.start_date, `experience.${i}.end_date`, exp.end_date, v.edit_mode) ? `<span class="tl-period">${_rangeEditable(`experience.${i}.start_date`, exp.start_date, `experience.${i}.end_date`, exp.end_date, v.edit_mode)}</span>` : ''}
 </div>
 ${exp.company ? `<div class="tl-company" ${_editable(`experience.${i}.company`)}>${exp.company}</div>` : ''}
-${exp.location ? `<div class="tl-location">${exp.location}</div>` : ''}
+${exp.location ? `<div class="tl-location" ${_editable(`experience.${i}.location`)}>${exp.location}</div>` : ''}
 ${exp.description ? `<p class="tl-desc" ${_editable(`experience.${i}.description`, true)}>${exp.description}</p>` : ''}
 ${exp.key_points?.length ? `<ul class="tl-points" ${_listEditable(`experience.${i}.key_points`)}>${exp.key_points.map((k) => `<li>${k}</li>`).join('')}</ul>` : ''}
 </div>`).join('\n')}
@@ -388,19 +377,18 @@ ${exp.key_points?.length ? `<ul class="tl-points" ${_listEditable(`experience.${
 </div>
 </section>` : '';
 
-	// Skills — render as animated bars
+	// Skills — render as tags
 	const skillsHtml = !hidden.has('skills') && v.skill_groups?.length
 		? `<section id="skills">
 <div class="container">
 <div class="section-header reveal"><div class="section-label">Skills</div><h2 class="section-title">Core <em>Competencies</em></h2></div>
 <div class="skills-layout">
 ${v.skill_groups.map((g, i) => {
-	const pcts = [90, 85, 80, 75, 72, 68, 65, 62].slice(0, g.skills.length);
-	const bars = g.skills.map((s, si) => `<div class="skill-bar-item"><div class="skill-bar-label">${s}</div><div class="skill-track"><div class="skill-fill" data-width="${pcts[si] ?? 60}" style="width:0"></div></div></div>`).join('');
+	const tags = g.skills.map((s) => `<span class="skill-tag">${s}</span>`).join('');
 	return `<div class="skill-group-card reveal" data-item-wrap>
 <button class="del-btn ce-del-btn" data-del-section="skills" data-del-index="${i}">&#x2715;</button>
 <div class="skill-cat" ${_editable(`skills.${i}.category`)}>${g.category}</div>
-${bars}
+<div class="skill-tags">${tags}</div>
 </div>`;
 }).join('\n')}
 </div>
@@ -421,11 +409,11 @@ ${v.projects.map((p, i) => {
 	const bg = projBannerGradient(p);
 	const bannerImg = p.images?.[0];
 	const respHtml = p.responsibilities?.length
-		? `<ul class="tl-points" ${_listEditable(`projects.${i}.responsibilities`)}>${p.responsibilities.slice(0, 3).map(r => `<li>${r}</li>`).join('')}</ul>`
+		? `<ul class="tl-points" ${_listEditable(`projects.${i}.responsibilities`)}>${p.responsibilities.map(r => `<li>${r}</li>`).join('')}</ul>`
 		: '';
 	return `<div class="proj-card reveal-up" data-item-wrap>
 <button class="del-btn ce-del-btn" data-del-section="projects" data-del-index="${i}">&#x2715;</button>
-<div class="proj-banner"${bannerImg ? '' : ` style="background:${bg}"`}>
+<div class="proj-banner" ${_imgUpload(`projects.${i}.images`, v.edit_mode, 'Upload image')}${bannerImg ? '' : ` style="background:${bg}"`}>
 ${bannerImg ? `<img class="proj-banner-img" src="${bannerImg}" alt="${p.title}">` : ''}
 <div class="proj-banner-bg"${bannerImg ? '' : ` style="background:${bg}"`}></div>
 ${bannerImg ? '' : `<div class="proj-banner-initials">${bannerInitials}</div>`}
@@ -454,8 +442,8 @@ ${techs ? `<div class="proj-tags" ${_listEditable(`projects.${i}.tech_stack`)}>$
 <div class="edu-grid">
 ${v.education.map((edu, i) => `<div class="edu-card reveal-up" data-item-wrap>
 <button class="del-btn ce-del-btn" data-del-section="education" data-del-index="${i}">&#x2715;</button>
-<div class="edu-period" ${_editable(`education.${i}.year_range`)}>${edu.year_range}</div>
-<div class="edu-degree" ${_editable(`education.${i}.degree`)}>${[edu.degree, edu.field_of_study].filter(Boolean).join(' in ')}</div>
+<div class="edu-period">${_rangeEditable(`education.${i}.start_year`, edu.start_year, `education.${i}.end_year`, edu.end_year, v.edit_mode, '–')}</div>
+<div class="edu-degree">${_pairEditable(`education.${i}.degree`, edu.degree, `education.${i}.field_of_study`, edu.field_of_study, v.edit_mode, ' in ')}</div>
 ${edu.institution ? `<div class="edu-school" ${_editable(`education.${i}.institution`)}>${edu.institution}</div>` : ''}
 ${edu.grade_or_score ? `<div class="edu-grade" ${_editable(`education.${i}.grade_or_score`)}>${edu.grade_or_score}</div>` : ''}
 </div>`).join('\n')}
@@ -474,7 +462,7 @@ ${v.certifications.map((c, i) => `<div class="cert-card reveal-up" data-item-wra
 <button class="del-btn ce-del-btn" data-del-section="certifications" data-del-index="${i}">&#x2715;</button>
 <div class="cert-ico">&#10003;</div>
 <div>
-<div class="cert-name">${c.url ? `<a href="${c.url}" target="_blank" rel="noopener noreferrer">${c.name}</a>` : c.name}</div>
+<div class="cert-name"${!c.url ? ` ${_editable(`certifications.${i}.name`)}` : ''}>${c.url ? `<a href="${c.url}" target="_blank" rel="noopener noreferrer">${c.name}</a>` : c.name}</div>
 ${c.issuer ? `<div class="cert-issuer" ${_editable(`certifications.${i}.issuer`)}>${c.issuer}</div>` : ''}
 ${c.year ? `<div class="cert-year" ${_editable(`certifications.${i}.year`)}>${c.year}</div>` : ''}
 </div>
@@ -580,21 +568,34 @@ ${v.location ? `<div class="ct-item"><div class="ct-label">Location</div><div cl
 	const customSectionsHtml = !hidden.has('custom_sections') && (v.custom_sections?.length ?? 0) > 0
 		? (v.custom_sections ?? []).map((cs, csIdx) => {
 			if (!cs.items?.length) return '';
-			const items = cs.items.map((item, i) => `<div class="proj-card" data-item-wrap>
-<button class="ce-del-btn" data-del-section="custom_sections" data-del-index="${i}">&#x2715;</button>
-${item.label ? `<h3 class="proj-name">${item.label}</h3>` : ''}
-${item.subtitle ? `<p class="proj-meta">${item.subtitle}</p>` : ''}
-${item.value ? `<p class="proj-desc">${item.value}</p>` : ''}
-${item.tags?.length ? `<div class="proj-tags">${item.tags.map((t) => `<span class="tag">${t}</span>`).join('')}</div>` : ''}
+			const items = cs.items.map((item, i) => `<div class="proj-card reveal-up" data-item-wrap data-cs-idx="${csIdx}">
+<button class="del-btn ce-del-btn" data-del-section="custom_sections.${csIdx}" data-del-index="${i}">&#x2715;</button>
+<div class="proj-body">
+${item.label ? `<div class="proj-title" ${_editable(`custom_sections.${csIdx}.items.${i}.label`)}>${item.label}</div>` : ''}
+${item.subtitle ? `<div class="proj-desc" style="color:var(--gold);font-size:.8rem;margin-bottom:4px" ${_editable(`custom_sections.${csIdx}.items.${i}.subtitle`)}>${item.subtitle}</div>` : ''}
+${item.value ? `<p class="proj-desc" ${_editable(`custom_sections.${csIdx}.items.${i}.value`, true)}>${item.value}</p>` : ''}
+${item.tags?.length ? `<div class="proj-tags" ${_listEditable(`custom_sections.${csIdx}.items.${i}.tags`)}>${item.tags.map((t) => `<span class="proj-tag">${t}</span>`).join('')}</div>` : ''}
+${item.url ? `<a href="${item.url}" class="proj-link" target="_blank" rel="noopener noreferrer">View &#8599;</a>` : ''}
+</div>
+</div>`).join('\n');
+			const tlItems = cs.items.map((item, i) => `<div class="tl-item reveal" data-item-wrap data-cs-idx="${csIdx}">
+<button class="del-btn ce-del-btn" data-del-section="custom_sections.${csIdx}" data-del-index="${i}">&#x2715;</button>
+${(item.label || item.subtitle) ? `<div class="tl-header">${item.label ? `<span class="tl-role" ${_editable(`custom_sections.${csIdx}.items.${i}.label`)}>${item.label}</span>` : ''}${item.subtitle ? `<span class="tl-period" ${_editable(`custom_sections.${csIdx}.items.${i}.subtitle`)}>${item.subtitle}</span>` : ''}</div>` : ''}
+${item.value ? `<p class="tl-desc" ${_editable(`custom_sections.${csIdx}.items.${i}.value`, true)}>${item.value}</p>` : ''}
+${item.tags?.length ? `<div class="proj-tags" ${_listEditable(`custom_sections.${csIdx}.items.${i}.tags`)}>${item.tags.map((t) => `<span class="proj-tag">${t}</span>`).join('')}</div>` : ''}
 ${item.url ? `<a href="${item.url}" class="proj-link" target="_blank" rel="noopener noreferrer">View &#8599;</a>` : ''}
 </div>`).join('\n');
 			const grid = cs.display_type === 'cards'
-				? `<div class="projects-grid">${items}</div>`
-				: `<div class="exp-list">${items}</div>`;
+				? `<div class="proj-grid">${items}</div>`
+				: cs.display_type === 'timeline'
+				? `<div class="timeline">${tlItems}</div>`
+				: `<div style="display:flex;flex-direction:column;gap:18px">${items}</div>`;
 			return `<section id="${cs.section_id}">
-<div class="section-header"><h2 class="section-title">${cs.title}</h2></div>
+<div class="container">
+<div class="section-header reveal"><div class="section-label">${cs.title}</div><h2 class="section-title">${cs.title}</h2></div>
 ${grid}
-<button class="ce-add-btn" data-add-section="custom_sections.${csIdx}.items">+ Add Item</button>
+<button class="add-btn ce-add-btn" data-add-section="custom_sections.${csIdx}.items">+ Add Item</button>
+</div>
 </section>`;
 		}).filter(Boolean).join('\n')
 		: '';
@@ -639,7 +640,7 @@ ${v.email ? `<a href="mailto:${v.email}" class="nav-cta">Hire Me</a>` : ''}
 <div class="hero-grid-lines"></div>
 <div class="hero-left">
 <p class="hero-tag">Portfolio</p>
-<h1 class="hero-name" ${_editable('profile.name')}>${v.name}</h1>
+<h1 class="hero-name" ${_editable('profile.full_name')}>${v.name}</h1>
 ${v.headline ? `<p class="hero-title-sub" ${_editable('portfolio.headline')}>${v.headline}</p>` : ''}
 ${v.bio ? `<p class="hero-desc" ${_editable('portfolio.bio', true)}>${v.bio}</p>` : ''}
 ${socialLinks ? `<div class="hero-links">${socialLinks}</div>` : ''}
@@ -647,7 +648,7 @@ ${heroStats}
 </div>
 <div class="hero-right">
 <div class="hero-photo-frame">
-<div class="hero-photo-inner">${avatarHtml}</div>
+<div class="hero-photo-inner" ${_imgUpload('profile.profile_image', v.edit_mode)}>${avatarHtml}</div>
 ${v.headline ? `<div class="hero-badge">${v.headline}</div>` : ''}
 </div>
 </div>

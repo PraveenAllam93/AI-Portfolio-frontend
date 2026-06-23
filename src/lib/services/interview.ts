@@ -13,6 +13,8 @@ export interface StartInterviewParams {
 	mode: InterviewMode;
 	source: InterviewSource;
 	roleInfo?: string;
+	/** Which portfolio to base resume questions on. Omit to use the most recent one. */
+	uploadId?: string;
 }
 
 export interface StartInterviewResult {

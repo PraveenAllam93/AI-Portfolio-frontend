@@ -51,6 +51,76 @@ export function _listEditable(path: string): string {
 }
 
 /**
+ * Returns HTML attribute string that turns an image container into an inline
+ * upload zone in the live editor. The element it is placed on must wrap the
+ * displayed image (or its placeholder) — the editor overlays a clickable
+ * "upload" affordance on it and, on click, opens the file picker and routes the
+ * chosen file to `path`.
+ *
+ * `path` is the target the parent editor updates:
+ *   - 'profile.profile_image'         → hero/profile photo (replace)
+ *   - 'profile.summary_image'         → about/summary image (replace)
+ *   - '{section}.{visibleIdx}.images' → section item image, e.g. 'projects.0.images'
+ *
+ * Only active in edit mode; returns '' for published output so nothing leaks
+ * into the static portfolio.
+ */
+export function _imgUpload(path: string, editMode: boolean, label = 'Upload photo'): string {
+	return editMode ? `data-img-upload="${path}" data-img-label="${label}"` : '';
+}
+
+/**
+ * Inline-editable "start – end" range for experience dates or education years.
+ *
+ * Binds to the two REAL model fields (start_date/end_date, start_year/end_year),
+ * NEVER the computed `duration`/`year_range`. The computed fields cannot
+ * round-trip through the editor: the right-side pane has no input for them and
+ * normalize() recomputes them from the real fields, so an inline edit to a
+ * combined span is silently discarded on the next re-render. Use this helper so
+ * every template stays in sync in both directions.
+ *
+ * Empty ends are omitted in BOTH edit and published mode — no "Start"/"End"
+ * placeholder text leaks into the preview. Non-empty values stay inline-editable;
+ * empty ones are edited from the right-side form pane.
+ */
+export function _rangeEditable(
+	startPath: string,
+	startVal: string,
+	endPath: string,
+	endVal: string,
+	editMode: boolean,
+	sep = ' – '
+): string {
+	if (!startVal && !endVal) return '';
+	const s = startVal ? `<span ${editMode ? _editable(startPath) : ''}>${startVal}</span>` : '';
+	const e = endVal ? `<span ${editMode ? _editable(endPath) : ''}>${endVal}</span>` : '';
+	return `${s}${s && e ? sep : ''}${e}`;
+}
+
+/**
+ * Inline-editable "degree, field_of_study" pair that keeps the visual join but
+ * edits each field separately. Prevents the bug where the whole "Degree in
+ * Field" string is bound to `degree` alone — which both makes field_of_study
+ * uneditable inline AND duplicates the field text on re-render.
+ *
+ * Empty fields (and the joiner) are omitted entirely in BOTH edit and published
+ * mode — no placeholder text leaks into the preview. Non-empty values stay
+ * inline-editable; empty ones are edited from the right-side form pane.
+ */
+export function _pairEditable(
+	aPath: string,
+	aVal: string,
+	bPath: string,
+	bVal: string,
+	editMode: boolean,
+	joiner = ' '
+): string {
+	const a = aVal ? `<span ${editMode ? _editable(aPath) : ''}>${aVal}</span>` : '';
+	const b = bVal ? `${a ? joiner : ''}<span ${editMode ? _editable(bPath) : ''}>${bVal}</span>` : '';
+	return `${a}${b}`;
+}
+
+/**
  * Pure JS body for the inline editor (no <script> tags).
  * Exported separately so the edit page can also inject it programmatically,
  * which is more reliable than relying on document.write() script execution.
@@ -73,7 +143,15 @@ export const EDITOR_JS = `(function(){
     '.ce-ai-btn{display:none;position:absolute;top:6px;right:32px;padding:2px 8px;border-radius:12px;border:1px solid rgba(139,92,246,0.4);background:rgba(238,235,255,0.9);color:#7c3aed;font-size:11px;font-weight:600;cursor:pointer;z-index:10;white-space:nowrap;line-height:18px}',
     '.ce-ai-btn:hover{background:rgba(139,92,246,0.18);border-color:rgba(139,92,246,0.7)}',
     '[data-item-wrap]{position:relative!important}',
-    '[data-item-wrap]:hover .ce-del-btn,[data-item-wrap]:hover .ce-ai-btn{display:block}'
+    '[data-item-wrap]:hover .ce-del-btn,[data-item-wrap]:hover .ce-ai-btn{display:block}',
+    '[data-img-upload]{cursor:pointer!important}',
+    '[data-img-upload].ce-img-empty{min-width:120px;min-height:120px}',
+    '.ce-img-ov{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;opacity:0;background:rgba(17,24,39,0);transition:opacity .15s,background .15s;cursor:pointer;z-index:30;border-radius:inherit;overflow:hidden}',
+    '[data-img-upload]:hover .ce-img-ov{opacity:1;background:rgba(17,24,39,.5)}',
+    '[data-img-upload].ce-img-empty .ce-img-ov{opacity:1;background:rgba(99,102,241,.16)}',
+    '.ce-img-ov-inner{display:flex;flex-direction:column;align-items:center;gap:6px;color:#fff;font-size:12px;font-weight:700;letter-spacing:.02em;font-family:system-ui,-apple-system,sans-serif;pointer-events:none;text-align:center;padding:6px;text-shadow:0 1px 4px rgba(0,0,0,.55)}',
+    '[data-img-upload].ce-img-empty .ce-img-ov-inner{color:#4f46e5;text-shadow:none}',
+    '.ce-img-ic{width:26px;height:26px;display:block}'
   ].join('');
   document.head.appendChild(s);
 
@@ -166,6 +244,14 @@ export const EDITOR_JS = `(function(){
       section:btn.dataset.aiSection,index:parseInt(btn.dataset.aiIndex,10)},'*');
   });
 
+  document.addEventListener('click',function(e){
+    var z=e.target.closest('[data-img-upload]');
+    if(!z)return;
+    e.preventDefault();
+    e.stopPropagation();
+    window.parent.postMessage({type:'image-upload-click',target:z.getAttribute('data-img-upload')},'*');
+  },true);
+
   window.addEventListener('message',function(e){
     if(!e.data)return;
     if(e.data.type==='update-field'){
@@ -198,7 +284,9 @@ export const EDITOR_JS = `(function(){
       if(wrap.querySelector('.ce-ai-btn'))return;
       var del=wrap.querySelector('[data-del-section]');
       if(!del)return;
-      if(_NO_AI_SECTIONS.indexOf(del.getAttribute('data-del-section'))>=0)return;
+      var sec=del.getAttribute('data-del-section')||'';
+      if(_NO_AI_SECTIONS.indexOf(sec)>=0)return;
+      if(sec.startsWith('custom_sections'))return;
       var btn=document.createElement('button');
       btn.className='ce-ai-btn';
       btn.setAttribute('data-ai-section',del.getAttribute('data-del-section'));
@@ -207,8 +295,23 @@ export const EDITOR_JS = `(function(){
       wrap.appendChild(btn);
     });
   }
-  if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded',injectAiBtns);}
-  else{injectAiBtns();}
+  var _CAM='<svg class="ce-img-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>';
+  function injectImgZones(){
+    document.querySelectorAll('[data-img-upload]').forEach(function(z){
+      if(z.querySelector(':scope > .ce-img-ov'))return;
+      var cs=window.getComputedStyle(z);
+      if(cs.position==='static')z.style.position='relative';
+      if(!z.querySelector('img'))z.classList.add('ce-img-empty');
+      else z.classList.remove('ce-img-empty');
+      var label=z.getAttribute('data-img-label')||'Upload photo';
+      var ov=document.createElement('div');
+      ov.className='ce-img-ov';
+      ov.innerHTML='<div class="ce-img-ov-inner">'+_CAM+'<span>'+label+'</span></div>';
+      z.appendChild(ov);
+    });
+  }
+  if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded',function(){injectAiBtns();injectImgZones();});}
+  else{injectAiBtns();injectImgZones();}
 })();`;
 
 /**
@@ -220,12 +323,17 @@ export const EDITOR_SCRIPT = `<script data-editor>${EDITOR_JS}<\/script>`;
 export interface NormalizedData {
 	// Profile
 	name: string;
-	headline: string;
+	headline: string;        // portfolioContent.headline || profile.headline (AI preferred)
+	profile_headline: string; // profile.headline only (raw professional title)
 	bio: string;
+	uniqueValue: string;     // portfolioContent.uniqueValue (editable via portfolio.uniqueValue)
 	email: string;
 	phone: string;
 	location: string;
 	profile_image: string;
+	summary_image: string;
+	contact_tagline: string;
+	core_expertise: string[];
 	linkedin_url: string;
 	github_url: string;
 	portfolio_url: string;
@@ -237,6 +345,9 @@ export interface NormalizedData {
 		company: string;
 		location: string;
 		duration: string;
+		start_date: string;
+		end_date: string;
+		is_current: boolean;
 		description: string;
 		key_points: string[];
 		channels_managed: string[];
@@ -248,6 +359,8 @@ export interface NormalizedData {
 		institution: string;
 		location: string;
 		year_range: string;
+		start_year: string;
+		end_year: string;
 		grade_or_score: string;
 	}>;
 	certifications: Array<{ name: string; issuer: string; year: string; url: string }>;
@@ -298,6 +411,8 @@ export interface NormalizedData {
 			url: string;
 		}>;
 	}>;
+	// Template-specific stat overrides (null/absent = use auto-computed value)
+	template_overrides: Record<string, number | null>;
 	// Metadata
 	category: string;
 	section_order: string[];
@@ -311,18 +426,28 @@ export function normalize(
 	category: string,
 	sectionOrder?: string[],
 	hiddenSections?: string[] | Set<string>,
-	editMode = true
+	editMode = true,
+	templateOverrides?: Record<string, number | null>
 ): NormalizedData {
 	const profile = parsedData.profile ?? {};
 	const social = profile.social_links ?? {};
 
 	const name = _e(profile.full_name) || 'Portfolio';
+	const profile_headline = _e(profile.headline);
 	const headline = _e(portfolioContent.headline || profile.headline);
 	const bio = _e(portfolioContent.bio || profile.summary);
+	const uniqueValue = _e(portfolioContent.uniqueValue);
 	const email = _e(profile.email);
 	const phone = _e(profile.phone);
 	const location = _e(profile.location);
 	const profile_image = _safeUrl(profile.profile_image);
+	const summary_image = _safeUrl(profile.summary_image);
+	const contact_tagline = _e(profile.contact_tagline);
+	const core_expertise = String(profile.core_expertise ?? '')
+		.split('\n')
+		.map((s) => s.trim())
+		.filter(Boolean)
+		.map(_e);
 
 	const linkedin_url = _safeUrl(social['linkedin']);
 	const github_url = _safeUrl(social['github']);
@@ -346,6 +471,9 @@ export function normalize(
 			company: _e(exp.company),
 			location: _e(exp.location),
 			duration: _e(duration),
+			start_date: _e(start),
+			end_date: _e(endRaw ? String(endRaw) : (exp.is_current ? 'Present' : '')),
+			is_current: !!exp.is_current,
 			description: _e(exp.description),
 			key_points: (Array.isArray(exp.key_points) ? exp.key_points : []).filter(Boolean).map(_e),
 			channels_managed: (Array.isArray(exp.channels_managed) ? exp.channels_managed : []).filter(Boolean).map(_e),
@@ -377,6 +505,8 @@ export function normalize(
 			institution: _e(edu.institution),
 			location: _e(edu.location),
 			year_range: _e(year_range),
+			start_year: _e(String(sy)),
+			end_year: _e(String(ey)),
 			grade_or_score: _e(edu.grade_or_score)
 		};
 	});
@@ -460,11 +590,16 @@ export function normalize(
 	return {
 		name,
 		headline,
+		profile_headline,
 		bio,
+		uniqueValue,
 		email,
 		phone,
 		location,
 		profile_image,
+		summary_image,
+		contact_tagline,
+		core_expertise,
 		linkedin_url,
 		github_url,
 		portfolio_url,
@@ -482,6 +617,7 @@ export function normalize(
 		financial_modeling,
 		investment_portfolios,
 		custom_sections,
+		template_overrides: templateOverrides ?? {},
 		category,
 		section_order: sectionOrder ?? DEFAULT_SECTION_ORDER,
 		hidden_sections: hidden,

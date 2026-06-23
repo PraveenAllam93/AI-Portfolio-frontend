@@ -9,7 +9,7 @@
  * Do NOT apply _e() again — that would cause double-escaping.
  */
 
-import { type NormalizedData, DEFAULT_SECTION_ORDER, _editable, _listEditable, EDITOR_SCRIPT } from './base';
+import { type NormalizedData, DEFAULT_SECTION_ORDER, _editable, _listEditable, _rangeEditable, _pairEditable, EDITOR_SCRIPT } from './base';
 
 const _CSS = `
 @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;0,900;1,400;1,600&family=DM+Sans:wght@300;400;500;600&display=swap');
@@ -56,6 +56,10 @@ body::before{
   padding:90px 5vw 80px;
   position:relative;
   overflow:hidden;
+  min-height:100vh;
+  display:flex;
+  flex-direction:column;
+  justify-content:center;
 }
 .hero-rule{
   position:absolute;top:0;left:0;right:0;height:6px;
@@ -252,8 +256,6 @@ function _about(v: NormalizedData): string {
   const parts: string[] = [];
   if (v.headline) parts.push(`<p class="about-pull" ${ed('portfolio.headline', true)}>${v.headline}</p>`);
   if (v.bio)      parts.push(`<p class="about-text" ${ed('portfolio.bio', true)}>${v.bio}</p>`);
-  const meta = [v.location, v.email, v.phone].filter(Boolean).join(' &bull; ');
-  if (meta) parts.push(`<p class="about-meta">${meta}</p>`);
   return parts.join('');
 }
 
@@ -281,7 +283,11 @@ function _experience(v: NormalizedData): string {
   let out = '<div>';
   for (let i = 0; i < items.length; i++) {
     const exp = items[i];
-    const meta = [exp.location, exp.duration].filter(Boolean).join(' &bull; ');
+    const metaSpans: string[] = [];
+    if (exp.location) metaSpans.push(`<span ${ed(`experience.${i}.location`)}>${exp.location || ''}</span>`);
+    const expDates = _rangeEditable(`experience.${i}.start_date`, exp.start_date, `experience.${i}.end_date`, exp.end_date, v.edit_mode);
+    if (expDates) metaSpans.push(expDates);
+    const meta = metaSpans.join(' &bull; ');
     const pts = (exp.key_points || []);
     const ptsHtml = pts.length
       ? `<ul class="card-list" ${led(`experience.${i}.key_points`)}>${pts.map((p: string) => `<li>${p}</li>`).join('')}</ul>`
@@ -307,13 +313,17 @@ function _education(v: NormalizedData): string {
   let out = '<div>';
   for (let i = 0; i < items.length; i++) {
     const edu = items[i];
-    const titleParts = [edu.degree, edu.field_of_study].filter(Boolean);
-    const title = titleParts.length ? titleParts.join(', ') : edu.institution;
-    const meta = [titleParts.length ? edu.institution : '', edu.location, edu.year_range].filter(Boolean).join(' &bull; ');
+    const title = _pairEditable(`education.${i}.degree`, edu.degree, `education.${i}.field_of_study`, edu.field_of_study, v.edit_mode, ', ');
+    const metaSpans: string[] = [];
+    if (edu.institution) metaSpans.push(`<span ${ed(`education.${i}.institution`)}>${edu.institution || ''}</span>`);
+    if (edu.location) metaSpans.push(`<span ${ed(`education.${i}.location`)}>${edu.location || ''}</span>`);
+    const eduYears = _rangeEditable(`education.${i}.start_year`, edu.start_year, `education.${i}.end_year`, edu.end_year, v.edit_mode, '–');
+    if (eduYears) metaSpans.push(eduYears);
+    const meta = metaSpans.join(' &bull; ');
     out += `<div class="card"${iw}>${del('education', i)}
-<div class="card-title" ${ed(`education.${i}.degree`)}>${title}</div>
+<div class="card-title">${title}</div>
 ${meta ? `<div class="card-sub">${meta}</div>` : ''}
-${edu.grade_or_score ? `<div class="card-grade">${edu.grade_or_score}</div>` : ''}
+${edu.grade_or_score ? `<div class="card-grade" ${ed(`education.${i}.grade_or_score`)}>${edu.grade_or_score}</div>` : ''}
 </div>`;
   }
   out += `</div>${add('education', 'Education')}`;
@@ -355,8 +365,11 @@ function _certifications(v: NormalizedData): string {
   let out = '<div class="cert-list">';
   for (let i = 0; i < items.length; i++) {
     const c = items[i];
-    const meta = [c.issuer, c.year ? String(c.year) : ''].filter(Boolean).join(' &bull; ');
-    const label = c.url
+    const metaParts: string[] = [];
+    if (c.issuer) metaParts.push(`<span ${ed(`certifications.${i}.issuer`)}>${c.issuer || ''}</span>`);
+    if (c.year) metaParts.push(`<span ${ed(`certifications.${i}.year`)}>${c.year || ''}</span>`);
+    const meta = metaParts.join(' &bull; ');
+    const label = c.url && !v.edit_mode
       ? `<a class="cert-link" href="${c.url}" target="_blank" rel="noopener">${c.name || ''}</a>`
       : `<span class="cert-name" ${ed(`certifications.${i}.name`)}>${c.name || ''}</span>`;
     out += `<div class="card cert-row"${iw}>${del('certifications', i)}${label}${meta ? `<span class="cert-meta">${meta}</span>` : ''}</div>`;
@@ -373,7 +386,7 @@ function _achievements(v: NormalizedData): string {
   for (let i = 0; i < items.length; i++) {
     const a = items[i];
     out += `<div class="card"${iw}>${del('achievements', i)}
-<div class="card-title"><span ${ed(`achievements.${i}.title`)}>${a.title || ''}</span>${a.year ? `&nbsp;<span class="yr">${a.year}</span>` : ''}</div>
+<div class="card-title"><span ${ed(`achievements.${i}.title`)}>${a.title || ''}</span>${(a.year) ? `&nbsp;<span class="yr" ${ed(`achievements.${i}.year`)}>${a.year || ''}</span>` : ''}</div>
 ${a.description ? `<p class="card-body" ${ed(`achievements.${i}.description`, true)}>${a.description}</p>` : ''}
 </div>`;
   }
@@ -388,8 +401,11 @@ function _awards(v: NormalizedData): string {
   let out = '<div class="award-list">';
   for (let i = 0; i < items.length; i++) {
     const a = items[i];
-    const meta = [a.awarding_body, a.year ? String(a.year) : ''].filter(Boolean).join(' &bull; ');
-    const label = a.url
+    const metaParts: string[] = [];
+    if (a.awarding_body) metaParts.push(`<span ${ed(`awards.${i}.awarding_body`)}>${a.awarding_body || ''}</span>`);
+    if (a.year) metaParts.push(`<span ${ed(`awards.${i}.year`)}>${a.year || ''}</span>`);
+    const meta = metaParts.join(' &bull; ');
+    const label = a.url && !v.edit_mode
       ? `<a class="cert-link" href="${a.url}" target="_blank" rel="noopener">${a.title || ''}</a>`
       : `<span class="card-title" ${ed(`awards.${i}.title`)}>${a.title || ''}</span>`;
     out += `<div class="card cert-row"${iw}>${del('awards', i)}${label}${meta ? `<span class="cert-meta">${meta}</span>` : ''}</div>`;
@@ -405,9 +421,10 @@ function _design_philosophy(v: NormalizedData): string {
 }
 
 function _software_proficiency(v: NormalizedData): string {
+  const { led } = _em(v.edit_mode);
   const items = v.software_proficiency || [];
-  if (!items.length) return '';
-  return `<div class="tag-row">${items.map((s: string) => `<span class="tag">${s}</span>`).join('')}</div>`;
+  if (!items.length && !v.edit_mode) return '';
+  return `<div class="tag-row" ${led('software_proficiency')}>${items.map((s: string) => `<span class="tag">${s}</span>`).join('')}</div>`;
 }
 
 function _campaigns(v: NormalizedData): string {
@@ -420,9 +437,9 @@ function _campaigns(v: NormalizedData): string {
     const chTags = (c.channels_used || []).map((ch: string) => `<span class="tag">${ch}</span>`).join('');
     const metrics = (c.performance_metrics || []).map((m: string) => `<li>${m}</li>`).join('');
     out += `<div class="card"${iw}>${del('campaigns', i)}
-<div class="card-title" ${ed(`campaigns.${i}.campaign_name`)}>${c.campaign_name || ''}${c.campaign_type ? `&nbsp;<span class="cert-meta">${c.campaign_type}</span>` : ''}</div>
-${chTags ? `<div class="tag-row">${chTags}</div>` : ''}
-${c.budget ? `<p class="card-body">Budget: ${c.budget}</p>` : ''}
+<div class="card-title" ${ed(`campaigns.${i}.campaign_name`)}>${c.campaign_name || ''}</div>${(c.campaign_type) ? `<div class="cert-meta"><span ${ed(`campaigns.${i}.campaign_type`)}>${c.campaign_type || ''}</span></div>` : ''}
+${(chTags || v.edit_mode) ? `<div class="tag-row" ${led(`campaigns.${i}.channels_used`)}>${chTags}</div>` : ''}
+${(c.budget) ? `<p class="card-body">Budget: <span ${ed(`campaigns.${i}.budget`)}>${c.budget || ''}</span></p>` : ''}
 ${metrics ? `<ul class="card-list" ${led(`campaigns.${i}.performance_metrics`)}>${metrics}</ul>` : ''}
 </div>`;
   }
@@ -458,8 +475,8 @@ function _investment_portfolios(v: NormalizedData): string {
     out += `<div class="card"${iw}>${del('investment_portfolios', i)}
 <div class="card-title" ${ed(`investment_portfolios.${i}.portfolio_type`)}>${ip.portfolio_type || ''}</div>
 <div style="display:flex;gap:24px;margin-top:10px;flex-wrap:wrap">
-${ip.assets_under_management ? `<span><span style="font-size:.7rem;text-transform:uppercase;letter-spacing:.08em;color:var(--ink3);display:block">AUM</span>${ip.assets_under_management}</span>` : ''}
-${ip.performance_return ? `<span><span style="font-size:.7rem;text-transform:uppercase;letter-spacing:.08em;color:var(--ink3);display:block">Return</span>${ip.performance_return}</span>` : ''}
+${(ip.assets_under_management) ? `<span><span style="font-size:.7rem;text-transform:uppercase;letter-spacing:.08em;color:var(--ink3);display:block">AUM</span><span ${ed(`investment_portfolios.${i}.assets_under_management`)}>${ip.assets_under_management || ''}</span></span>` : ''}
+${(ip.performance_return) ? `<span><span style="font-size:.7rem;text-transform:uppercase;letter-spacing:.08em;color:var(--ink3);display:block">Return</span><span ${ed(`investment_portfolios.${i}.performance_return`)}>${ip.performance_return || ''}</span></span>` : ''}
 </div>
 </div>`;
   }
@@ -504,12 +521,13 @@ export function html(v: NormalizedData): string {
     if (key === 'custom_sections') {
       return (v.custom_sections ?? []).filter(cs => cs.items?.length || em).map((cs, csIdx) => {
         const itemsHtml = (cs.items ?? []).map((item, i) => {
-          const del = em ? `<button class="ce-del-btn" data-del-section="custom_sections" data-del-index="${i}">&#x2715;</button>` : '';
-          return `<div class="card" style="position:relative">${del}
-${item.label ? `<p class="card-title">${item.label}</p>` : ''}
-${item.subtitle ? `<p style="opacity:.65;font-size:.85rem;margin-top:4px">${item.subtitle}</p>` : ''}
-${item.value ? `<p style="margin-top:8px;line-height:1.7">${item.value}</p>` : ''}
-${item.tags?.length ? `<div class="tag-row" style="margin-top:10px">${item.tags.map((t) => `<span class="tag">${t}</span>`).join('')}</div>` : ''}
+          const del = em ? `<button class="ce-del-btn" data-del-section="custom_sections.${csIdx}" data-del-index="${i}">&#x2715;</button>` : '';
+          const csIw = em ? ` data-item-wrap data-cs-idx="${csIdx}"` : '';
+          return `<div class="card" style="position:relative"${csIw}>${del}
+${item.label ? `<p class="card-title" ${em ? _editable(`custom_sections.${csIdx}.items.${i}.label`) : ''}>${item.label}</p>` : ''}
+${item.subtitle ? `<p class="card-sub" ${em ? _editable(`custom_sections.${csIdx}.items.${i}.subtitle`) : ''}>${item.subtitle}</p>` : ''}
+${item.value ? `<p class="card-body" ${em ? _editable(`custom_sections.${csIdx}.items.${i}.value`, true) : ''}>${item.value}</p>` : ''}
+${item.tags?.length ? `<div class="tag-row" style="margin-top:10px" ${em ? _listEditable(`custom_sections.${csIdx}.items.${i}.tags`) : ''}>${item.tags.map((t) => `<span class="tag">${t}</span>`).join('')}</div>` : ''}
 ${item.url ? `<a href="${item.url}" style="font-size:.82rem;margin-top:8px;display:inline-block;color:var(--orange)" target="_blank" rel="noopener">View &#8599;</a>` : ''}
 </div>`;
         }).join('\n');
@@ -545,7 +563,7 @@ ${item.url ? `<a href="${item.url}" style="font-size:.82rem;margin-top:8px;displ
     <p class="hero-eyebrow">Portfolio &mdash; ${new Date().getFullYear()}</p>
     <h1 class="hero-name" ${ed('profile.full_name')}>${name}</h1>
     ${v.headline ? `<p class="hero-title" ${ed('profile.headline')}>${v.headline}</p>` : ''}
-    ${v.location || v.phone ? `<p class="hero-title" style="font-size:.9rem;margin-top:-18px;margin-bottom:24px;opacity:.6"><span ${ed('profile.location')}>${v.location || ''}</span>${v.phone ? ` &bull; <span ${ed('profile.phone')}>${v.phone}</span>` : ''}</p>` : ''}
+    ${v.location || v.phone || v.email ? `<p class="hero-title" style="font-size:.9rem;margin-top:-18px;margin-bottom:24px;opacity:.6">${[v.location ? `<span ${ed('profile.location')}>${v.location}</span>` : '', v.phone ? `<span ${ed('profile.phone')}>${v.phone}</span>` : '', v.email ? `<span ${ed('profile.email')}>${v.email}</span>` : ''].filter(Boolean).join(' &bull; ')}</p>` : ''}
     ${liHtml ? `<div class="hero-links">${liHtml}</div>` : ''}
   </div>
   <div class="hero-deco" aria-hidden="true">&amp;</div>

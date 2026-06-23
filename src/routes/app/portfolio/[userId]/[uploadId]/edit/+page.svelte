@@ -1,4 +1,4 @@
-<script lang="ts">
+﻿<script lang="ts">
 	import { onMount, tick } from 'svelte';
 	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
@@ -18,6 +18,7 @@
 		getImageUploadUrl,
 		generateProjectImage,
 		getAiSuggestions,
+		saveTemplateOverrides,
 		addCustomSection as addCustomSectionApi,
 		type LlmSuggestion
 	} from '$lib/services/portfolio';
@@ -32,10 +33,11 @@
 		CustomSectionItem
 	} from '$lib/types/portfolio';
 	import { DEFAULT_SECTION_ORDER } from '$lib/types/portfolio';
-	import { renderPortfolio } from '$lib/templates';
+	import { renderPortfolio, TEMPLATE_META, TEMPLATE_FIELDS, SUMMARY_IMAGE_TEMPLATES, CORE_EXPERTISE_TEMPLATES, CONTACT_TAGLINE_TEMPLATES, DEFAULT_CONTACT_TAGLINE, customDisplayTypes } from '$lib/templates';
 	import { EDITOR_JS, EDITOR_SCRIPT } from '$lib/templates/base';
 
 	const userId: string = $derived($page.params.userId ?? '');
+	const uploadId: string = $derived($page.params.uploadId ?? '');
 
 	// Ownership guard
 	$effect(() => {
@@ -86,11 +88,12 @@
 		},
 		projects: {
 			label: 'Projects',
-			categories: ['software_engineer', 'designer'],
+			categories: ['software_engineer', 'designer', 'civil_engineer', 'mechanical_engineer'],
 			type: 'array',
 			itemTitle: (item, i) => (item.title as string) || `Project ${i + 1}`,
 			fields: [
 				{ key: 'title', label: 'Project Title', inputType: 'text', limit: 200 },
+				{ key: 'project_category', label: 'Category', inputType: 'text', limit: 100 },
 				{ key: 'description', label: 'Description', inputType: 'textarea', aiEnhanceable: true, limit: 1500 },
 				{ key: 'tech_stack', label: 'Tech Stack (one per line)', inputType: 'list' },
 				{ key: 'github_repo', label: 'GitHub URL', inputType: 'url', limit: 500 },
@@ -101,7 +104,7 @@
 				{ key: 'software_used', label: 'Software Used (one per line)', inputType: 'list' },
 				{ key: 'images', label: 'Images (max 3)', inputType: 'images' }
 			],
-			emptyItem: () => ({ title: '', description: '', tech_stack: [], github_repo: '', project_url: '', responsibilities: [], measurable_outcomes: [], images: [] })
+			emptyItem: () => ({ title: '', project_category: '', description: '', tech_stack: [], github_repo: '', project_url: '', responsibilities: [], measurable_outcomes: [], images: [] })
 		},
 		education: {
 			label: 'Education',
@@ -207,7 +210,7 @@
 		},
 		software_proficiency: {
 			label: 'Software Proficiency',
-			categories: ['designer'],
+			categories: ['designer', 'civil_engineer', 'mechanical_engineer'],
 			type: 'list',
 			itemTitle: () => '',
 			fields: [],
@@ -266,10 +269,13 @@
 		social_portfolio: string;
 		social_twitter: string;
 		profile_image: string;
+		summary_image: string;
+		contact_tagline: string;
+		core_expertise: string;
 	}
 
 	function emptyRawProfile(): RawProfileState {
-		return { full_name: '', headline: '', email: '', phone: '', location: '', summary: '', social_linkedin: '', social_github: '', social_gitlab: '', social_portfolio: '', social_twitter: '', profile_image: '' };
+		return { full_name: '', headline: '', email: '', phone: '', location: '', summary: '', social_linkedin: '', social_github: '', social_gitlab: '', social_portfolio: '', social_twitter: '', profile_image: '', summary_image: '', contact_tagline: '', core_expertise: '' };
 	}
 
 	let rawProfile: RawProfileState = $state(emptyRawProfile());
@@ -280,6 +286,20 @@
 	// Profile image upload state
 	let imageUploadStatus = $state<'idle' | 'uploading' | 'done' | 'error'>('idle');
 	let imageUploadError: string = $state('');
+
+	// Summary/section image upload state (separate from the hero profile photo)
+	let summaryImageUploadStatus = $state<'idle' | 'uploading' | 'done' | 'error'>('idle');
+	let summaryImageUploadError: string = $state('');
+
+	// Inline (in-preview) image upload — a hidden file input the preview triggers
+	// via an `image-upload-click` message. `inlineImgTarget` records which field
+	// the chosen file should be routed to (e.g. 'profile.profile_image',
+	// 'profile.summary_image', or '{section}.{visibleIdx}.images').
+	let inlineImgInputEl = $state<HTMLInputElement | null>(null);
+	let inlineImgTarget = $state('');
+
+	// Template portfolio text-field (contact tagline / core expertise) save state
+	let portfolioFieldStatus = $state<'idle' | 'saving' | 'saved' | 'error'>('idle');
 
 	const isRawProfileDirty = $derived(JSON.stringify(rawProfile) !== JSON.stringify(rawProfileOriginal));
 
@@ -371,6 +391,11 @@
 	// ── Template ───────────────────────────────────────────────────────────────
 	let templateId = $state('neon');
 
+	// ── Template stat overrides ───────────────────────────────────────────────
+	let templateOverrides = $state<Record<string, number | null>>({});
+	let templateOverridesStatus = $state<'idle' | 'saving' | 'saved' | 'error'>('idle');
+	let templateOverridesError = $state('');
+
 	// ── Live preview (client-side rendering) ───────────────────────────────────
 	// Reconstruct ParsedData from in-memory editor state so the preview re-renders
 	// instantly on every keystroke without any server round-trip.
@@ -383,6 +408,9 @@
 			location:      rawProfile.location,
 			summary:       rawProfile.summary,
 			profile_image: rawProfile.profile_image || undefined,
+			summary_image: rawProfile.summary_image || undefined,
+			contact_tagline: rawProfile.contact_tagline || undefined,
+			core_expertise: rawProfile.core_expertise || undefined,
 			social_links: {
 				...(rawProfile.social_linkedin  ? { linkedin:  rawProfile.social_linkedin  } : {}),
 				...(rawProfile.social_github    ? { github:    rawProfile.social_github    } : {}),
@@ -422,8 +450,11 @@
 		uniqueValue: profileFields.uniqueValue.value,
 	});
 
+	let templateDropdownOpen = $state(false);
+	let hoverTemplateId = $state<string | null>(null);
+
 	const renderedHTML = $derived(
-		renderPortfolio(templateId, liveParsedData, livePortfolioContent, category, sectionOrder, [...hiddenSections])
+		renderPortfolio(hoverTemplateId ?? templateId, liveParsedData, livePortfolioContent, category, sectionOrder, [...hiddenSections], templateOverrides)
 	);
 
 	// ── Delete confirmation modal ──────────────────────────────────────────────
@@ -438,7 +469,7 @@
 		const items = [...sections[sKey]];
 		[items[idx - 1], items[idx]] = [items[idx], items[idx - 1]];
 		sections = { ...sections, [sKey]: items };
-		savePortfolioSection(userId, sKey, items.map(it => it.data));
+		savePortfolioSection(userId, uploadId, sKey, items.map(it => it.data));
 		// LLM suggestion indices are now stale — drop them so we fall back to
 		// the static derived suggestions which always reflect current order.
 		llmSuggestions = [];
@@ -452,7 +483,7 @@
 		const updated = [...items];
 		[updated[idx], updated[idx + 1]] = [updated[idx + 1], updated[idx]];
 		sections = { ...sections, [sKey]: updated };
-		savePortfolioSection(userId, sKey, updated.map(it => it.data));
+		savePortfolioSection(userId, uploadId, sKey, updated.map(it => it.data));
 		// LLM suggestion indices are now stale — drop them.
 		llmSuggestions = [];
 		llmSuggestionsLoaded = false;
@@ -467,7 +498,7 @@
 		else delete newData._hidden;
 		items[idx] = { ...items[idx], hidden: newHidden, data: newData };
 		sections = { ...sections, [sKey]: items };
-		savePortfolioSection(userId, sKey, items.map(it => it.data));
+		savePortfolioSection(userId, uploadId, sKey, items.map(it => it.data));
 		// Drop stale LLM suggestions — liveParsedData excludes hidden items so
 		// indices from a previous LLM run no longer map correctly to sections[].
 		llmSuggestions = [];
@@ -480,7 +511,7 @@
 		deleteModal = { open: false, sectionKey: '', itemIdx: -1 };
 		const items = sections[sectionKey].filter((_, i) => i !== itemIdx);
 		sections = { ...sections, [sectionKey]: items };
-		savePortfolioSection(userId, sectionKey, items.map((it) => it.data));
+		savePortfolioSection(userId, uploadId, sectionKey, items.map((it) => it.data));
 		queuePreviewRefresh();
 	}
 
@@ -518,15 +549,127 @@
 	let llmSuggestionsLoaded = $state(false);
 	let llmSuggestionsError = $state('');
 
+	// ── Per-item suggestion suppression ──────────────────────────────────────────
+	// Once the user accepts or dismisses a suggestion for a target (an item, a
+	// profile field, or the skills section), we snapshot a content SIGNATURE of that
+	// target. While the target's current content still matches a stored signature it
+	// is suppressed — the moment the user edits anything in it the signature changes
+	// and it becomes eligible again. Persisted to localStorage so it survives reload.
+	let handledSignatures = $state<Set<string>>(new Set());
+
+	function _hash(str: string): string {
+		let h = 0x811c9dc5;
+		for (let i = 0; i < str.length; i++) {
+			h ^= str.charCodeAt(i);
+			h = Math.imul(h, 0x01000193);
+		}
+		return (h >>> 0).toString(36);
+	}
+
+	// Per-section AI-enhanceable fields — mirrors backend _ENHANCEABLE_FIELDS so the
+	// frontend suppresses at the same granularity the enhancer accepts.
+	const ENHANCEABLE_ITEM_FIELDS: Record<string, string[]> = {
+		experience:         ['description', 'key_points'],
+		projects:           ['description', 'responsibilities', 'measurable_outcomes'],
+		achievements:       ['description'],
+		campaigns:          ['performance_metrics'],
+		financial_modeling: ['outcome']
+	};
+
+	// Signature of a suggestion target's CURRENT content. Returns null when the
+	// target can't be resolved (e.g. stale index / missing field). Field-scoped for
+	// items so only that one field's suggestion is suppressed — other fields of the
+	// same item stay eligible. Content-based (no index) so it survives reorders.
+	function targetSignature(s: { section: string; index?: number | null; field?: string; profileKey?: string }): string | null {
+		if (s.section === 'profile') {
+			const pk = s.profileKey as EditableField | undefined;
+			if (!pk || !(pk in profileFields)) return null;
+			return `profile:${pk}:${_hash(profileFields[pk].value ?? '')}`;
+		}
+		if (s.section === 'skills') {
+			return `skills:${_hash(JSON.stringify(skillGroups))}`;
+		}
+		if (s.index == null || !s.field) return null;
+		const item = sections[s.section]?.[s.index];
+		if (!item) return null;
+		const fieldValue = (item.data as Record<string, unknown>)[s.field];
+		return `${s.section}:${s.field}:${_hash(JSON.stringify(fieldValue ?? ''))}`;
+	}
+
+	// Canonical routing key sent to the backend / matched against suppressedKeys.
+	// Items are keyed by section+index+field (the index addresses the current request).
+	function canonicalKey(s: { section: string; index?: number | null; field?: string; profileKey?: string }): string | null {
+		if (s.section === 'profile') return s.profileKey ? `profile:${s.profileKey}` : null;
+		if (s.section === 'skills') return 'skills';
+		if (s.index == null || !s.field) return null;
+		return `${s.section}:${s.index}:${s.field}`;
+	}
+
+	function persistHandled() {
+		if (typeof localStorage === 'undefined' || !uploadId) return;
+		try {
+			localStorage.setItem(`aiHandled:${uploadId}`, JSON.stringify([...handledSignatures]));
+		} catch { /* quota / private mode — non-fatal */ }
+	}
+
+	// Record a target as handled using its CURRENT content signature. Call AFTER the
+	// accept handler has already applied the new value, so the snapshot reflects it.
+	function markHandled(s: { section: string; index?: number | null; field?: string; profileKey?: string }) {
+		const sig = targetSignature(s);
+		if (!sig) return;
+		handledSignatures = new Set([...handledSignatures, sig]);
+		persistHandled();
+	}
+
+	// Targets that are currently suppressed: a handled signature still matches the
+	// live content. Reactive — editing an item drops its key here automatically.
+	const suppressedKeys = $derived.by(() => {
+		const keys = new Set<string>();
+		if (handledSignatures.size === 0) return keys;
+		for (const pk of ['bio', 'headline', 'uniqueValue'] as EditableField[]) {
+			const sig = targetSignature({ section: 'profile', profileKey: pk });
+			if (sig && handledSignatures.has(sig)) keys.add(`profile:${pk}`);
+		}
+		const sSig = targetSignature({ section: 'skills' });
+		if (sSig && handledSignatures.has(sSig)) keys.add('skills');
+		for (const sec of Object.keys(ENHANCEABLE_ITEM_FIELDS)) {
+			const items = sections[sec] ?? [];
+			for (let i = 0; i < items.length; i++) {
+				for (const field of ENHANCEABLE_ITEM_FIELDS[sec]) {
+					const sig = targetSignature({ section: sec, index: i, field });
+					if (sig && handledSignatures.has(sig)) keys.add(`${sec}:${i}:${field}`);
+				}
+			}
+		}
+		return keys;
+	});
+
+	function dismissSuggestion(s: SuggestionItem | LlmSuggestion) {
+		dismissedSuggestions = new Set([...dismissedSuggestions, s.id]);
+		markHandled(s);
+	}
+
+	// Escape hatch: clear both within-session dismissals AND persistent per-item
+	// suppression so every eligible suggestion can surface again. Survives reload
+	// because it wipes the localStorage-backed handledSignatures too.
+	function resetSuggestionSuppression() {
+		dismissedSuggestions = new Set();
+		handledSignatures = new Set();
+		persistHandled();
+	}
+
 	async function fetchLlmSuggestions() {
 		llmSuggestionsLoading = true;
 		llmSuggestionsError = '';
 		// Pass current in-memory state so the LLM always sees what the user sees,
 		// regardless of whether auto-save debounce has flushed to DynamoDB yet.
-		const result = await getAiSuggestions(userId, {
+		// `suppressed` tells the backend which targets are already handled+unchanged
+		// so it never regenerates them (point 2).
+		const result = await getAiSuggestions(userId, uploadId, {
 			parsedData: liveParsedData,
 			portfolioContent: livePortfolioContent,
-			category
+			category,
+			suppressed: [...suppressedKeys]
 		});
 		llmSuggestionsLoading = false;
 		llmSuggestionsLoaded = true;
@@ -655,6 +798,9 @@
 		const base = llmSuggestionsLoaded ? llmSuggestions : aiSuggestions;
 		return base.filter(s => {
 			if (dismissedSuggestions.has(s.id)) return false;
+			// Suppress targets the user already handled and hasn't changed since (point 2).
+			const ck = canonicalKey(s);
+			if (ck && suppressedKeys.has(ck)) return false;
 			// Hide suggestions that belong to a currently-hidden item
 			if (s.index != null && sections[s.section]?.[s.index]?.hidden) return false;
 			return true;
@@ -738,12 +884,17 @@
 			.map(([key]) => key)
 	);
 
+	// Templates filtered to only those matching this portfolio's profession.
+	const visibleTemplates = $derived(
+		Object.entries(TEMPLATE_META).filter(([, m]) => m.profession === category)
+	);
+
 	// ── Load ────────────────────────────────────────────────────────────────────
 
 	onMount(async () => {
 		let result: Awaited<ReturnType<typeof getPortfolioData>> = { ok: false, error: 'Loading' };
 		try {
-			result = await getPortfolioData(userId);
+			result = await getPortfolioData(userId, uploadId);
 		} catch {
 			result = { ok: false, error: 'Network error' };
 		} finally {
@@ -772,6 +923,9 @@
 			location:         (prof.location as string)      ?? '',
 			summary:          (prof.summary as string)       ?? '',
 			profile_image:    (prof.profile_image as string) ?? '',
+			summary_image:    (prof.summary_image as string) ?? '',
+			contact_tagline:  (prof.contact_tagline as string) ?? '',
+			core_expertise:   (prof.core_expertise as string) ?? '',
 			social_linkedin:  soc.linkedin   ?? '',
 			social_github:    soc.github     ?? '',
 			social_gitlab:    soc.gitlab     ?? '',
@@ -816,6 +970,16 @@
 		if (result.data?.templateId) templateId = result.data.templateId;
 		if (result.data?.sectionOrder) sectionOrder = result.data.sectionOrder;
 		if (result.data?.hiddenSections) hiddenSections = new Set(result.data.hiddenSections);
+		if (result.data?.templateOverrides) templateOverrides = result.data.templateOverrides;
+
+		// Normalize any stored display_type the current template can't render,
+		// so the dropdown shows a valid option and the preview matches it.
+		{
+			const allowedDt = customDisplayTypes(templateId);
+			customSections = customSections.map((cs) =>
+				allowedDt.includes(cs.display_type) ? cs : { ...cs, display_type: allowedDt[0] }
+			);
+		}
 
 		// Build dndItems from visible sections in order
 		const visibleKeys = Object.entries(SECTION_CONFIG)
@@ -830,6 +994,14 @@
 			.filter(k => visibleKeys.includes(k))
 			.concat(visibleKeys.filter(k => !sectionOrder.includes(k)));
 		dndItems = sortedVisible.map(k => ({ id: k }));
+
+		// Restore per-item suggestion suppression (survives reload) before fetching.
+		if (typeof localStorage !== 'undefined' && uploadId) {
+			try {
+				const raw = localStorage.getItem(`aiHandled:${uploadId}`);
+				if (raw) handledSignatures = new Set(JSON.parse(raw));
+			} catch { /* corrupt entry — ignore */ }
+		}
 
 		// Fetch LLM suggestions non-blockingly after data loads
 		fetchLlmSuggestions();
@@ -851,7 +1023,7 @@
 		if (f.value === f.original || f.status === 'saving') return;
 		profileFields[key].status = 'saving';
 		profileFields[key].errorMsg = '';
-		const result = await savePortfolioContent(userId, key, f.value);
+		const result = await savePortfolioContent(userId, uploadId, key, f.value);
 		if (result.ok) {
 			profileFields[key].original = f.value;
 			profileFields[key].status = 'saved';
@@ -894,7 +1066,12 @@
 		if (rawProfile.profile_image) {
 			profileData.profile_image = rawProfile.profile_image;
 		}
-		const result = await savePortfolioSection(userId, 'profile', profileData);
+		if (rawProfile.summary_image) {
+			profileData.summary_image = rawProfile.summary_image;
+		}
+		if (rawProfile.contact_tagline) profileData.contact_tagline = rawProfile.contact_tagline;
+		if (rawProfile.core_expertise) profileData.core_expertise = rawProfile.core_expertise;
+		const result = await savePortfolioSection(userId, uploadId, 'profile', profileData);
 		if (result.ok) {
 			rawProfileOriginal = JSON.parse(JSON.stringify(rawProfile));
 			rawProfileStatus = 'saved';
@@ -912,7 +1089,7 @@
 		imageUploadError = '';
 
 		// 1. Get presigned URL from our backend
-		const urlResult = await getImageUploadUrl(userId, file.type);
+		const urlResult = await getImageUploadUrl(userId, uploadId, file.type);
 		if (!urlResult.ok || !urlResult.data) {
 			imageUploadStatus = 'error';
 			imageUploadError = urlResult.error ?? 'Failed to get upload URL';
@@ -951,14 +1128,91 @@
 		if (rawProfile.social_gitlab)    social_links.gitlab    = rawProfile.social_gitlab;
 		if (rawProfile.social_portfolio) social_links.portfolio = rawProfile.social_portfolio;
 		if (rawProfile.social_twitter)   social_links.twitter   = rawProfile.social_twitter;
-		await savePortfolioSection(userId, 'profile', {
+		await savePortfolioSection(userId, uploadId, 'profile', {
 			full_name: rawProfile.full_name, headline: rawProfile.headline,
 			email: rawProfile.email, phone: rawProfile.phone,
 			location: rawProfile.location, summary: rawProfile.summary,
 			social_links, profile_image: imageUrl,
+			...(rawProfile.summary_image ? { summary_image: rawProfile.summary_image } : {}),
+			...(rawProfile.contact_tagline ? { contact_tagline: rawProfile.contact_tagline } : {}),
+			...(rawProfile.core_expertise ? { core_expertise: rawProfile.core_expertise } : {}),
 		});
 
 		setTimeout(() => { imageUploadStatus = 'idle'; }, 3000);
+	}
+
+	/** Uploads a SEPARATE summary/section image (profile.summary_image), distinct
+	 *  from the hero profile photo. Used by templates that show an About/summary image. */
+	async function uploadSummaryImage(file: File) {
+		if (summaryImageUploadStatus === 'uploading') return;
+		summaryImageUploadStatus = 'uploading';
+		summaryImageUploadError = '';
+
+		const urlResult = await getImageUploadUrl(userId, uploadId, file.type);
+		if (!urlResult.ok || !urlResult.data) {
+			summaryImageUploadStatus = 'error';
+			summaryImageUploadError = urlResult.error ?? 'Failed to get upload URL';
+			return;
+		}
+		const { uploadUrl, imageUrl } = urlResult.data;
+
+		try {
+			const putRes = await fetch(uploadUrl, { method: 'PUT', headers: { 'Content-Type': file.type }, body: file });
+			if (!putRes.ok) {
+				summaryImageUploadStatus = 'error';
+				summaryImageUploadError = 'Upload to storage failed';
+				return;
+			}
+		} catch {
+			summaryImageUploadStatus = 'error';
+			summaryImageUploadError = 'Network error during upload';
+			return;
+		}
+
+		rawProfile = { ...rawProfile, summary_image: imageUrl };
+		rawProfileOriginal = { ...rawProfileOriginal, summary_image: imageUrl };
+		summaryImageUploadStatus = 'done';
+		queuePreviewRefresh();
+
+		const social_links: Record<string, string> = {};
+		if (rawProfile.social_linkedin)  social_links.linkedin  = rawProfile.social_linkedin;
+		if (rawProfile.social_github)    social_links.github    = rawProfile.social_github;
+		if (rawProfile.social_gitlab)    social_links.gitlab    = rawProfile.social_gitlab;
+		if (rawProfile.social_portfolio) social_links.portfolio = rawProfile.social_portfolio;
+		if (rawProfile.social_twitter)   social_links.twitter   = rawProfile.social_twitter;
+		await savePortfolioSection(userId, uploadId, 'profile', {
+			full_name: rawProfile.full_name, headline: rawProfile.headline,
+			email: rawProfile.email, phone: rawProfile.phone,
+			location: rawProfile.location, summary: rawProfile.summary,
+			social_links, summary_image: imageUrl,
+			...(rawProfile.profile_image ? { profile_image: rawProfile.profile_image } : {}),
+			...(rawProfile.contact_tagline ? { contact_tagline: rawProfile.contact_tagline } : {}),
+			...(rawProfile.core_expertise ? { core_expertise: rawProfile.core_expertise } : {}),
+		});
+
+		setTimeout(() => { summaryImageUploadStatus = 'idle'; }, 3000);
+	}
+
+	/** Clears the summary/section image. */
+	async function removeSummaryImage() {
+		rawProfile = { ...rawProfile, summary_image: '' };
+		rawProfileOriginal = { ...rawProfileOriginal, summary_image: '' };
+		queuePreviewRefresh();
+		const social_links: Record<string, string> = {};
+		if (rawProfile.social_linkedin)  social_links.linkedin  = rawProfile.social_linkedin;
+		if (rawProfile.social_github)    social_links.github    = rawProfile.social_github;
+		if (rawProfile.social_gitlab)    social_links.gitlab    = rawProfile.social_gitlab;
+		if (rawProfile.social_portfolio) social_links.portfolio = rawProfile.social_portfolio;
+		if (rawProfile.social_twitter)   social_links.twitter   = rawProfile.social_twitter;
+		await savePortfolioSection(userId, uploadId, 'profile', {
+			full_name: rawProfile.full_name, headline: rawProfile.headline,
+			email: rawProfile.email, phone: rawProfile.phone,
+			location: rawProfile.location, summary: rawProfile.summary,
+			social_links, summary_image: '',
+			...(rawProfile.profile_image ? { profile_image: rawProfile.profile_image } : {}),
+			...(rawProfile.contact_tagline ? { contact_tagline: rawProfile.contact_tagline } : {}),
+			...(rawProfile.core_expertise ? { core_expertise: rawProfile.core_expertise } : {}),
+		});
 	}
 
 	// Per-item image upload state: key = `${sKey}-${idx}`, value = 'idle'|'uploading'|'error'
@@ -980,7 +1234,7 @@
 		itemImageUploadStatus = { ...itemImageUploadStatus, [stateKey]: 'uploading' };
 		itemImageUploadError = { ...itemImageUploadError, [stateKey]: '' };
 
-		const urlResult = await getImageUploadUrl(userId, file.type);
+		const urlResult = await getImageUploadUrl(userId, uploadId, file.type);
 		if (!urlResult.ok || !urlResult.data) {
 			itemImageUploadStatus = { ...itemImageUploadStatus, [stateKey]: 'error' };
 			itemImageUploadError = { ...itemImageUploadError, [stateKey]: urlResult.error ?? 'Failed to get upload URL' };
@@ -1014,6 +1268,78 @@
 		await saveItem(sKey, idx);
 	}
 
+	/** Inline upload for a section item's primary (banner) image. Unlike
+	 *  uploadSectionImage (which appends), this REPLACES the visible slot 0 — the
+	 *  banner shown in the preview — or appends when the item has no image yet. */
+	async function uploadSectionImageInline(sKey: string, idx: number, file: File) {
+		const stateKey = `${sKey}-${idx}`;
+		if (itemImageUploadStatus[stateKey] === 'uploading') return;
+		itemImageUploadStatus = { ...itemImageUploadStatus, [stateKey]: 'uploading' };
+		itemImageUploadError = { ...itemImageUploadError, [stateKey]: '' };
+
+		const urlResult = await getImageUploadUrl(userId, uploadId, file.type);
+		if (!urlResult.ok || !urlResult.data) {
+			itemImageUploadStatus = { ...itemImageUploadStatus, [stateKey]: 'error' };
+			itemImageUploadError = { ...itemImageUploadError, [stateKey]: urlResult.error ?? 'Failed to get upload URL' };
+			return;
+		}
+		const { uploadUrl, imageUrl } = urlResult.data;
+
+		try {
+			const putRes = await fetch(uploadUrl, { method: 'PUT', headers: { 'Content-Type': file.type }, body: file });
+			if (!putRes.ok) {
+				itemImageUploadStatus = { ...itemImageUploadStatus, [stateKey]: 'error' };
+				itemImageUploadError = { ...itemImageUploadError, [stateKey]: 'Upload to storage failed' };
+				return;
+			}
+		} catch {
+			itemImageUploadStatus = { ...itemImageUploadStatus, [stateKey]: 'error' };
+			itemImageUploadError = { ...itemImageUploadError, [stateKey]: 'Network error during upload' };
+			return;
+		}
+
+		const currentImages = [...((sections[sKey]?.[idx]?.data?.images as string[]) ?? [])];
+		if (currentImages.length > 0) currentImages[0] = imageUrl;
+		else currentImages.push(imageUrl);
+		const items = [...sections[sKey]];
+		items[idx] = { ...items[idx], data: { ...items[idx].data, images: currentImages }, isDirty: true };
+		sections = { ...sections, [sKey]: items };
+		itemImageUploadStatus = { ...itemImageUploadStatus, [stateKey]: 'idle' };
+		queuePreviewRefresh();
+		await saveItem(sKey, idx);
+	}
+
+	/** Triggered by an `image-upload-click` message from the preview. Opens the
+	 *  hidden file picker, remembering which field the file is destined for. */
+	function handleInlineImageClick(target: string) {
+		if (!target) return;
+		inlineImgTarget = target;
+		inlineImgInputEl?.click();
+	}
+
+	/** Routes the picked file to the correct uploader based on inlineImgTarget. */
+	function onInlineImgFile(e: Event) {
+		const input = e.target as HTMLInputElement;
+		const file = input.files?.[0];
+		input.value = '';
+		if (!file) return;
+		const target = inlineImgTarget;
+		inlineImgTarget = '';
+		if (target === 'profile.profile_image') {
+			uploadProfileImage(file);
+		} else if (target === 'profile.summary_image') {
+			uploadSummaryImage(file);
+		} else {
+			const m = target.match(/^([a-z_]+)\.(\d+)\.images$/i);
+			if (m) {
+				const sKey = m[1];
+				const visIdx = parseInt(m[2], 10);
+				const actualIdx = visibleToActual[sKey]?.[visIdx] ?? visIdx;
+				uploadSectionImageInline(sKey, actualIdx, file);
+			}
+		}
+	}
+
 	function removeSectionImage(sKey: string, idx: number, imageIdx: number) {
 		const items = [...sections[sKey]];
 		const currentImages = [...((items[idx].data.images as string[]) ?? [])];
@@ -1043,7 +1369,7 @@
 		aiImageError = { ...aiImageError, [stateKey]: '' };
 		aiImagePending = { ...aiImagePending, [stateKey]: '' };
 
-		const result = await generateProjectImage(userId, sKey, idx);
+		const result = await generateProjectImage(userId, uploadId, sKey, idx);
 
 		aiImageGenerating = { ...aiImageGenerating, [stateKey]: false };
 
@@ -1080,7 +1406,7 @@
 		profileFields[key].aiLoading = true;
 		profileFields[key].aiSuggestion = null;
 		profileFields[key].aiError = '';
-		const result = await getAiEnhancement(userId, key, f.aiInstruction, f.value);
+		const result = await getAiEnhancement(userId, uploadId, key, f.aiInstruction, f.value);
 		profileFields[key].aiLoading = false;
 		if (result.ok && result.data) {
 			profileFields[key].aiSuggestion = result.data.suggestion;
@@ -1098,6 +1424,8 @@
 		profileFields[key].aiInstruction = '';
 		profileFields[key].aiError = '';
 		autoSaveProfileField(key);
+		// Snapshot the updated profile field so it won't be re-suggested until edited (point 2)
+		markHandled({ section: 'profile', profileKey: key });
 		// Remove matching suggestion from left pane — match by tracked ID, derived ID,
 		// AND by section+profileKey to handle LLM ID format variance.
 		const trackedId = activeProfileSuggestionIds[key];
@@ -1123,7 +1451,7 @@
 		if (!isSkillsDirty || skillsStatus === 'saving') return;
 		skillsStatus = 'saving';
 		skillsSaveError = '';
-		const result = await savePortfolioSection(userId, 'skills', skillGroups);
+		const result = await savePortfolioSection(userId, uploadId, 'skills', skillGroups);
 		if (result.ok) {
 			skillGroupsOriginal = JSON.parse(JSON.stringify(skillGroups));
 			skillsStatus = 'saved';
@@ -1140,7 +1468,7 @@
 		skillsAiLoading = true;
 		skillsAiSuggestion = null;
 		skillsAiError = '';
-		const result = await getAiSkillsEnhancement(userId, skillsAiInstruction);
+		const result = await getAiSkillsEnhancement(userId, uploadId, skillsAiInstruction);
 		skillsAiLoading = false;
 		if (result.ok && result.data) {
 			skillsAiSuggestion = result.data.suggestion;
@@ -1157,6 +1485,8 @@
 		skillsAiInstruction = '';
 		skillsAiError = '';
 		autoSaveSkills();
+		// Snapshot the updated skills section so it won't be re-suggested until edited (point 2)
+		markHandled({ section: 'skills' });
 		// Dismiss the LLM suggestion that triggered this panel
 		if (activeSkillsSuggestionId) {
 			dismissedSuggestions = new Set([...dismissedSuggestions, activeSkillsSuggestionId]);
@@ -1253,7 +1583,7 @@
 		sections = { ...sections, [sectionKey]: saving };
 
 		const allData = sections[sectionKey].map((it) => it.data);
-		const result = await savePortfolioSection(userId, sectionKey, allData);
+		const result = await savePortfolioSection(userId, uploadId, sectionKey, allData);
 
 		const done = [...sections[sectionKey]];
 		if (result.ok) {
@@ -1279,7 +1609,7 @@
 		sections = { ...sections, [sectionKey]: items };
 
 		const allData = sections[sectionKey].map((it) => it.data);
-		const result = await savePortfolioSection(userId, sectionKey, allData);
+		const result = await savePortfolioSection(userId, uploadId, sectionKey, allData);
 
 		const updated = [...sections[sectionKey]];
 		if (result.ok) {
@@ -1355,7 +1685,7 @@
 		updated[itemIdx] = { ...updated[itemIdx], aiLoading: true, aiSuggestion: null, aiError: '' };
 		sections = { ...sections, [sectionKey]: updated };
 
-		const result = await getAiItemEnhancement(userId, sectionKey, itemIdx, item.aiField, item.aiInstruction);
+		const result = await getAiItemEnhancement(userId, uploadId, sectionKey, itemIdx, item.aiField, item.aiInstruction);
 
 		const u = [...sections[sectionKey]];
 		u[itemIdx] = { ...u[itemIdx], aiLoading: false };
@@ -1387,6 +1717,9 @@
 		};
 		sections = { ...sections, [sectionKey]: updated };
 		autoSaveItem(sectionKey, itemIdx);
+		// Snapshot the now-updated field so it won't be re-suggested until that field
+		// changes (point 2, field-level granularity)
+		markHandled({ section: sectionKey, index: itemIdx, field: acceptedField });
 		// Remove matching suggestion from left pane — match by derived ID, tracked ID,
 		// AND by section+index+field to handle LLM ID format variance.
 		const derivedId = `${sectionKey}-${itemIdx}-${acceptedField}`;
@@ -1439,7 +1772,7 @@
 		const data: string | string[] = cfg?.type === 'list'
 			? stringSections[key].split('\n').map((s) => s.trim()).filter(Boolean)
 			: stringSections[key];
-		const result = await savePortfolioSection(userId, key, data);
+		const result = await savePortfolioSection(userId, uploadId, key, data);
 		if (result.ok) {
 			stringSectionOriginals = { ...stringSectionOriginals, [key]: stringSections[key] };
 			stringSectionStatus = { ...stringSectionStatus, [key]: 'saved' };
@@ -1461,7 +1794,7 @@
 	async function saveCustomSections() {
 		csSaveStatus = 'saving';
 		csSaveError = '';
-		const result = await savePortfolioSection(userId, 'custom_sections', customSections);
+		const result = await savePortfolioSection(userId, uploadId, 'custom_sections', customSections);
 		if (result.ok) {
 			csSaveStatus = 'saved';
 			queuePreviewRefresh();
@@ -1472,7 +1805,7 @@
 				if (!dndItems.find(i => i.id === 'custom_sections')) {
 					dndItems = [...dndItems, { id: 'custom_sections' }];
 				}
-				await updatePortfolioConfig(userId, { sectionOrder });
+				await updatePortfolioConfig(userId, uploadId, { sectionOrder });
 			}
 			setTimeout(() => { csSaveStatus = 'idle'; }, 2500);
 		} else {
@@ -1484,6 +1817,36 @@
 	function autoSaveCustomSections() {
 		if (_formSaveTimers['custom_sections']) clearTimeout(_formSaveTimers['custom_sections']);
 		_formSaveTimers['custom_sections'] = setTimeout(saveCustomSections, 800);
+	}
+
+	async function saveTemplateOverridesFromForm() {
+		if (templateOverridesStatus === 'saving') return;
+		templateOverridesStatus = 'saving';
+		templateOverridesError = '';
+		const result = await saveTemplateOverrides(userId, uploadId, templateOverrides);
+		if (result.ok) {
+			templateOverridesStatus = 'saved';
+			hasUnpublishedChanges = true;
+			setTimeout(() => { templateOverridesStatus = 'idle'; }, 2500);
+		} else {
+			templateOverridesStatus = 'error';
+			templateOverridesError = result.error ?? 'Save failed.';
+		}
+	}
+
+	function updateTemplateOverride(key: string, rawVal: string) {
+		const digitsOnly = rawVal.replace(/\D/g, '');
+		const num = digitsOnly ? parseInt(digitsOnly) : null;
+		templateOverrides = { ...templateOverrides, [key]: num };
+		if (_formSaveTimers[`tov_${key}`]) clearTimeout(_formSaveTimers[`tov_${key}`]);
+		_formSaveTimers[`tov_${key}`] = setTimeout(saveTemplateOverridesFromForm, 800);
+	}
+
+	function clearTemplateOverride(key: string) {
+		const { [key]: _, ...rest } = templateOverrides;
+		templateOverrides = rest;
+		if (_formSaveTimers[`tov_${key}`]) clearTimeout(_formSaveTimers[`tov_${key}`]);
+		_formSaveTimers[`tov_${key}`] = setTimeout(saveTemplateOverridesFromForm, 800);
 	}
 
 	function updateCsItem(csIdx: number, itemIdx: number, field: keyof CustomSectionItem, val: string) {
@@ -1574,7 +1937,7 @@
 		customSectionAiStatus = 'loading';
 		customSectionAiResult = null;
 		customSectionAiError = '';
-		const result = await addCustomSectionApi(userId, text, customSectionTitleHint.trim() || undefined);
+		const result = await addCustomSectionApi(userId, uploadId, text, customSectionTitleHint.trim() || undefined);
 		customSectionAiStatus = result.ok ? 'done' : 'error';
 		if (result.ok && result.data) {
 			customSectionAiResult = result.data as CsAiResult;
@@ -1607,7 +1970,7 @@
 	async function handleDndFinalize(e: CustomEvent<{ items: DndItem[] }>) {
 		dndItems = e.detail.items;
 		sectionOrder = dndItems.map(i => i.id);
-		await updatePortfolioConfig(userId, { sectionOrder });
+		await updatePortfolioConfig(userId, uploadId, { sectionOrder });
 		queuePreviewRefresh();
 	}
 
@@ -1616,8 +1979,15 @@
 		if (newHidden.has(key)) newHidden.delete(key);
 		else newHidden.add(key);
 		hiddenSections = newHidden;
-		await updatePortfolioConfig(userId, { hiddenSections: [...hiddenSections] });
+		await updatePortfolioConfig(userId, uploadId, { hiddenSections: [...hiddenSections] });
 		queuePreviewRefresh();
+	}
+
+	async function applyTemplate(newId: string) {
+		templateId = newId;
+		hoverTemplateId = null;
+		templateDropdownOpen = false;
+		await updatePortfolioConfig(userId, uploadId, { templateId: newId });
 	}
 
 	// ── Publish ──────────────────────────────────────────────────────────────────
@@ -1625,7 +1995,7 @@
 		if (publishStatus === 'publishing') return;
 		publishStatus = 'publishing';
 		publishToast = '';
-		const result = await publishPortfolio(userId);
+		const result = await publishPortfolio(userId, uploadId);
 		if (result.ok) {
 			publishStatus = 'done';
 			publishToast = 'Portfolio published! Changes are live.';
@@ -1696,6 +2066,26 @@
 			}
 		} else if (ns === 'design_philosophy') {
 			stringSections = { ...stringSections, design_philosophy: value };
+		} else if (ns === 'template_overrides') {
+			// idxOrKey is the override key (e.g. 'years_experience')
+			// value comes from contenteditable which may include stray chars — strip to digits
+			const digitsOnly = rawValue.replace(/\D/g, '');
+			const num = digitsOnly ? parseInt(digitsOnly) : null;
+			templateOverrides = { ...templateOverrides, [idxOrKey]: num };
+		} else if (ns === 'custom_sections') {
+			// path: custom_sections.{csIdx}.items.{itemIdx}.{csField}
+			const csIdx = parseInt(idxOrKey);
+			const itemIdx = parseInt(parts[3]);
+			const csField = parts[4];
+			if (!isNaN(csIdx) && !isNaN(itemIdx) && csField) {
+				const u = [...customSections];
+				if (u[csIdx]?.items?.[itemIdx]) {
+					const updatedItems = [...u[csIdx].items];
+					updatedItems[itemIdx] = { ...updatedItems[itemIdx], [csField]: value };
+					u[csIdx] = { ...u[csIdx], items: updatedItems };
+					customSections = u;
+				}
+			}
 		} else {
 			const idx = parseInt(idxOrKey);
 			const arr = [...(sections[ns] ?? [])];
@@ -1733,15 +2123,22 @@
 				location: rawProfile.location, summary: rawProfile.summary, social_links,
 			};
 			if (rawProfile.profile_image) profilePayload.profile_image = rawProfile.profile_image;
-			await savePortfolioSection(userId, 'profile', profilePayload);
+			if (rawProfile.summary_image) profilePayload.summary_image = rawProfile.summary_image;
+			if (rawProfile.contact_tagline) profilePayload.contact_tagline = rawProfile.contact_tagline;
+			if (rawProfile.core_expertise) profilePayload.core_expertise = rawProfile.core_expertise;
+			await savePortfolioSection(userId, uploadId, 'profile', profilePayload);
 		} else if (ns === 'portfolio') {
-			await savePortfolioContent(userId, idxOrKey as EditableField, profileFields[idxOrKey as EditableField].value);
+			await savePortfolioContent(userId, uploadId, idxOrKey as EditableField, profileFields[idxOrKey as EditableField].value);
 		} else if (ns === 'skills') {
-			await savePortfolioSection(userId, 'skills', skillGroups);
+			await savePortfolioSection(userId, uploadId, 'skills', skillGroups);
 		} else if (ns === 'design_philosophy') {
-			await savePortfolioSection(userId, 'design_philosophy', stringSections.design_philosophy);
+			await savePortfolioSection(userId, uploadId, 'design_philosophy', stringSections.design_philosophy);
+		} else if (ns === 'template_overrides') {
+			await saveTemplateOverrides(userId, uploadId, templateOverrides);
+		} else if (ns === 'custom_sections') {
+			autoSaveCustomSections();
 		} else {
-			const result = await savePortfolioSection(userId, ns, (sections[ns] ?? []).map((it) => it.data));
+			const result = await savePortfolioSection(userId, uploadId, ns, (sections[ns] ?? []).map((it) => it.data));
 			if (result.ok) {
 				// Inline edit auto-saved successfully  mark all items clean so the
 				// section banner and item-level "Unsaved changes" labels clear.
@@ -1755,16 +2152,68 @@
 		}
 	}
 
+	/** Persists the full profile section (incl. image + portfolio-field extras). */
+	async function persistProfile() {
+		const social_links: Record<string, string> = {};
+		if (rawProfile.social_linkedin)  social_links.linkedin  = rawProfile.social_linkedin;
+		if (rawProfile.social_github)    social_links.github    = rawProfile.social_github;
+		if (rawProfile.social_gitlab)    social_links.gitlab    = rawProfile.social_gitlab;
+		if (rawProfile.social_portfolio) social_links.portfolio = rawProfile.social_portfolio;
+		if (rawProfile.social_twitter)   social_links.twitter   = rawProfile.social_twitter;
+		const payload: Record<string, unknown> = {
+			full_name: rawProfile.full_name, headline: rawProfile.headline,
+			email: rawProfile.email, phone: rawProfile.phone,
+			location: rawProfile.location, summary: rawProfile.summary, social_links,
+		};
+		if (rawProfile.profile_image)   payload.profile_image   = rawProfile.profile_image;
+		if (rawProfile.summary_image)   payload.summary_image   = rawProfile.summary_image;
+		if (rawProfile.contact_tagline) payload.contact_tagline = rawProfile.contact_tagline;
+		if (rawProfile.core_expertise)  payload.core_expertise  = rawProfile.core_expertise;
+		return savePortfolioSection(userId, uploadId, 'profile', payload);
+	}
+
+	/** Debounced update+save for template portfolio text fields (Portfolio Fields tab). */
+	function updatePortfolioTextField(key: 'contact_tagline' | 'core_expertise', value: string) {
+		rawProfile = { ...rawProfile, [key]: value };
+		const tk = `pf_${key}`;
+		if (_formSaveTimers[tk]) clearTimeout(_formSaveTimers[tk]);
+		_formSaveTimers[tk] = setTimeout(async () => {
+			portfolioFieldStatus = 'saving';
+			const r = await persistProfile();
+			if (r.ok) {
+				rawProfileOriginal = { ...rawProfileOriginal, [key]: value };
+				hasUnpublishedChanges = true;
+				portfolioFieldStatus = 'saved';
+				setTimeout(() => { portfolioFieldStatus = 'idle'; }, 2000);
+			} else {
+				portfolioFieldStatus = 'error';
+			}
+		}, 700);
+	}
+
 	function openListEditor(path: string, fieldRect: ListEditorState['fieldRect'], iframeNode: HTMLIFrameElement) {
 		const parts = path.split('.');
 		const [ns, idxStr, field] = parts;
 		let items: string[] = [];
 		if (ns === 'skills') {
 			items = [...(skillGroups[parseInt(idxStr)]?.skills ?? [])];
+		} else if (ns === 'software_proficiency') {
+			// Flat string-list section stored newline-joined in stringSections.
+			items = (stringSections.software_proficiency ?? '').split('\n').map((s) => s.trim()).filter(Boolean);
+		} else if (ns === 'core_expertise') {
+			// Template portfolio-field list stored newline-joined in rawProfile.
+			// Seed from skill-group categories when the user hasn't set it yet.
+			const raw = (rawProfile.core_expertise ?? '').split('\n').map((s) => s.trim()).filter(Boolean);
+			items = raw.length ? raw : skillGroups.map((g) => g.category).filter(Boolean);
+		} else if (ns === 'custom_sections') {
+			// path: custom_sections.{csIdx}.items.{itemIdx}.tags
+			const csIdx = parseInt(idxStr);
+			const itemIdx = parseInt(parts[3]);
+			items = [...(customSections[csIdx]?.items?.[itemIdx]?.tags ?? [])];
 		} else {
-			// eslint-disable-next-line @typescript-eslint/no-explicit-any
-			const data = sections[ns]?.[parseInt(idxStr)]?.data ?? {} as any;
-			items = [...(data[field] ?? [])];
+			const data = (sections[ns]?.[parseInt(idxStr)]?.data ?? {}) as Record<string, unknown>;
+			const val = field ? data[field] : undefined;
+			items = Array.isArray(val) ? val.map((v) => String(v)) : [];
 		}
 		listEditor = { path, items, iframeRect: iframeNode.getBoundingClientRect(), fieldRect, saving: false, error: '' };
 	}
@@ -1774,20 +2223,45 @@
 		listEditor = { ...listEditor, saving: true };
 		const { path, items } = listEditor;
 		const parts = path.split('.');
-		const [ns, idxStr, field] = parts;
+		const [ns, idxStr] = parts;
 		const cleanItems = items.filter(Boolean);
 		if (ns === 'skills') {
 			const idx = parseInt(idxStr);
 			const grps = [...skillGroups];
 			grps[idx] = { ...grps[idx], skills: cleanItems };
 			skillGroups = grps;
-			await savePortfolioSection(userId, 'skills', skillGroups);
+			await savePortfolioSection(userId, uploadId, 'skills', skillGroups);
+		} else if (ns === 'software_proficiency') {
+			const joined = cleanItems.join('\n');
+			stringSections = { ...stringSections, software_proficiency: joined };
+			stringSectionOriginals = { ...stringSectionOriginals, software_proficiency: joined };
+			await savePortfolioSection(userId, uploadId, 'software_proficiency', cleanItems);
+			queuePreviewRefresh();
+		} else if (ns === 'core_expertise') {
+			const joined = cleanItems.join('\n');
+			rawProfile = { ...rawProfile, core_expertise: joined };
+			rawProfileOriginal = { ...rawProfileOriginal, core_expertise: joined };
+			await persistProfile();
+			queuePreviewRefresh();
+		} else if (ns === 'custom_sections') {
+			// path: custom_sections.{csIdx}.items.{itemIdx}.tags
+			const csIdx = parseInt(idxStr);
+			const itemIdx = parseInt(parts[3]);
+			const u = [...customSections];
+			if (u[csIdx]?.items?.[itemIdx]) {
+				const updatedItems = [...u[csIdx].items];
+				updatedItems[itemIdx] = { ...updatedItems[itemIdx], tags: cleanItems };
+				u[csIdx] = { ...u[csIdx], items: updatedItems };
+				customSections = u;
+				autoSaveCustomSections();
+			}
 		} else {
+			const field = parts[2];
 			const idx = parseInt(idxStr);
 			const arr = [...(sections[ns] ?? [])];
 			arr[idx] = { ...arr[idx], data: { ...arr[idx].data, [field]: cleanItems } };
 			sections = { ...sections, [ns]: arr };
-			await savePortfolioSection(userId, ns, arr.map((it) => it.data));
+			await savePortfolioSection(userId, uploadId, ns, arr.map((it) => it.data));
 		}
 		hasUnpublishedChanges = true;
 		listEditor = null;
@@ -1940,9 +2414,9 @@
 		// eslint-disable-next-line @typescript-eslint/no-explicit-any
 		let result: { ok: boolean; data?: { suggestion: string | string[] }; error?: string } = { ok: false };
 		if (ns === 'portfolio') {
-			result = await getAiEnhancement(userId, idxStr as EditableField, instruction, selectedText);
+			result = await getAiEnhancement(userId, uploadId, idxStr as EditableField, instruction, selectedText);
 		} else {
-			result = await getAiItemEnhancement(userId, ns, parseInt(idxStr), field, instruction);
+			result = await getAiItemEnhancement(userId, uploadId, ns, parseInt(idxStr), field, instruction);
 		}
 		if (!result.ok || !result.data) {
 			aiToolbar = { ...aiToolbar, loading: false, error: result.error ?? 'AI enhancement failed.' };
@@ -2028,11 +2502,17 @@
 					const parts = path.split('.');
 					const ns = parts[0];
 					if (ns === 'profile') {
-						// profile.full_name → rp-full-name, profile.headline → rp-headline, etc.
-						activeTab = 'profile';
-						mobileTab = 'edit';
 						const fieldKey = parts[1] ?? '';
-						scrollRightPanelToField('rp-' + fieldKey.replace(/_/g, '-'), 80);
+						mobileTab = 'edit';
+						if (fieldKey === 'contact_tagline' || fieldKey === 'core_expertise') {
+							// Template portfolio fields live in the Portfolio Fields tab.
+							activeTab = 'template_overrides';
+							setTimeout(() => scrollRightPanelToField('pf-' + fieldKey.replace(/_/g, '-'), 80), 60);
+						} else {
+							// profile.full_name → rp-full-name, profile.headline → rp-headline, etc.
+							activeTab = 'profile';
+							scrollRightPanelToField('rp-' + fieldKey.replace(/_/g, '-'), 80);
+						}
 					} else if (ns === 'portfolio') {
 						// portfolio.bio / portfolio.headline / portfolio.uniqueValue → pf-{key}
 						activeTab = 'profile';
@@ -2045,6 +2525,22 @@
 					} else if (ns === 'skills') {
 						activeTab = 'skills';
 						mobileTab = 'edit';
+					} else if (ns === 'template_overrides') {
+						activeTab = 'template_overrides';
+						mobileTab = 'edit';
+						const overrideKey = parts[1] ?? '';
+						if (overrideKey) setTimeout(() => scrollRightPanelToField(`tov-${overrideKey}`, 80), 60);
+					} else if (ns === 'custom_sections') {
+						// path: custom_sections.{csIdx}.items.{itemIdx}.{field}
+						const csIdx = parseInt(parts[1]);
+						activeTab = 'custom_sections';
+						mobileTab = 'edit';
+						if (!isNaN(csIdx)) {
+							csExpanded = { ...csExpanded, [csIdx]: true };
+							if (focusItemTimer) { clearTimeout(focusItemTimer); focusItemTimer = null; }
+							suppressNextFocusItemScroll = true;
+							setTimeout(() => scrollRightPanelToItem('custom_sections', csIdx), 150);
+						}
 					} else if (ns && parts.length >= 3) {
 						// {section}.{visibleIdx}.{field} — map visible index to actual index
 						const visibleIdx = parseInt(parts[1]);
@@ -2086,7 +2582,11 @@
 					// so the user can see the field they just clicked alongside the list editor.
 					const listPath = d.path as string;
 					const listParts = listPath.split('.');
-					if (listParts.length >= 3) {
+					if (listPath === 'core_expertise') {
+						activeTab = 'template_overrides';
+						mobileTab = 'edit';
+						setTimeout(() => scrollRightPanelToField('pf-core-expertise', 80), 60);
+					} else if (listParts.length >= 3) {
 						const listNs = listParts[0];
 						const listVisIdx = parseInt(listParts[1]);
 						const listFieldKey = listParts[2];
@@ -2128,6 +2628,21 @@
 				case 'focus-item': {
 					const sec = d.section as string;
 					const visIdx = d.index as number;
+					// Custom sections encode their index as "custom_sections.{csIdx}"
+					if (sec.startsWith('custom_sections.')) {
+						const csIdx = parseInt(sec.split('.')[1]);
+						activeTab = 'custom_sections';
+						mobileTab = 'edit';
+						if (!isNaN(csIdx)) {
+							csExpanded = { ...csExpanded, [csIdx]: true };
+							if (focusItemTimer) clearTimeout(focusItemTimer);
+							focusItemTimer = setTimeout(() => {
+								focusItemTimer = null;
+								scrollRightPanelToItem('custom_sections', csIdx);
+							}, 80);
+						}
+						break;
+					}
 					const actualIdx = visibleToActual[sec]?.[visIdx] ?? visIdx;
 					activeTab = sec;
 					mobileTab = 'edit';
@@ -2175,9 +2690,17 @@
 					}
 					break;
 				}
+				case 'image-upload-click':
+					handleInlineImageClick(d.target as string);
+					break;
 				case 'delete-item': {
 					const sec = d.section as string;
 					const visIdx = d.index as number;
+					if (sec.startsWith('custom_sections.')) {
+						const csIdx = parseInt(sec.split('.')[1]);
+						if (!isNaN(csIdx)) removeCsItem(csIdx, visIdx);
+						break;
+					}
 					const actualIdx = visibleToActual[sec]?.[visIdx] ?? visIdx;
 					promptDeleteItem(sec, actualIdx);
 					break;
@@ -2269,6 +2792,12 @@
 							</div>
 						{/each}
 					</div>
+					{#if (TEMPLATE_FIELDS[templateId]?.length ?? 0) > 0 || SUMMARY_IMAGE_TEMPLATES.has(templateId) || CORE_EXPERTISE_TEMPLATES.has(templateId) || CONTACT_TAGLINE_TEMPLATES.has(templateId)}
+						<button onclick={() => { activeTab = 'template_overrides'; mobileTab = 'edit'; }} class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm font-medium transition-colors {activeTab === 'template_overrides' ? 'bg-brand text-white' : 'text-ink-soft hover:bg-surface-muted'}">
+							<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="h-3.5 w-3.5 flex-shrink-0 opacity-60"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 3v11.25A2.25 2.25 0 0 0 6 16.5h2.25M3.75 3h-1.5m1.5 0h16.5m0 0h1.5m-1.5 0v11.25A2.25 2.25 0 0 1 18 16.5h-2.25m-7.5 0h7.5m-7.5 0-1 3m8.5-3 1 3m0 0 .5 1.5m-.5-1.5h-9.5m0 0-.5 1.5" /></svg>
+							Portfolio Fields
+						</button>
+					{/if}
 				{/if}
 			</div>
 
@@ -2352,7 +2881,7 @@
 								<button
 									type="button"
 									aria-label="Dismiss suggestion"
-									onclick={() => { dismissedSuggestions = new Set([...dismissedSuggestions, s.id]); }}
+									onclick={() => dismissSuggestion(s)}
 									class="absolute right-2 top-2 flex h-5 w-5 items-center justify-center rounded-full text-ink-muted opacity-0 transition-opacity hover:bg-surface-muted hover:text-ink-soft group-hover:opacity-100"
 								>×</button>
 							</div>
@@ -2360,10 +2889,10 @@
 					</div>
 				{/if}
 
-				{#if dismissedSuggestions.size > 0}
+				{#if dismissedSuggestions.size > 0 || suppressedKeys.size > 0}
 					<div class="border-t border-surface-muted px-4 py-2 text-center">
-						<button onclick={() => dismissedSuggestions = new Set()} class="text-xs font-medium text-ink-muted hover:text-ink-soft">
-							Show dismissed ({dismissedSuggestions.size})
+						<button onclick={resetSuggestionSuppression} class="text-xs font-medium text-ink-muted hover:text-ink-soft">
+							Show all suggestions{suppressedKeys.size > 0 ? ` (${suppressedKeys.size} hidden)` : ''}
 						</button>
 					</div>
 				{/if}
@@ -2372,9 +2901,58 @@
 		</aside>
 
 		<div class="{mobileTab === 'preview' ? 'flex' : 'hidden'} sm:flex flex-1 flex-col overflow-hidden border-r border-surface-muted bg-gradient-to-b from-surface-muted to-surface-muted/70">
-			<div class="flex flex-shrink-0 items-center justify-between border-b border-surface-muted bg-white px-4 py-2">
-				<span class="text-sm font-bold text-ink-soft">Preview</span>
-				<span class="text-xs text-ink-muted">Click any text to edit · select text for AI ✦</span>
+			<div class="flex flex-shrink-0 items-center gap-3 border-b border-surface-muted bg-white px-4 py-2">
+				<span class="text-sm font-bold text-ink-soft flex-shrink-0">Preview</span>
+
+				<!-- Template switcher -->
+				<div class="relative ml-auto">
+					<button
+						type="button"
+						onclick={() => templateDropdownOpen = !templateDropdownOpen}
+						class="flex items-center gap-1.5 rounded-lg border border-surface-muted bg-surface-subtle px-3 py-1.5 text-xs font-medium text-ink-soft transition-colors hover:bg-surface-muted"
+					>
+						<span class="h-3 w-3 flex-shrink-0 rounded-full" style="background:{TEMPLATE_META[templateId]?.accent ?? '#00ff88'}"></span>
+						<span>{TEMPLATE_META[templateId]?.name ?? templateId}</span>
+						<svg class="h-3 w-3 flex-shrink-0 opacity-50" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+							<path d="M2 4l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+						</svg>
+					</button>
+
+					{#if templateDropdownOpen}
+						<button
+							type="button"
+							class="fixed inset-0 z-30 cursor-default"
+							aria-label="Close template selector"
+							onclick={() => { templateDropdownOpen = false; hoverTemplateId = null; }}
+						></button>
+						<div class="absolute right-0 top-full z-40 mt-1 w-44 overflow-hidden rounded-xl border border-surface-muted bg-white p-1.5 shadow-lg ring-1 ring-black/[0.04]">
+							<p class="px-2.5 pb-1 pt-1 text-[10px] font-bold uppercase tracking-widest text-ink-muted">Templates</p>
+							{#if visibleTemplates.length === 0}
+								<p class="px-2.5 py-3 text-[11px] text-ink-muted leading-snug">Finance-specific templates coming soon.</p>
+							{:else}
+								{#each visibleTemplates as [id, meta]}
+									<button
+										type="button"
+										onmouseenter={() => hoverTemplateId = id}
+										onmouseleave={() => hoverTemplateId = null}
+										onclick={() => applyTemplate(id)}
+										class="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-xs transition-colors hover:bg-surface-subtle {id === templateId ? 'bg-brand/5 font-bold text-brand' : 'text-ink-soft'}"
+									>
+										<span class="h-3.5 w-3.5 flex-shrink-0 rounded-full ring-1 ring-black/10" style="background:{meta.accent}"></span>
+										<span class="flex-1 truncate">{meta.name}</span>
+										{#if id === templateId}
+											<svg class="h-3 w-3 flex-shrink-0 text-brand" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+												<path d="M2 6l3 3 5-5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+											</svg>
+										{/if}
+									</button>
+								{/each}
+							{/if}
+						</div>
+					{/if}
+				</div>
+
+				<span class="hidden text-xs text-ink-muted sm:block">Click any text to edit · select text for AI ✦</span>
 			</div>
 			<div class="relative flex-1 overflow-hidden p-4 sm:p-5">
 				{#if pageLoading}
@@ -2745,6 +3323,110 @@
 						</div>
 					</div>
 
+				{:else if activeTab === 'template_overrides'}
+					{@const tplFields = TEMPLATE_FIELDS[templateId] ?? []}
+					{#if CONTACT_TAGLINE_TEMPLATES.has(templateId) || CORE_EXPERTISE_TEMPLATES.has(templateId)}
+						<div class="mb-4 rounded-[1.5rem] border border-surface-muted bg-white p-6 shadow-sm">
+							<div class="mb-4 flex items-start justify-between">
+								<div>
+									<p class="text-xs font-bold uppercase tracking-widest text-ink-muted">Section Content</p>
+									<p class="mt-0.5 text-xs text-ink-muted">Editable copy shown in this template that isn't from your résumé.</p>
+								</div>
+								{#if portfolioFieldStatus === 'saved'}<span class="flex-shrink-0 rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-600 ring-1 ring-emerald-100">Saved ✓</span>
+								{:else if portfolioFieldStatus === 'saving'}<span class="flex-shrink-0 rounded-full bg-surface-muted px-3 py-1 text-xs font-bold text-ink-muted">Saving…</span>
+								{:else if portfolioFieldStatus === 'error'}<span class="flex-shrink-0 rounded-full bg-red-50 px-3 py-1 text-xs font-bold text-red-600 ring-1 ring-red-100">Error</span>{/if}
+							</div>
+							{#if CORE_EXPERTISE_TEMPLATES.has(templateId)}
+								<div id="pf-core-expertise" class="mb-5">
+									<label for="pf-core-expertise-input" class="text-xs font-bold uppercase tracking-widest text-ink-soft">Core Expertise</label>
+									<textarea id="pf-core-expertise-input" rows="5" value={rawProfile.core_expertise} oninput={(e) => updatePortfolioTextField('core_expertise', (e.target as HTMLTextAreaElement).value)} placeholder="One item per line" class="mt-1 w-full rounded-xl border border-surface-muted bg-surface-subtle/50 px-4 py-3 text-sm text-ink outline-none focus:border-brand/60 focus:ring-2 focus:ring-brand/15"></textarea>
+									<p class="mt-1 text-xs text-ink-muted">One per line. Leave blank to use your skill categories.</p>
+								</div>
+							{/if}
+							{#if CONTACT_TAGLINE_TEMPLATES.has(templateId)}
+								<div id="pf-contact-tagline">
+									<label for="pf-contact-tagline-input" class="text-xs font-bold uppercase tracking-widest text-ink-soft">Contact Tagline</label>
+									<textarea id="pf-contact-tagline-input" rows="3" value={rawProfile.contact_tagline} oninput={(e) => updatePortfolioTextField('contact_tagline', (e.target as HTMLTextAreaElement).value)} placeholder={DEFAULT_CONTACT_TAGLINE[templateId] ?? ''} class="mt-1 w-full rounded-xl border border-surface-muted bg-surface-subtle/50 px-4 py-3 text-sm text-ink outline-none focus:border-brand/60 focus:ring-2 focus:ring-brand/15"></textarea>
+									<p class="mt-1 text-xs text-ink-muted">Shown in the Contact section. Leave blank to use the default.</p>
+								</div>
+							{/if}
+						</div>
+					{/if}
+					{#if SUMMARY_IMAGE_TEMPLATES.has(templateId)}
+						<div class="mb-4 rounded-[1.5rem] border border-surface-muted bg-white p-6 shadow-sm">
+							<div class="mb-4 flex items-start justify-between">
+								<div>
+									<p class="text-xs font-bold uppercase tracking-widest text-ink-muted">Summary Image</p>
+									<p class="mt-0.5 text-xs text-ink-muted">A separate image shown beside the Professional Summary (not your hero profile photo).</p>
+								</div>
+								{#if summaryImageUploadStatus === 'done'}<span class="flex-shrink-0 rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-600 ring-1 ring-emerald-100">Saved ✓</span>
+								{:else if summaryImageUploadStatus === 'uploading'}<span class="flex-shrink-0 rounded-full bg-surface-muted px-3 py-1 text-xs font-bold text-ink-muted">Uploading…</span>
+								{:else if summaryImageUploadStatus === 'error'}<span class="flex-shrink-0 rounded-full bg-red-50 px-3 py-1 text-xs font-bold text-red-600 ring-1 ring-red-100">Error</span>{/if}
+							</div>
+							<div class="flex items-center gap-4">
+								{#if rawProfile.summary_image}
+									<img src={rawProfile.summary_image} alt="Summary" class="h-20 w-28 flex-shrink-0 rounded-lg object-cover ring-1 ring-surface-muted" />
+								{:else}
+									<div class="flex h-20 w-28 flex-shrink-0 items-center justify-center rounded-lg bg-surface-subtle text-ink-muted ring-1 ring-surface-muted">
+										<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="h-7 w-7"><path stroke-linecap="round" stroke-linejoin="round" d="m2.25 15.75 5.159-5.159a2.25 2.25 0 0 1 3.182 0l5.159 5.159m-1.5-1.5 1.409-1.409a2.25 2.25 0 0 1 3.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 0 0 1.5-1.5V6a1.5 1.5 0 0 0-1.5-1.5H3.75A1.5 1.5 0 0 0 2.25 6v12a1.5 1.5 0 0 0 1.5 1.5Z" /></svg>
+									</div>
+								{/if}
+								<div class="flex flex-col items-start gap-2">
+									<label class="inline-flex cursor-pointer items-center gap-2 rounded-xl bg-brand px-4 py-2 text-xs font-bold text-white shadow-sm transition-all hover:bg-brand-dark active:scale-95 {summaryImageUploadStatus === 'uploading' ? 'pointer-events-none opacity-50' : ''}">
+										<input type="file" accept="image/*" class="hidden" disabled={summaryImageUploadStatus === 'uploading'} onchange={(e) => { const f = (e.target as HTMLInputElement).files?.[0]; if (f) uploadSummaryImage(f); (e.target as HTMLInputElement).value = ''; }} />
+										{summaryImageUploadStatus === 'uploading' ? 'Uploading…' : rawProfile.summary_image ? 'Replace image' : 'Upload image'}
+									</label>
+									{#if rawProfile.summary_image}
+										<button onclick={() => removeSummaryImage()} class="text-xs font-medium text-ink-muted transition-colors hover:text-red-500">Remove image</button>
+									{/if}
+								</div>
+							</div>
+							{#if summaryImageUploadError}<p class="mt-3 rounded-lg bg-red-50 px-3 py-2 text-xs font-bold text-red-600">{summaryImageUploadError}</p>{/if}
+						</div>
+					{/if}
+					<div class="rounded-[1.5rem] border border-surface-muted bg-white p-6 shadow-sm">
+						<div class="mb-5 flex items-start justify-between">
+							<div>
+								<p class="text-xs font-bold uppercase tracking-widest text-ink-muted">Portfolio Fields</p>
+								<p class="mt-0.5 text-xs text-ink-muted">Override the auto-calculated stat numbers shown in this template. Leave blank to use the auto value.</p>
+							</div>
+							{#if templateOverridesStatus === 'saved'}<span class="flex-shrink-0 rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-600 ring-1 ring-emerald-100">Saved ✓</span>
+							{:else if templateOverridesStatus === 'saving'}<span class="flex-shrink-0 rounded-full bg-surface-muted px-3 py-1 text-xs font-bold text-ink-muted">Saving…</span>
+							{:else if templateOverridesStatus === 'error'}<span class="flex-shrink-0 rounded-full bg-red-50 px-3 py-1 text-xs font-bold text-red-600 ring-1 ring-red-100">Error</span>{/if}
+						</div>
+						{#if tplFields.length > 0}
+							<div class="space-y-5">
+								{#each tplFields as field}
+									{@const currentVal = templateOverrides[field.key]}
+									<div id="tov-{field.key}">
+										<div class="mb-1 flex items-center justify-between">
+											<label for="tov-input-{field.key}" class="text-xs font-bold uppercase tracking-widest text-ink-soft">{field.label}</label>
+											{#if currentVal != null}
+												<button onclick={() => clearTemplateOverride(field.key)} class="text-xs text-ink-muted hover:text-red-500 transition-colors" title="Reset to auto">Reset to auto</button>
+											{/if}
+										</div>
+										<input
+											id="tov-input-{field.key}"
+											type="number"
+											min="0"
+											max="9999"
+											value={currentVal ?? ''}
+											placeholder="Auto (from your data)"
+											oninput={(e) => updateTemplateOverride(field.key, (e.target as HTMLInputElement).value)}
+											class="w-full rounded-xl border border-surface-muted bg-surface-subtle/50 px-4 py-3 text-sm text-ink outline-none focus:border-brand/60 focus:ring-2 focus:ring-brand/15"
+										/>
+										<p class="mt-1 text-xs text-ink-muted">{field.hint}</p>
+									</div>
+								{/each}
+							</div>
+							{#if templateOverridesError}
+								<p class="mt-4 rounded-lg bg-red-50 px-3 py-2 text-xs font-bold text-red-600">{templateOverridesError}</p>
+							{/if}
+						{:else}
+							<p class="text-sm text-ink-muted">The current template has no overridable stat fields.</p>
+						{/if}
+					</div>
+
 				{:else if activeTab === 'custom_sections'}
 					<div class="space-y-3">
 						<div class="flex items-center gap-3 pb-1">
@@ -2763,7 +3445,7 @@
 
 						<!-- Existing custom sections -->
 						{#each customSections as cs, csIdx}
-							<div class="overflow-hidden rounded-[1.5rem] border bg-white shadow-sm transition-all {csExpanded[csIdx] ? 'border-brand/20 shadow-md' : 'border-surface-muted hover:shadow-md'}">
+							<div data-item-card="custom_sections-{csIdx}" class="overflow-hidden rounded-[1.5rem] border bg-white shadow-sm transition-all {csExpanded[csIdx] ? 'border-brand/20 shadow-md' : 'border-surface-muted hover:shadow-md'}">
 								<!-- Section header -->
 								<div class="flex w-full items-center gap-2 px-4 py-3">
 									<button type="button" onclick={() => { csExpanded = { ...csExpanded, [csIdx]: !csExpanded[csIdx] }; }} class="flex min-w-0 flex-1 items-center gap-2 text-left">
@@ -2791,9 +3473,13 @@
 											<div>
 												<label class="mb-1 block text-xs font-bold uppercase tracking-widest text-ink-soft">Display Type</label>
 												<select value={cs.display_type} onchange={(e) => { const u = [...customSections]; u[csIdx] = { ...u[csIdx], display_type: (e.target as HTMLSelectElement).value as 'cards'|'list'|'timeline' }; customSections = u; autoSaveCustomSections(); }} class="w-full rounded-xl border border-surface-muted bg-surface-subtle/50 px-3 py-2 text-sm text-ink outline-none focus:border-brand/60 focus:ring-2 focus:ring-brand/15">
-													<option value="cards">Cards</option>
-													<option value="list">List</option>
+													{#if customDisplayTypes(templateId).includes('cards')}<option value="cards">Cards (grid)</option>{/if}
+													{#if customDisplayTypes(templateId).includes('list')}
+													<option value="list">List (vertical)</option>
+													{/if}
+													{#if customDisplayTypes(templateId).includes('timeline')}
 													<option value="timeline">Timeline</option>
+													{/if}
 												</select>
 											</div>
 										</div>
@@ -2868,30 +3554,32 @@
 
 							{#if customSectionAiResult}
 								{#if customSectionAiResult.action === 'merge'}
+									{@const merge = customSectionAiResult}
 									<div class="mt-4 rounded-xl border border-amber-100 bg-amber-50/60 p-4">
 										<p class="mb-1 text-sm font-bold text-amber-700">This fits in an existing section</p>
-										<p class="mb-3 text-xs text-amber-700/80">AI suggests adding this to your <strong class="capitalize">{customSectionAiResult.targetSection}</strong> section instead of creating a new one.</p>
+										<p class="mb-3 text-xs text-amber-700/80">AI suggests adding this to your <strong class="capitalize">{merge.targetSection}</strong> section instead of creating a new one.</p>
 										<div class="flex gap-2">
-											<button onclick={() => { activeTab = customSectionAiResult!.targetSection; customSectionAiResult = null; customSectionAiStatus = 'idle'; }} class="rounded-lg bg-amber-500 px-4 py-1.5 text-xs font-bold text-white hover:bg-amber-600 capitalize">Go to {customSectionAiResult.targetSection}</button>
+											<button onclick={() => { activeTab = merge.targetSection; customSectionAiResult = null; customSectionAiStatus = 'idle'; }} class="rounded-lg bg-amber-500 px-4 py-1.5 text-xs font-bold text-white hover:bg-amber-600 capitalize">Go to {merge.targetSection}</button>
 											<button onclick={() => { customSectionAiResult = null; customSectionAiStatus = 'idle'; }} class="rounded-lg border border-surface-muted px-3 py-1.5 text-xs font-bold text-ink-soft hover:bg-surface-muted">Dismiss</button>
 										</div>
 									</div>
 								{:else if customSectionAiResult.action === 'new_section'}
+									{@const cs = customSectionAiResult}
 									<div class="mt-4 rounded-xl border border-emerald-100 bg-emerald-50/50 p-4">
 										<p class="mb-1 text-xs font-bold uppercase tracking-widest text-emerald-700">New Section Preview</p>
-										<p class="mb-0.5 text-sm font-bold text-ink">{customSectionAiResult.section.title}</p>
-										<p class="mb-3 text-xs text-ink-muted capitalize">{customSectionAiResult.section.display_type} · {customSectionAiResult.section.items.length} item{customSectionAiResult.section.items.length !== 1 ? 's' : ''}</p>
-										{#each customSectionAiResult.section.items.slice(0, 3) as previewItem}
+										<p class="mb-0.5 text-sm font-bold text-ink">{cs.section.title}</p>
+										<p class="mb-3 text-xs text-ink-muted capitalize">{cs.section.display_type} · {cs.section.items.length} item{cs.section.items.length !== 1 ? 's' : ''}</p>
+										{#each cs.section.items.slice(0, 3) as previewItem}
 											<div class="mb-1.5 rounded-lg bg-emerald-50 px-3 py-2">
 												{#if previewItem.label}<p class="text-xs font-bold text-ink-soft">{previewItem.label}</p>{/if}
 												{#if previewItem.value}<p class="mt-0.5 text-xs text-ink-muted line-clamp-2">{previewItem.value}</p>{/if}
 											</div>
 										{/each}
-										{#if customSectionAiResult.section.items.length > 3}
-											<p class="mt-1 mb-3 text-xs text-ink-muted">+{customSectionAiResult.section.items.length - 3} more item{customSectionAiResult.section.items.length - 3 !== 1 ? 's' : ''}</p>
+										{#if cs.section.items.length > 3}
+											<p class="mt-1 mb-3 text-xs text-ink-muted">+{cs.section.items.length - 3} more item{cs.section.items.length - 3 !== 1 ? 's' : ''}</p>
 										{/if}
 										<div class="mt-3 flex gap-2">
-											<button onclick={() => acceptNewCustomSection(customSectionAiResult!.section)} class="rounded-lg bg-emerald-600 px-4 py-1.5 text-xs font-bold text-white hover:bg-emerald-700">Add to Portfolio</button>
+											<button onclick={() => acceptNewCustomSection(cs.section)} class="rounded-lg bg-emerald-600 px-4 py-1.5 text-xs font-bold text-white hover:bg-emerald-700">Add to Portfolio</button>
 											<button onclick={() => { customSectionAiResult = null; customSectionAiStatus = 'idle'; }} class="rounded-lg border border-surface-muted px-3 py-1.5 text-xs font-bold text-ink-soft hover:bg-surface-muted">Dismiss</button>
 										</div>
 									</div>
@@ -2906,6 +3594,15 @@
 
 	</div>
 </div>
+
+<!-- Hidden file input for inline (in-preview) image uploads -->
+<input
+	bind:this={inlineImgInputEl}
+	type="file"
+	accept="image/*"
+	class="hidden"
+	onchange={onInlineImgFile}
+/>
 
 <!-- Overlay backdrop — dismisses AI toolbar and list editor on outside click -->
 {#if aiToolbar || listEditor}

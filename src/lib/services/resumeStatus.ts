@@ -9,13 +9,31 @@
 
 export type ProcessingStatus =
 	| 'UPLOADED'
+	| 'PENDING_UPLOAD'
+	| 'VALIDATING'
+	| 'VALIDATED'
+	| 'EXTRACTING_TEXT'
 	| 'PARSING'
+	| 'AWAITING_SELECTION'
+	| 'QUEUED_FOR_AI'
 	| 'AI_PROCESSING'
+	| 'AI_COMPLETE'
 	| 'GENERATING'
 	| 'COMPLETE'
 	| 'FAILED'
 	| 'AI_FAILED'
+	| 'INVALID_DOCUMENT'
+	| 'CANCELLED'
 	| 'REJECTED';
+
+/** Resume professions the classifier can return (matches backend allowlist). */
+export type PredictedProfession =
+	| 'software_engineer'
+	| 'designer'
+	| 'marketing'
+	| 'finance'
+	| 'civil_engineer'
+	| 'mechanical_engineer';
 
 export type FailureStage = 'VALIDATION' | 'AI_PROCESSING' | 'PROCESSING';
 
@@ -36,6 +54,10 @@ export interface StatusResponse {
 	canRetry: boolean;
 	/** Present only when status === 'COMPLETE' */
 	portfolioPath?: string;
+	/** Auto-detected profession — present when status === 'AWAITING_SELECTION'. Advisory. */
+	predictedProfession?: PredictedProfession | null;
+	/** Classifier confidence 0–100 for the predicted profession. */
+	predictedConfidence?: number;
 }
 
 export interface PollingCallbacks {

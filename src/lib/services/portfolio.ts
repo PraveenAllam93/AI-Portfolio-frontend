@@ -13,12 +13,76 @@ interface ServiceResult<T = undefined> {
 	error?: string;
 }
 
-// Portfolio data fetch
+// ─── Portfolio list ─────────────────────────────────────────────────────────
 
-/** Fetches portfolioContent + parsedData + category for the edit page. */
-export async function getPortfolioData(userId: string): Promise<ServiceResult<PortfolioData>> {
+export interface PortfolioSummary {
+	uploadId: string;
+	templateId: string;
+	status: string;
+	portfolioPath: string;
+	activeVersion: string | null;
+	portfolioUrl: string | null;
+	isLive: boolean;
+	category: string;
+	version: number;
+	createdAt: string;
+	updatedAt: string | null;
+}
+
+export async function listPortfolios(
+	userId: string
+): Promise<ServiceResult<{ portfolios: PortfolioSummary[]; total: number }>> {
 	try {
 		const res = await fetch(`/api/portfolio/${userId}`);
+		if (!res.ok) return { ok: false, error: 'Failed to list portfolios' };
+		return { ok: true, data: await res.json() };
+	} catch {
+		return { ok: false, error: 'Network error' };
+	}
+}
+
+export async function togglePortfolioLive(
+	userId: string,
+	uploadId: string,
+	isLive: boolean
+): Promise<ServiceResult> {
+	try {
+		const res = await fetch(`/api/portfolio/${userId}/${uploadId}/toggle-live`, {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ isLive })
+		});
+		if (!res.ok) {
+			const err = await res.json().catch(() => ({}));
+			return { ok: false, error: (err as { error?: string }).error ?? 'Failed to toggle live' };
+		}
+		return { ok: true };
+	} catch {
+		return { ok: false, error: 'Network error' };
+	}
+}
+
+export async function deletePortfolio(userId: string, uploadId: string): Promise<ServiceResult> {
+	try {
+		const res = await fetch(`/api/portfolio/${userId}/${uploadId}`, { method: 'DELETE' });
+		if (!res.ok) {
+			const err = await res.json().catch(() => ({})) as { error?: string; message?: string };
+			return { ok: false, error: err.message ?? err.error ?? 'Failed to delete portfolio' };
+		}
+		return { ok: true };
+	} catch {
+		return { ok: false, error: 'Network error' };
+	}
+}
+
+// ─── Single portfolio ───────────────────────────────────────────────────────
+
+export async function getPortfolioData(
+	userId: string,
+	uploadId: string
+): Promise<ServiceResult<PortfolioData>> {
+	try {
+		const res = await fetch(`/api/portfolio/${userId}/${uploadId}`);
 		if (!res.ok) return { ok: false, error: 'Failed to load portfolio data' };
 		const raw = await res.json();
 		return {
@@ -29,7 +93,8 @@ export async function getPortfolioData(userId: string): Promise<ServiceResult<Po
 				category: raw.category ?? 'software_engineer',
 				templateId: raw.templateId ?? undefined,
 				sectionOrder: raw.sectionOrder ?? undefined,
-				hiddenSections: raw.hiddenSections ?? undefined
+				hiddenSections: raw.hiddenSections ?? undefined,
+				templateOverrides: raw.templateOverrides ?? undefined
 			}
 		};
 	} catch {
@@ -37,20 +102,21 @@ export async function getPortfolioData(userId: string): Promise<ServiceResult<Po
 	}
 }
 
-/** Legacy helper kept for backwards compatibility. */
 export async function getPortfolioContent(
-	userId: string
+	userId: string,
+	uploadId: string
 ): Promise<ServiceResult<PortfolioContent>> {
-	const result = await getPortfolioData(userId);
+	const result = await getPortfolioData(userId, uploadId);
 	if (!result.ok || !result.data) return { ok: false, error: result.error };
 	return { ok: true, data: result.data.portfolioContent };
 }
 
 export async function getPortfolioAnalytics(
-	userId: string
+	userId: string,
+	uploadId: string
 ): Promise<ServiceResult<PortfolioAnalytics>> {
 	try {
-		const res = await fetch(`/api/portfolio/${userId}/analytics`);
+		const res = await fetch(`/api/portfolio/${userId}/${uploadId}/analytics`);
 		if (!res.ok) return { ok: false, error: 'Failed to load analytics' };
 		return { ok: true, data: await res.json() };
 	} catch {
@@ -58,15 +124,16 @@ export async function getPortfolioAnalytics(
 	}
 }
 
-// Scalar field save (portfolioContent)
+// ─── Content edits ──────────────────────────────────────────────────────────
 
 export async function savePortfolioContent(
 	userId: string,
+	uploadId: string,
 	field: EditableField,
 	value: string
 ): Promise<ServiceResult> {
 	try {
-		const res = await fetch(`/api/portfolio/${userId}/content`, {
+		const res = await fetch(`/api/portfolio/${userId}/${uploadId}/content`, {
 			method: 'PATCH',
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({ field, value })
@@ -81,19 +148,14 @@ export async function savePortfolioContent(
 	}
 }
 
-// Section save (parsedData)
-
-/**
- * Replace an entire section in parsedData.
- * data is the full updated array (or string / string[] for special sections).
- */
 export async function savePortfolioSection(
 	userId: string,
+	uploadId: string,
 	section: string,
 	data: unknown
 ): Promise<ServiceResult> {
 	try {
-		const res = await fetch(`/api/portfolio/${userId}/content`, {
+		const res = await fetch(`/api/portfolio/${userId}/${uploadId}/content`, {
 			method: 'PATCH',
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({ section, data })
@@ -111,79 +173,13 @@ export async function savePortfolioSection(
 	}
 }
 
-// AI enhancement (scalar field)
-
-export async function getAiEnhancement(
-	userId: string,
-	field: EditableField,
-	instruction: string,
-	currentValue: string
-): Promise<ServiceResult<{ suggestion: string }>> {
-	try {
-		const res = await fetch(`/api/portfolio/${userId}/ai-enhance`, {
-			method: 'POST',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ field, instruction, currentValue })
-		});
-		if (!res.ok) return { ok: false, error: 'Failed to get suggestion' };
-		const json = await res.json();
-		return { ok: true, data: { suggestion: json.suggestedValue ?? '' } };
-	} catch {
-		return { ok: false, error: 'Network error' };
-	}
-}
-
-// AI enhancement (section item)
-
-export async function getAiItemEnhancement(
-	userId: string,
-	section: string,
-	itemIndex: number,
-	enhanceField: string,
-	instruction: string
-): Promise<ServiceResult<{ suggestion: string | string[] }>> {
-	try {
-		const res = await fetch(`/api/portfolio/${userId}/ai-enhance`, {
-			method: 'POST',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ section, itemIndex, enhanceField, instruction })
-		});
-		if (!res.ok) return { ok: false, error: 'Failed to get suggestion' };
-		const json = await res.json();
-		return { ok: true, data: { suggestion: json.suggestedValue ?? '' } };
-	} catch {
-		return { ok: false, error: 'Network error' };
-	}
-}
-
-// AI enhancement (skills with full context)
-
-export async function getAiSkillsEnhancement(
-	userId: string,
-	instruction: string
-): Promise<ServiceResult<{ suggestion: SkillGroup[] }>> {
-	try {
-		const res = await fetch(`/api/portfolio/${userId}/ai-enhance`, {
-			method: 'POST',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ section: 'skills', instruction })
-		});
-		if (!res.ok) return { ok: false, error: 'Failed to get suggestion' };
-		const json = await res.json();
-		return { ok: true, data: { suggestion: json.suggestedValue ?? [] } };
-	} catch {
-		return { ok: false, error: 'Network error' };
-	}
-}
-
-// Portfolio config (section order + visibility)
-
 export async function updatePortfolioConfig(
 	userId: string,
+	uploadId: string,
 	config: Partial<PortfolioConfig>
 ): Promise<ServiceResult> {
 	try {
-		const res = await fetch(`/api/portfolio/${userId}/content`, {
+		const res = await fetch(`/api/portfolio/${userId}/${uploadId}/content`, {
 			method: 'PATCH',
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({ section: 'config', data: config })
@@ -198,11 +194,127 @@ export async function updatePortfolioConfig(
 	}
 }
 
-// Publish draft to live
-
-export async function publishPortfolio(userId: string): Promise<ServiceResult> {
+export async function saveTemplateOverrides(
+	userId: string,
+	uploadId: string,
+	overrides: Record<string, number | null>
+): Promise<ServiceResult> {
 	try {
-		const res = await fetch(`/api/portfolio/${userId}/publish`, {
+		const res = await fetch(`/api/portfolio/${userId}/${uploadId}/content`, {
+			method: 'PATCH',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ section: 'template_overrides', data: overrides })
+		});
+		if (!res.ok) {
+			const err = await res.json().catch(() => ({}));
+			return { ok: false, error: (err as { error?: string }).error ?? 'Failed to save template overrides' };
+		}
+		return { ok: true };
+	} catch {
+		return { ok: false, error: 'Network error' };
+	}
+}
+
+// ─── AI enhancement ─────────────────────────────────────────────────────────
+
+export async function getAiEnhancement(
+	userId: string,
+	uploadId: string,
+	field: EditableField,
+	instruction: string,
+	currentValue: string
+): Promise<ServiceResult<{ suggestion: string }>> {
+	try {
+		const res = await fetch(`/api/portfolio/${userId}/${uploadId}/ai-enhance`, {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ field, instruction, currentValue })
+		});
+		if (!res.ok) return { ok: false, error: 'Failed to get suggestion' };
+		const json = await res.json();
+		return { ok: true, data: { suggestion: json.suggestedValue ?? '' } };
+	} catch {
+		return { ok: false, error: 'Network error' };
+	}
+}
+
+export async function getAiItemEnhancement(
+	userId: string,
+	uploadId: string,
+	section: string,
+	itemIndex: number,
+	enhanceField: string,
+	instruction: string
+): Promise<ServiceResult<{ suggestion: string | string[] }>> {
+	try {
+		const res = await fetch(`/api/portfolio/${userId}/${uploadId}/ai-enhance`, {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ section, itemIndex, enhanceField, instruction })
+		});
+		if (!res.ok) return { ok: false, error: 'Failed to get suggestion' };
+		const json = await res.json();
+		return { ok: true, data: { suggestion: json.suggestedValue ?? '' } };
+	} catch {
+		return { ok: false, error: 'Network error' };
+	}
+}
+
+export async function getAiSkillsEnhancement(
+	userId: string,
+	uploadId: string,
+	instruction: string
+): Promise<ServiceResult<{ suggestion: SkillGroup[] }>> {
+	try {
+		const res = await fetch(`/api/portfolio/${userId}/${uploadId}/ai-enhance`, {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ section: 'skills', instruction })
+		});
+		if (!res.ok) return { ok: false, error: 'Failed to get suggestion' };
+		const json = await res.json();
+		return { ok: true, data: { suggestion: json.suggestedValue ?? [] } };
+	} catch {
+		return { ok: false, error: 'Network error' };
+	}
+}
+
+export async function getAiSuggestions(
+	userId: string,
+	uploadId: string,
+	currentState?: { parsedData: unknown; portfolioContent: unknown; category?: string; suppressed?: string[] }
+): Promise<ServiceResult<{ suggestions: LlmSuggestion[] }>> {
+	try {
+		// When uploadId is not available, use the userId-only route which relies on
+		// the client-provided parsedData in the request body (no DynamoDB lookup needed).
+		const url = uploadId
+			? `/api/portfolio/${userId}/${uploadId}/ai-enhance`
+			: `/api/portfolio/${userId}/ai-enhance`;
+		const res = await fetch(url, {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({
+				action: 'analyze_and_suggest',
+				...(currentState ?? {})
+			})
+		});
+		if (!res.ok) {
+			let detail = '';
+			try { const b = await res.json(); detail = b?.message ?? b?.error ?? ''; } catch { /* ignore */ }
+			return { ok: false, error: `Failed to get suggestions (${res.status})${detail ? ': ' + detail : ''}` };
+		}
+		const json = await res.json();
+		return { ok: true, data: { suggestions: json.suggestions ?? [] } };
+	} catch {
+		return { ok: false, error: 'Network error' };
+	}
+}
+
+// ─── Publish ─────────────────────────────────────────────────────────────────
+
+export async function publishPortfolio(userId: string, uploadId: string): Promise<ServiceResult> {
+	try {
+		const res = await fetch(`/api/portfolio/${userId}/${uploadId}/publish`, {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' }
 		});
@@ -216,18 +328,15 @@ export async function publishPortfolio(userId: string): Promise<ServiceResult> {
 	}
 }
 
-// Image upload
+// ─── Image upload ─────────────────────────────────────────────────────────
 
-/**
- * Request a presigned PUT URL for uploading a portfolio image asset.
- * Returns uploadUrl (PUT to S3 directly) and imageUrl (CloudFront URL to persist).
- */
 export async function getImageUploadUrl(
 	userId: string,
+	uploadId: string,
 	contentType: string
 ): Promise<ServiceResult<{ uploadUrl: string; imageUrl: string; expiresIn: number }>> {
 	try {
-		const res = await fetch(`/api/portfolio/${userId}/image-upload-url`, {
+		const res = await fetch(`/api/portfolio/${userId}/${uploadId}/image-upload-url`, {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({ contentType })
@@ -242,17 +351,14 @@ export async function getImageUploadUrl(
 	}
 }
 
-/**
- * Generate an AI image for a project or experience item via DALL-E 3.
- * Returns the CloudFront imageUrl — does NOT save; caller must accept explicitly.
- */
 export async function generateProjectImage(
 	userId: string,
+	uploadId: string,
 	sectionKey: string,
 	itemIdx: number
 ): Promise<ServiceResult<{ imageUrl: string }>> {
 	try {
-		const res = await fetch(`/api/portfolio/${userId}/project-image/generate`, {
+		const res = await fetch(`/api/portfolio/${userId}/${uploadId}/project-image/generate`, {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({ sectionKey, itemIdx })
@@ -267,50 +373,23 @@ export async function generateProjectImage(
 	}
 }
 
-// LLM portfolio suggestions
-
-export interface LlmSuggestion {
-	id: string;
-	section: string;
-	index?: number;
-	field?: string;
-	profileKey?: string;
-	label: string;
-	sublabel: string;
-	instruction: string;
-	priority: 'high' | 'medium' | 'low';
-}
-
-export async function getAiSuggestions(
-	userId: string,
-	currentState?: { parsedData: unknown; portfolioContent: unknown; category?: string }
-): Promise<ServiceResult<{ suggestions: LlmSuggestion[] }>> {
-	try {
-		const res = await fetch(`/api/portfolio/${userId}/ai-enhance`, {
-			method: 'POST',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({
-				action: 'analyze_and_suggest',
-				...(currentState ?? {})
-			})
-		});
-		if (!res.ok) return { ok: false, error: 'Failed to get suggestions' };
-		const json = await res.json();
-		return { ok: true, data: { suggestions: json.suggestions ?? [] } };
-	} catch {
-		return { ok: false, error: 'Network error' };
-	}
-}
-
-// Custom section classifier
+// ─── Custom section ──────────────────────────────────────────────────────────
 
 export async function addCustomSection(
 	userId: string,
+	uploadId: string,
 	text: string,
 	title?: string
-): Promise<ServiceResult<{ action: string; targetSection?: string; item?: Record<string, unknown>; section?: unknown }>> {
+): Promise<
+	ServiceResult<{
+		action: string;
+		targetSection?: string;
+		item?: Record<string, unknown>;
+		section?: unknown;
+	}>
+> {
 	try {
-		const res = await fetch(`/api/portfolio/${userId}/custom-section`, {
+		const res = await fetch(`/api/portfolio/${userId}/${uploadId}/custom-section`, {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({ text, ...(title ? { title } : {}) })
@@ -325,7 +404,7 @@ export async function addCustomSection(
 	}
 }
 
-// Portfolio versions
+// ─── Versions ────────────────────────────────────────────────────────────────
 
 export interface PortfolioVersion {
 	versionId: string;
@@ -337,11 +416,26 @@ export interface PortfolioVersion {
 	isActive: boolean;
 }
 
+export interface LlmSuggestion {
+	id: string;
+	section: string;
+	index?: number;
+	field?: string;
+	profileKey?: string;
+	label: string;
+	sublabel: string;
+	instruction: string;
+	priority: 'high' | 'medium' | 'low';
+}
+
 export async function listVersions(
-	userId: string
-): Promise<ServiceResult<{ versions: PortfolioVersion[]; activeVersion: string | null; total: number }>> {
+	userId: string,
+	uploadId: string
+): Promise<
+	ServiceResult<{ versions: PortfolioVersion[]; activeVersion: string | null; portfolioIsLive: boolean; total: number }>
+> {
 	try {
-		const res = await fetch(`/api/portfolio/${userId}/versions`);
+		const res = await fetch(`/api/portfolio/${userId}/${uploadId}/versions`);
 		if (!res.ok) return { ok: false, error: 'Could not load your portfolio versions.' };
 		return { ok: true, data: await res.json() };
 	} catch {
@@ -349,15 +443,25 @@ export async function listVersions(
 	}
 }
 
-export async function activateVersion(userId: string, versionId: string): Promise<ServiceResult> {
+export async function activateVersion(
+	userId: string,
+	uploadId: string,
+	versionId: string
+): Promise<ServiceResult> {
 	try {
-		const res = await fetch(`/api/portfolio/${userId}/versions/${versionId}/activate`, {
-			method: 'POST',
-			headers: { 'Content-Type': 'application/json' }
-		});
+		const res = await fetch(
+			`/api/portfolio/${userId}/${uploadId}/versions/${versionId}/activate`,
+			{
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' }
+			}
+		);
 		if (!res.ok) {
 			const err = await res.json().catch(() => ({}));
-			return { ok: false, error: (err as { message?: string }).message ?? 'Could not activate version.' };
+			return {
+				ok: false,
+				error: (err as { message?: string }).message ?? 'Could not activate version.'
+			};
 		}
 		return { ok: true };
 	} catch {
@@ -365,14 +469,21 @@ export async function activateVersion(userId: string, versionId: string): Promis
 	}
 }
 
-export async function deleteVersion(userId: string, versionId: string): Promise<ServiceResult> {
+export async function deleteVersion(
+	userId: string,
+	uploadId: string,
+	versionId: string
+): Promise<ServiceResult> {
 	try {
-		const res = await fetch(`/api/portfolio/${userId}/versions/${versionId}`, {
+		const res = await fetch(`/api/portfolio/${userId}/${uploadId}/versions/${versionId}`, {
 			method: 'DELETE'
 		});
 		if (!res.ok) {
 			const err = await res.json().catch(() => ({}));
-			return { ok: false, error: (err as { message?: string }).message ?? 'Could not delete version.' };
+			return {
+				ok: false,
+				error: (err as { message?: string }).message ?? 'Could not delete version.'
+			};
 		}
 		return { ok: true };
 	} catch {
@@ -380,10 +491,14 @@ export async function deleteVersion(userId: string, versionId: string): Promise<
 	}
 }
 
-// URL helpers
+// ─── URL helpers ─────────────────────────────────────────────────────────────
 
-export function getPortfolioDraftUrl(userId: string, cloudFrontDomain: string): string {
-	return `https://${cloudFrontDomain}/${userId}/draft/index.html`;
+export function getPortfolioDraftUrl(
+	userId: string,
+	uploadId: string,
+	cloudFrontDomain: string
+): string {
+	return `https://${cloudFrontDomain}/${userId}/${uploadId}/draft/index.html`;
 }
 
 export function getPortfolioPublishedUrl(portfolioPath: string, cloudFrontDomain: string): string {

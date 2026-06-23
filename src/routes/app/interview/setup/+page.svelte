@@ -1,7 +1,10 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
+	import { onMount } from 'svelte';
 	import { startInterview } from '$lib/services/interview';
 	import type { Difficulty, InterviewMode, InterviewSource } from '$lib/services/interview';
+	import { listPortfolios, type PortfolioSummary } from '$lib/services/portfolio';
+	import { authStore } from '$lib/stores/auth';
 	import { reveal } from '$lib/actions/animate';
 	import Spinner from '$lib/components/common/Spinner.svelte';
 	import AppHeader from '$lib/components/common/AppHeader.svelte';
@@ -14,12 +17,55 @@
 	let isLoading = $state(false);
 	let errorMessage = $state('');
 
+	// Portfolio selection — lets the user pick which resume/portfolio to base
+	// questions on when they have more than one.
+	let portfolios = $state<PortfolioSummary[]>([]);
+	let selectedUploadId = $state<string>('');
+	let portfoliosLoading = $state(true);
+
+	onMount(async () => {
+		const userId = $authStore.user?.userId;
+		if (!userId) {
+			portfoliosLoading = false;
+			return;
+		}
+		const result = await listPortfolios(userId);
+		if (result.ok && result.data?.portfolios) {
+			portfolios = [...result.data.portfolios].sort(
+				(a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+			);
+			// Default to the most recent portfolio.
+			selectedUploadId = portfolios[0]?.uploadId ?? '';
+		}
+		portfoliosLoading = false;
+	});
+
+	function portfolioLabel(p: PortfolioSummary): string {
+		const category = (p.category || 'Portfolio')
+			.replace(/_/g, ' ')
+			.replace(/\b\w/g, (c) => c.toUpperCase());
+		const template = (p.templateId || '')
+			.replace(/_/g, ' ')
+			.replace(/\b\w/g, (c) => c.toUpperCase());
+		return template ? `${category} · ${template}` : category;
+	}
+
+	function formatDate(iso: string): string {
+		if (!iso) return '';
+		return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+	}
+
 	async function handleStart(e: SubmitEvent) {
 		e.preventDefault();
 		errorMessage = '';
 
 		if (source === 'role' && !roleInfo.trim()) {
 			errorMessage = 'Please enter a job role or description.';
+			return;
+		}
+
+		if (source === 'resume' && !portfoliosLoading && portfolios.length === 0) {
+			errorMessage = 'No portfolio found. Upload a resume first, or choose "Job Role" as the source.';
 			return;
 		}
 
@@ -30,6 +76,7 @@
 			mode,
 			source,
 			roleInfo: roleInfo.trim() || undefined,
+			uploadId: source === 'resume' && selectedUploadId ? selectedUploadId : undefined,
 		});
 
 		if (result.success && result.data) {
@@ -205,6 +252,46 @@
 								class="w-full rounded-2xl border border-surface-muted bg-white px-5 py-4 text-sm font-medium text-ink outline-none transition-all placeholder:text-ink-muted focus:border-brand/60 focus:ring-2 focus:ring-brand/15"
 							/>
 						</div>
+					{/if}
+
+					{#if source === 'resume'}
+						{#if portfoliosLoading}
+							<p class="mt-3 text-xs text-ink-muted">Loading your portfolios…</p>
+						{:else if portfolios.length === 0}
+							<div class="mt-3 rounded-2xl border border-amber-100 bg-amber-50/60 px-5 py-4 text-sm font-medium text-amber-700">
+								You don't have a portfolio yet. <a href="/app/resumes/upload" class="font-bold underline">Upload a resume</a> first, or choose "Job Role" above.
+							</div>
+						{:else if portfolios.length === 1}
+							<p class="mt-3 text-xs text-ink-muted">
+								Using <span class="font-bold text-ink-soft">{portfolioLabel(portfolios[0])}</span>
+								{#if portfolios[0].createdAt}· created {formatDate(portfolios[0].createdAt)}{/if}.
+							</p>
+						{:else}
+							<div class="mt-4 space-y-2">
+								<p class="text-xs font-bold tracking-widest text-ink-muted uppercase">Which portfolio?</p>
+								<div class="grid grid-cols-1 gap-2">
+									{#each portfolios as p (p.uploadId)}
+										<button
+											type="button"
+											onclick={() => (selectedUploadId = p.uploadId)}
+											class="relative flex items-center justify-between rounded-2xl border px-5 py-4 text-left transition-all {selectedUploadId === p.uploadId
+												? 'border-2 border-brand bg-white shadow-sm'
+												: 'border border-surface-muted bg-white hover:border-brand/40'}"
+										>
+											<span class="min-w-0">
+												<span class="block truncate text-sm font-bold text-ink">{portfolioLabel(p)}</span>
+												<span class="mt-0.5 block text-xs text-ink-soft">
+													{#if p.isLive}<span class="font-bold text-emerald-600">Live</span> · {/if}Created {formatDate(p.createdAt)}
+												</span>
+											</span>
+											{#if selectedUploadId === p.uploadId}
+												<span class="ml-3 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-brand text-[9px] font-black text-white">✓</span>
+											{/if}
+										</button>
+									{/each}
+								</div>
+							</div>
+						{/if}
 					{/if}
 				</div>
 

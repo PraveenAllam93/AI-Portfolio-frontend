@@ -7,7 +7,7 @@
 	import { reveal } from '$lib/actions/animate';
 	import Spinner from '$lib/components/common/Spinner.svelte';
 
-	const sessionId = $derived($page.params.sessionId);
+	const sessionId = $derived($page.params.sessionId ?? '');
 
 	import type { HistoryEntry } from '$lib/services/interview';
 
@@ -78,7 +78,7 @@
 <div class="min-h-screen bg-surface-subtle pb-20">
 	<!-- Header -->
 	<header class="border-b border-surface-muted bg-white px-6 py-5">
-		<div class="mx-auto flex max-w-4xl items-center justify-between">
+		<div class="mx-auto flex max-w-5xl items-center justify-between">
 			<div>
 				<h1 class="font-display text-2xl font-bold text-ink">Interview Report</h1>
 				{#if sessionMeta}
@@ -99,7 +99,7 @@
 		</div>
 	</header>
 
-	<main class="mx-auto w-full max-w-4xl px-6 py-10">
+	<main class="mx-auto w-full max-w-5xl px-6 py-10">
 		{#if isLoading}
 			<div class="flex items-center justify-center py-24">
 				<Spinner size="lg" />

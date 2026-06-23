@@ -7,6 +7,12 @@
 	import AppHeader from '$lib/components/common/AppHeader.svelte';
 	import Badge from '$lib/components/common/Badge.svelte';
 	import LoadingState from '$lib/components/common/LoadingState.svelte';
+	import {
+		listPortfolios,
+		togglePortfolioLive,
+		deletePortfolio,
+		type PortfolioSummary
+	} from '$lib/services/portfolio';
 
 	async function handleLogout() {
 		await logout();
@@ -14,49 +20,73 @@
 		await goto('/');
 	}
 
-	let portfolioUrl: string | null = $state(null);
-	let portfolioUrlLoading = $state(true);
-	let totalViews: number | null = $state(null);
-	let activeVersion: string | null = $state(null);
-	let analyticsLoading = $state(true);
+	let portfolios: PortfolioSummary[] = $state([]);
+	let loading = $state(true);
+	let deleteConfirmId: string | null = $state(null);
+	let deletingId: string | null = $state(null);
+	let togglingId: string | null = $state(null);
+	let errorMsg: string | null = $state(null);
 
 	onMount(async () => {
 		try {
-			const res = await fetch('/api/portfolio/url');
-			if (res.ok) {
-				const data = await res.json();
-				portfolioUrl = data.url ?? null;
+			const userId = $authStore.user?.userId;
+			if (!userId) return;
+			const result = await listPortfolios(userId);
+			if (result.ok && result.data?.portfolios) {
+				portfolios = [...result.data.portfolios].sort(
+					(a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+				);
 			}
 		} catch {
+			// leave portfolios as []
 		} finally {
-			portfolioUrlLoading = false;
+			loading = false;
 		}
 	});
 
-	let analyticsFetched = false;
-	$effect(() => {
+	async function handleToggleLive(portfolio: PortfolioSummary) {
 		const userId = $authStore.user?.userId;
-		if (!portfolioUrlLoading && portfolioUrl && userId && !analyticsFetched) {
-			analyticsFetched = true;
-			fetch(`/api/portfolio/${userId}/analytics`)
-				.then((r) => (r.ok ? r.json() : null))
-				.then((data) => {
-					if (data) {
-						totalViews = data.totalViews;
-						if (data.byVersion) {
-							const versions = Object.keys(data.byVersion).sort().reverse();
-							if (versions.length > 0) activeVersion = versions[0];
-						}
-					}
-				})
-				.catch(() => {})
-				.finally(() => {
-					analyticsLoading = false;
-				});
-		} else if (!portfolioUrlLoading && !portfolioUrl) {
-			analyticsLoading = false;
+		if (!userId || togglingId) return;
+		togglingId = portfolio.uploadId;
+		const result = await togglePortfolioLive(userId, portfolio.uploadId, !portfolio.isLive);
+		if (result.ok) {
+			portfolios = portfolios.map((p) =>
+				p.uploadId === portfolio.uploadId ? { ...p, isLive: !p.isLive } : p
+			);
+		} else {
+			errorMsg = result.error ?? 'Failed to update live status';
 		}
-	});
+		togglingId = null;
+	}
+
+	async function handleDelete(uploadId: string) {
+		const userId = $authStore.user?.userId;
+		if (!userId) return;
+		deletingId = uploadId;
+		deleteConfirmId = null;
+		const result = await deletePortfolio(userId, uploadId);
+		if (result.ok) {
+			portfolios = portfolios.filter((p) => p.uploadId !== uploadId);
+		} else {
+			errorMsg = result.error ?? 'Failed to delete portfolio';
+		}
+		deletingId = null;
+	}
+
+	function formatDate(iso: string) {
+		return new Date(iso).toLocaleDateString('en-US', {
+			month: 'short',
+			day: 'numeric',
+			year: 'numeric'
+		});
+	}
+
+	function templateLabel(id: string | undefined) {
+		if (!id) return 'Default';
+		return id
+			.replace(/_/g, ' ')
+			.replace(/\b\w/g, (c) => c.toUpperCase());
+	}
 </script>
 
 <svelte:head>
@@ -73,7 +103,7 @@
 		</button>
 	</AppHeader>
 
-	<main class="mx-auto w-full max-w-5xl flex-1 px-6 py-12">
+	<main class="mx-auto w-full max-w-6xl flex-1 px-6 py-12">
 		<!-- Page title row -->
 		<div use:reveal class="mb-10 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
 			<div>
@@ -84,7 +114,7 @@
 				{:else}
 					<h1 class="font-display text-3xl font-bold text-ink" style="letter-spacing:-0.02em">Dashboard</h1>
 				{/if}
-				<p class="mt-2 text-ink-soft">Manage your AI-generated portfolio website.</p>
+				<p class="mt-2 text-ink-soft">Manage your AI-generated portfolio websites.</p>
 			</div>
 			<div class="flex items-center gap-3">
 				<a
@@ -117,63 +147,16 @@
 			</div>
 		</div>
 
-		{#if portfolioUrlLoading}
-			<LoadingState message="Loading dashboard…" />
-		{:else if portfolioUrl}
-			<!-- Quick stats row -->
-			<div use:reveal={{ delay: 50 }} class="mb-8 grid grid-cols-2 gap-4 sm:grid-cols-4">
-				{#each [{ label: 'Status', value: 'Live', valueClass: 'text-emerald-600', icon: 'M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z', iconColor: 'text-emerald-500' }, { label: 'Template', value: 'Clean', valueClass: 'text-ink', icon: 'M3.75 6A2.25 2.25 0 0 1 6 3.75h2.25A2.25 2.25 0 0 1 10.5 6v2.25a2.25 2.25 0 0 1-2.25 2.25H6a2.25 2.25 0 0 1-2.25-2.25V6ZM3.75 15.75A2.25 2.25 0 0 1 6 13.5h2.25a2.25 2.25 0 0 1 2.25 2.25V18a2.25 2.25 0 0 1-2.25 2.25H6A2.25 2.25 0 0 1 3.75 18v-2.25Z', iconColor: 'text-brand' }, { label: 'Total Views', value: analyticsLoading ? '…' : totalViews !== null ? totalViews.toLocaleString() : '–', valueClass: 'text-ink', icon: 'M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z', iconColor: 'text-brand' }, { label: 'Last Updated', value: 'Recent', valueClass: 'text-ink-soft', icon: 'M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z', iconColor: 'text-ink-muted' }] as stat}
-					<div class="flex items-center gap-4 rounded-2xl border border-surface-muted bg-white p-5 shadow-sm">
-						<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="h-6 w-6 {stat.iconColor}" aria-hidden="true">
-							<path stroke-linecap="round" stroke-linejoin="round" d={stat.icon} />
-						</svg>
-						<div class="min-w-0">
-							<p class="text-xs font-bold tracking-wider text-ink-muted uppercase">{stat.label}</p>
-							<p class="mt-1 truncate text-lg font-bold {stat.valueClass}">{stat.value}</p>
-						</div>
-					</div>
-				{/each}
+		{#if errorMsg}
+			<div class="mb-6 flex items-center justify-between rounded-2xl border border-red-200 bg-red-50 px-5 py-3 text-sm text-red-700">
+				<span>{errorMsg}</span>
+				<button onclick={() => (errorMsg = null)} class="ml-4 text-red-400 hover:text-red-600" aria-label="Dismiss">✕</button>
 			</div>
+		{/if}
 
-			<!-- Portfolio card -->
-			<div use:reveal={{ delay: 100 }} class="overflow-hidden rounded-3xl border border-surface-muted bg-white p-5 sm:p-8 shadow-sm">
-				<div class="flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
-					<div class="flex items-start gap-5">
-						<div class="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl border border-surface-muted bg-surface-subtle shadow-inner">
-							<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="h-8 w-8 text-brand" aria-hidden="true">
-								<path stroke-linecap="round" stroke-linejoin="round" d="M12 21a9.004 9.004 0 0 0 8.716-6.747M12 21a9.004 9.004 0 0 1-8.716-6.747M12 21c2.485 0 4.5-4.03 4.5-9S14.485 3 12 3m0 18c-2.485 0-4.5-4.03-4.5-9S9.515 3 12 3m0 0a8.997 8.997 0 0 1 7.843 4.582M12 3a8.997 8.997 0 0 0-7.843 4.582m15.686 0A11.953 11.953 0 0 1 12 10.5c-2.998 0-5.74-1.1-7.843-2.918m15.686 0A8.959 8.959 0 0 1 21 12c0 .778-.099 1.533-.284 2.253M3 12c0 .778.099 1.533.284 2.253" />
-							</svg>
-						</div>
-						<div class="min-w-0">
-							<div class="flex items-center gap-3">
-								<h2 class="font-display text-2xl font-bold text-ink" style="letter-spacing:-0.02em">Active Portfolio</h2>
-								<div class="flex items-center gap-2">
-									<Badge variant="live" pulse>Live</Badge>
-									{#if activeVersion}
-										<Badge variant="neutral" class="capitalize">{activeVersion}</Badge>
-									{/if}
-								</div>
-							</div>
-							<p class="mt-2 text-sm text-ink-soft">Your site is up and running securely on the edge network.</p>
-							<div class="mt-4 flex items-center gap-2">
-								<p class="max-w-xs truncate rounded-lg border border-surface-muted bg-surface-subtle px-3 py-1.5 font-mono text-sm font-medium text-ink-soft">{portfolioUrl}</p>
-							</div>
-						</div>
-					</div>
-					<div class="flex shrink-0 flex-col gap-3 sm:flex-row">
-						{#if $authStore.user}
-							<a href="/app/portfolio/{$authStore.user.userId}/analytics" class="inline-flex w-full items-center justify-center rounded-full border border-surface-muted bg-white px-5 py-3 text-sm font-bold text-ink-soft transition-all hover:bg-surface-subtle hover:text-ink sm:w-auto sm:py-2.5">Analytics</a>
-							<a href="/app/portfolio/{$authStore.user.userId}/edit" class="inline-flex w-full items-center justify-center rounded-full border border-surface-muted bg-white px-5 py-3 text-sm font-bold text-ink-soft transition-all hover:bg-surface-subtle hover:text-ink sm:w-auto sm:py-2.5">Edit Content</a>
-							<a href="/app/portfolio/{$authStore.user.userId}/versions" class="inline-flex w-full items-center justify-center rounded-full border border-surface-muted bg-white px-5 py-3 text-sm font-bold text-ink-soft transition-all hover:bg-surface-subtle hover:text-ink sm:w-auto sm:py-2.5">Versions</a>
-						{/if}
-						<a href={portfolioUrl} target="_blank" rel="noopener noreferrer" class="inline-flex w-full items-center justify-center gap-2 rounded-full bg-brand px-6 py-3 text-sm font-bold text-white shadow-lg transition-all hover:bg-brand-dark active:scale-95 sm:w-auto sm:py-2.5">
-							Open Link
-							<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="h-4 w-4" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3" /></svg>
-						</a>
-					</div>
-				</div>
-			</div>
-		{:else}
+		{#if loading}
+			<LoadingState message="Loading portfolios…" />
+		{:else if portfolios.length === 0}
 			<!-- Empty state -->
 			<div use:reveal={{ delay: 100 }} class="flex flex-col items-center justify-center rounded-[2.5rem] border border-surface-muted bg-white px-8 py-24 text-center shadow-sm">
 				<div class="mb-6 flex h-20 w-20 items-center justify-center rounded-2xl border border-surface-muted bg-surface-subtle">
@@ -181,7 +164,7 @@
 						<path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m6.75 12-3-3m0 0-3 3m3-3v6m-1.5-15H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
 					</svg>
 				</div>
-				<h2 class="font-display text-3xl font-bold text-ink" style="letter-spacing:-0.02em">No portfolio yet</h2>
+				<h2 class="font-display text-3xl font-bold text-ink" style="letter-spacing:-0.02em">No portfolios yet</h2>
 				<p class="mt-3 max-w-md text-ink-soft">Upload your resume to automatically generate a beautiful, fully-functional portfolio website in seconds.</p>
 				<a href="/app/resumes/upload" class="mt-8 inline-flex items-center gap-2 rounded-full bg-brand px-8 py-4 text-sm font-bold text-white shadow-xl transition-all hover:scale-105 hover:bg-brand-dark active:scale-95">
 					<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="h-5 w-5" aria-hidden="true">
@@ -189,6 +172,140 @@
 					</svg>
 					Upload Resume to Start
 				</a>
+			</div>
+		{:else}
+			<!-- Portfolio cards -->
+			<div class="flex flex-col gap-5">
+				{#each portfolios as portfolio, i (portfolio.uploadId)}
+					<div use:reveal={{ delay: i * 60 }} class="overflow-hidden rounded-3xl border border-surface-muted bg-white shadow-sm">
+						<!-- Card header -->
+						<div class="flex flex-col gap-4 px-6 pt-6 pb-4 sm:flex-row sm:items-start sm:justify-between">
+							<div class="flex items-start gap-4">
+								<!-- Icon -->
+								<div class="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-surface-muted bg-surface-subtle shadow-inner">
+									<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="h-7 w-7 text-brand" aria-hidden="true">
+										<path stroke-linecap="round" stroke-linejoin="round" d="M12 21a9.004 9.004 0 0 0 8.716-6.747M12 21a9.004 9.004 0 0 1-8.716-6.747M12 21c2.485 0 4.5-4.03 4.5-9S14.485 3 12 3m0 18c-2.485 0-4.5-4.03-4.5-9S9.515 3 12 3m0 0a8.997 8.997 0 0 1 7.843 4.582M12 3a8.997 8.997 0 0 0-7.843 4.582m15.686 0A11.953 11.953 0 0 1 12 10.5c-2.998 0-5.74-1.1-7.843-2.918m15.686 0A8.959 8.959 0 0 1 21 12c0 .778-.099 1.533-.284 2.253M3 12c0 .778.099 1.533.284 2.253" />
+									</svg>
+								</div>
+								<!-- Title + badges -->
+								<div class="min-w-0">
+									<div class="flex flex-wrap items-center gap-2">
+										<h2 class="font-display text-xl font-bold text-ink" style="letter-spacing:-0.01em">
+											{templateLabel(portfolio.templateId)}
+										</h2>
+										{#if portfolio.isLive}
+											<Badge variant="live" pulse>Live</Badge>
+										{:else}
+											<Badge variant="neutral">Offline</Badge>
+										{/if}
+										{#if portfolio.activeVersion}
+											<Badge variant="neutral" class="capitalize">{portfolio.activeVersion}</Badge>
+										{/if}
+									</div>
+									<p class="mt-1 text-sm text-ink-muted">Created {formatDate(portfolio.createdAt)}</p>
+									{#if portfolio.portfolioUrl}
+										<a
+											href={portfolio.portfolioUrl}
+											target="_blank"
+											rel="noopener noreferrer"
+											class="mt-2 inline-flex max-w-xs items-center gap-1.5 truncate rounded-lg border border-surface-muted bg-surface-subtle px-3 py-1.5 font-mono text-xs font-medium text-ink-soft transition-colors hover:text-brand"
+										>
+											<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="h-3 w-3 shrink-0" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M13.19 8.688a4.5 4.5 0 0 1 1.242 7.244l-4.5 4.5a4.5 4.5 0 0 1-6.364-6.364l1.757-1.757m13.35-.622 1.757-1.757a4.5 4.5 0 0 0-6.364-6.364l-4.5 4.5a4.5 4.5 0 0 0 1.242 7.244" /></svg>
+											<span class="truncate">{portfolio.portfolioUrl.replace(/^https?:\/\//, '')}</span>
+										</a>
+									{/if}
+								</div>
+							</div>
+
+							<!-- Live toggle -->
+							{#if $authStore.user}
+								<div class="flex shrink-0 items-center gap-2 sm:mt-1">
+									<span class="text-xs font-medium text-ink-muted">Live</span>
+									<button
+										onclick={() => handleToggleLive(portfolio)}
+										disabled={togglingId === portfolio.uploadId}
+										class="relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 disabled:opacity-50 {portfolio.isLive ? 'bg-emerald-500' : 'bg-surface-muted'}"
+										role="switch"
+										aria-checked={portfolio.isLive}
+										aria-label="Toggle live"
+									>
+										<span
+											class="pointer-events-none inline-block h-4 w-4 rounded-full bg-white shadow-md ring-0 transition-transform {portfolio.isLive ? 'translate-x-5' : 'translate-x-0.5'}"
+										></span>
+									</button>
+								</div>
+							{/if}
+						</div>
+
+						<!-- Card actions -->
+						{#if $authStore.user}
+							<div class="flex flex-wrap items-center gap-2 border-t border-surface-muted px-6 py-4">
+								<a
+									href="/app/portfolio/{$authStore.user.userId}/{portfolio.uploadId}/edit"
+									class="inline-flex items-center gap-1.5 rounded-full border border-surface-muted bg-white px-4 py-2 text-sm font-bold text-ink-soft transition-all hover:bg-surface-subtle hover:text-ink"
+								>
+									<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="h-3.5 w-3.5" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125" /></svg>
+									Edit
+								</a>
+								<a
+									href="/app/portfolio/{$authStore.user.userId}/{portfolio.uploadId}/analytics"
+									class="inline-flex items-center gap-1.5 rounded-full border border-surface-muted bg-white px-4 py-2 text-sm font-bold text-ink-soft transition-all hover:bg-surface-subtle hover:text-ink"
+								>
+									<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="h-3.5 w-3.5" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 0 1 3 19.875v-6.75ZM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V8.625ZM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V4.125Z" /></svg>
+									Analytics
+								</a>
+								<a
+									href="/app/portfolio/{$authStore.user.userId}/{portfolio.uploadId}/versions"
+									class="inline-flex items-center gap-1.5 rounded-full border border-surface-muted bg-white px-4 py-2 text-sm font-bold text-ink-soft transition-all hover:bg-surface-subtle hover:text-ink"
+								>
+									<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="h-3.5 w-3.5" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>
+									Versions
+								</a>
+								{#if portfolio.portfolioUrl}
+									<a
+										href={portfolio.portfolioUrl}
+										target="_blank"
+										rel="noopener noreferrer"
+										class="inline-flex items-center gap-1.5 rounded-full bg-brand px-4 py-2 text-sm font-bold text-white transition-all hover:bg-brand-dark active:scale-95"
+									>
+										Open
+										<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="h-3.5 w-3.5" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3" /></svg>
+									</a>
+								{/if}
+
+								<!-- Delete -->
+								<div class="ml-auto flex items-center">
+									{#if deleteConfirmId === portfolio.uploadId}
+										<div class="flex items-center gap-2">
+											<span class="text-xs text-ink-soft">Delete this portfolio?</span>
+											<button
+												onclick={() => handleDelete(portfolio.uploadId)}
+												disabled={deletingId === portfolio.uploadId}
+												class="rounded-full bg-red-500 px-3 py-1.5 text-xs font-bold text-white transition-colors hover:bg-red-600 disabled:opacity-50"
+											>
+												{deletingId === portfolio.uploadId ? 'Deleting…' : 'Yes, Delete'}
+											</button>
+											<button
+												onclick={() => (deleteConfirmId = null)}
+												class="rounded-full border border-surface-muted px-3 py-1.5 text-xs font-bold text-ink-soft transition-colors hover:bg-surface-subtle"
+											>
+												Cancel
+											</button>
+										</div>
+									{:else}
+										<button
+											onclick={() => (deleteConfirmId = portfolio.uploadId)}
+											class="inline-flex items-center gap-1.5 rounded-full border border-surface-muted px-3 py-1.5 text-xs font-bold text-ink-muted transition-all hover:border-red-200 hover:bg-red-50 hover:text-red-600"
+										>
+											<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="h-3.5 w-3.5" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" /></svg>
+											Delete
+										</button>
+									{/if}
+								</div>
+							</div>
+						{/if}
+					</div>
+				{/each}
 			</div>
 		{/if}
 	</main>

@@ -18,8 +18,28 @@ export const GET: RequestHandler = async ({ cookies }) => {
 		? rawCloudfront
 		: `https://${rawCloudfront}`;
 
+	const apiBase = env.API_BASE_URL ?? '';
+	const idToken = cookies.get('id_token') ?? '';
+
+	let portfolioPath: string | null = null;
+	try {
+		const res = await fetch(`${apiBase}/portfolio/${user.userId}`, {
+			headers: { Authorization: `Bearer ${idToken}` }
+		});
+		if (res.ok) {
+			const data = await res.json();
+			portfolioPath = data.portfolioPath ?? null;
+		}
+	} catch {
+		// fall through — portfolioPath stays null
+	}
+
+	const liveUrl = portfolioPath
+		? `${cloudfrontBase}/${portfolioPath}/index.html`
+		: null;
+
 	return json({
-		url: `${cloudfrontBase}/${user.userId}/v1/index.html`,
+		url: liveUrl,
 		draftUrl: `${cloudfrontBase}/${user.userId}/draft/index.html`,
 		userId: user.userId
 	});

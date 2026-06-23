@@ -1,4 +1,4 @@
-<script lang="ts">
+﻿<script lang="ts">
 	import { page } from '$app/stores';
 	import { onMount } from 'svelte';
 	import { fade, fly } from 'svelte/transition';
@@ -8,16 +8,19 @@
 	import { listVersions, activateVersion, deleteVersion } from '$lib/services/portfolio';
 	import type { PortfolioVersion } from '$lib/services/portfolio';
 
-	const userId = $page.params.userId;
+	const userId = $page.params.userId ?? '';
+	const uploadId = $page.params.uploadId ?? '';
 
 	let versions = $state<PortfolioVersion[]>([]);
 	let activeVersion = $state<string | null>(null);
+	let portfolioIsLive = $state(false);
 	let loading = $state(true);
 	let errorMsg = $state('');
 
 	// Per-version loading states
 	let activating = $state<Record<string, boolean>>({});
 	let deleting = $state<Record<string, boolean>>({});
+	let previewing = $state<Record<string, boolean>>({});
 	let confirmDelete = $state<string | null>(null);
 	let toastMsg = $state('');
 	let toastOk = $state(true);
@@ -29,10 +32,11 @@
 	async function load() {
 		loading = true;
 		errorMsg = '';
-		const result = await listVersions(userId);
+		const result = await listVersions(userId, uploadId);
 		if (result.ok && result.data) {
 			versions = result.data.versions;
 			activeVersion = result.data.activeVersion;
+			portfolioIsLive = result.data.portfolioIsLive ?? false;
 		} else {
 			errorMsg = result.error ?? 'Failed to load versions.';
 		}
@@ -47,7 +51,7 @@
 
 	async function handleActivate(versionId: string) {
 		activating = { ...activating, [versionId]: true };
-		const result = await activateVersion(userId, versionId);
+		const result = await activateVersion(userId, uploadId, versionId);
 		activating = { ...activating, [versionId]: false };
 		if (result.ok) {
 			activeVersion = versionId;
@@ -58,10 +62,29 @@
 		}
 	}
 
+	async function handlePreview(versionId: string) {
+		previewing = { ...previewing, [versionId]: true };
+		try {
+			const res = await fetch(
+				`/api/portfolio/${userId}/${uploadId}/preview?versionId=${encodeURIComponent(versionId)}`
+			);
+			if (!res.ok) {
+				showToast('Could not generate preview link.', false);
+				return;
+			}
+			const { previewUrl } = await res.json();
+			window.open(previewUrl, '_blank', 'noopener,noreferrer');
+		} catch {
+			showToast('Could not generate preview link.', false);
+		} finally {
+			previewing = { ...previewing, [versionId]: false };
+		}
+	}
+
 	async function handleDelete(versionId: string) {
 		confirmDelete = null;
 		deleting = { ...deleting, [versionId]: true };
-		const result = await deleteVersion(userId, versionId);
+		const result = await deleteVersion(userId, uploadId, versionId);
 		deleting = { ...deleting, [versionId]: false };
 		if (result.ok) {
 			versions = versions.filter((v) => v.versionId !== versionId);
@@ -81,7 +104,7 @@
 	}
 
 	const TEMPLATE_LABELS: Record<string, string> = {
-		nebula: 'Nebula', galaxy: 'Galaxy', codex: 'Codex', neon: 'Neon',
+		nebula: 'Nebula', codex: 'Codex', neon: 'Neon',
 		circuit: 'Circuit', 'navy-gold': 'Navy Gold', cosmos: 'Cosmos',
 		retro: 'Retro', luxe: 'Luxe', aurora: 'Aurora', quantum: 'Quantum',
 		minimal: 'Minimal', modern: 'Modern', bold: 'Bold', creative: 'Creative',
@@ -96,7 +119,7 @@
 <div class="flex min-h-screen flex-col bg-surface-subtle">
 	<BreadcrumbHeader title="Versions" />
 
-	<main class="mx-auto w-full max-w-3xl flex-1 px-6 py-12">
+	<main class="mx-auto w-full max-w-4xl flex-1 px-6 py-12">
 		<!-- Header row -->
 		<div class="mb-8 flex items-center justify-between">
 			<div>
@@ -165,15 +188,21 @@
 								<div>
 									<div class="flex items-center gap-2">
 										<span class="font-bold text-ink">{TEMPLATE_LABELS[v.templateId] ?? v.templateId} template</span>
-										{#if v.isActive}
+										{#if v.isActive && portfolioIsLive}
 											<span class="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-bold text-emerald-700 border border-emerald-100">
 												<span class="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
 												Live
 											</span>
+										{:else if v.isActive && !portfolioIsLive}
+											<span class="inline-flex items-center gap-1 rounded-full bg-surface-muted px-2 py-0.5 text-xs font-bold text-ink-muted border border-surface-muted">
+												<span class="h-1.5 w-1.5 rounded-full bg-ink-muted"></span>
+												Selected
+											</span>
 										{/if}
 									</div>
 									<p class="mt-0.5 text-xs text-ink-muted">Created {formatDate(v.createdAt)}</p>
-									{#if v.portfolioUrl}
+									{#if v.isActive && v.portfolioUrl}
+										<!-- Active version: stable public CloudFront URL for sharing -->
 										<a
 											href={v.portfolioUrl}
 											target="_blank"
@@ -183,8 +212,21 @@
 											<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="h-3 w-3">
 												<path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3" />
 											</svg>
-											Preview
+											Open live portfolio
 										</a>
+									{:else if !v.isActive}
+										<!-- Non-active version: presigned owner-only preview URL (1-hour TTL) -->
+										<button
+											onclick={() => handlePreview(v.versionId)}
+											disabled={previewing[v.versionId]}
+											class="mt-1 inline-flex items-center gap-1 text-xs font-medium text-ink-muted hover:text-brand disabled:opacity-50"
+										>
+											<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="h-3 w-3">
+												<path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" />
+												<path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+											</svg>
+											{previewing[v.versionId] ? 'Opening…' : 'Preview (owner only)'}
+										</button>
 									{/if}
 								</div>
 							</div>

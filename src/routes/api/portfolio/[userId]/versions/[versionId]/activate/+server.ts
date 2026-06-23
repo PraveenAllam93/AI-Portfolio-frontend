@@ -15,7 +15,7 @@ export const POST: RequestHandler = async ({ params, cookies }) => {
 
 	const upstream = await fetch(
 		`${apiBase}/portfolio/${params.userId}/versions/${params.versionId}/activate`,
-		{ method: 'POST', headers: { Authorization: idToken } }
+		{ method: 'POST', headers: { Authorization: `Bearer ${idToken}` } }
 	);
 
 	if (!upstream.ok) {

@@ -15,7 +15,7 @@ export const DELETE: RequestHandler = async ({ params, cookies }) => {
 
 	const upstream = await fetch(
 		`${apiBase}/portfolio/${params.userId}/versions/${params.versionId}`,
-		{ method: 'DELETE', headers: { Authorization: idToken } }
+		{ method: 'DELETE', headers: { Authorization: `Bearer ${idToken}` } }
 	);
 
 	if (!upstream.ok) {

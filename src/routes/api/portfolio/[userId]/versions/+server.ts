@@ -14,7 +14,7 @@ export const GET: RequestHandler = async ({ params, cookies }) => {
 	const idToken = cookies.get('id_token') ?? '';
 
 	const upstream = await fetch(`${apiBase}/portfolio/${params.userId}/versions`, {
-		headers: { Authorization: idToken }
+		headers: { Authorization: `Bearer ${idToken}` }
 	});
 
 	if (!upstream.ok) {

@@ -8,7 +8,7 @@
  */
 
 import type { NormalizedData } from './base';
-import { DEFAULT_SECTION_ORDER, _editable, _listEditable, EDITOR_SCRIPT } from './base';
+import { DEFAULT_SECTION_ORDER, _editable, _listEditable, _rangeEditable, _pairEditable, _imgUpload, EDITOR_SCRIPT } from './base';
 
 const FONTS_URL =
 	'https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,300&family=JetBrains+Mono:wght@400;500&display=swap';
@@ -444,10 +444,12 @@ export function html(v: NormalizedData): string {
 	const hidden = v.hidden_sections ?? new Set<string>();
 
 	const inits = initials(v.name);
-	const years = yearsExperience(v.experience);
-	const projCount = v.projects?.length ?? 0;
-	const certCount = v.certifications?.length ?? 0;
+	// Use manual overrides if set, fall back to auto-computed values
+	const years = v.template_overrides?.years_experience ?? yearsExperience(v.experience);
+	const projCount = v.template_overrides?.projects_count ?? (v.projects?.length ?? 0);
+	const certCount = v.template_overrides?.certifications_count ?? (v.certifications?.length ?? 0);
 	const totalSkills = (v.skill_groups ?? []).reduce((acc, g) => acc + g.skills.length, 0);
+	const ted = (key: string) => v.edit_mode ? `contenteditable="true" data-path="template_overrides.${key}"` : '';
 
 	// Nav links
 	const NAV_LABELS: Record<string, string> = {
@@ -457,7 +459,7 @@ export function html(v: NormalizedData): string {
 		investment_portfolios: 'Investments', contact: 'Contact',
 	};
 	const navAnchors: string[] = [];
-	if (v.bio || v.location || v.email || v.phone) navAnchors.push('about');
+	if (v.bio || v.skill_groups?.length) navAnchors.push('about');
 	for (const key of order) {
 		if (hidden.has(key)) continue;
 		if (key === 'custom_sections') {
@@ -492,11 +494,11 @@ export function html(v: NormalizedData): string {
 	].filter(Boolean).join('');
 
 	// Stat bubbles
-	const bubble1 = years > 0 ? `<div class="stat-bubble fade-in"><div><div class="stat-num">${years}+</div><div class="stat-label">Years<br>Exp.</div></div></div>` : '';
-	const bubble2 = projCount > 0 ? `<div class="stat-bubble fade-in delay-1"><div><div class="stat-num">${projCount}+</div><div class="stat-label">Projects<br>Built</div></div></div>` : '';
+	const bubble1 = years > 0 ? `<div class="stat-bubble fade-in"><div><div class="stat-num"><span ${ted('years_experience')}>${years}</span>+</div><div class="stat-label">Years<br>Exp.</div></div></div>` : '';
+	const bubble2 = projCount > 0 ? `<div class="stat-bubble fade-in delay-1"><div><div class="stat-num"><span ${ted('projects_count')}>${projCount}</span>+</div><div class="stat-label">Projects<br>Built</div></div></div>` : '';
 
 	// About section
-	const aboutHtml = v.bio || v.email || v.phone || v.location
+	const aboutHtml = v.bio || v.skill_groups?.length
 		? (() => {
 			const highlights = (v.skill_groups ?? []).slice(0, 4).map(g =>
 				`<div class="highlight-item fade-in">
@@ -507,17 +509,17 @@ export function html(v: NormalizedData): string {
 
 			const statsHtml = `
 <div class="astat">
-  <div class="astat-num">${years > 0 ? years + '+' : '—'}</div>
+  <div class="astat-num"><span ${ted('years_experience')}>${years > 0 ? years : '—'}</span>${years > 0 ? '+' : ''}</div>
   <div class="astat-label">Years Experience</div>
   <div class="astat-note">// industry</div>
 </div>
 <div class="astat">
-  <div class="astat-num">${projCount > 0 ? projCount + '+' : '—'}</div>
+  <div class="astat-num"><span ${ted('projects_count')}>${projCount > 0 ? projCount : '—'}</span>${projCount > 0 ? '+' : ''}</div>
   <div class="astat-label">Projects Delivered</div>
   <div class="astat-note">// completed</div>
 </div>
 <div class="astat">
-  <div class="astat-num">${certCount > 0 ? certCount : '—'}</div>
+  <div class="astat-num"><span ${ted('certifications_count')}>${certCount > 0 ? certCount : '—'}</span></div>
   <div class="astat-label">Certifications</div>
   <div class="astat-note">// certified</div>
 </div>
@@ -557,9 +559,9 @@ ${v.experience.map((exp, i) => `<div class="exp-item fade-in${i > 0 ? ' delay-' 
 <div class="exp-card">
   <div class="exp-header">
     <span class="exp-title" ${_editable(`experience.${i}.role`)}>${exp.role}</span>
-    ${exp.duration ? `<span class="exp-period" ${_editable(`experience.${i}.duration`)}>${exp.duration}</span>` : ''}
+    ${_rangeEditable(`experience.${i}.start_date`, exp.start_date, `experience.${i}.end_date`, exp.end_date, v.edit_mode) ? `<span class="exp-period">${_rangeEditable(`experience.${i}.start_date`, exp.start_date, `experience.${i}.end_date`, exp.end_date, v.edit_mode)}</span>` : ''}
   </div>
-  ${exp.company ? `<div class="exp-company" ${_editable(`experience.${i}.company`)}>${exp.company}${exp.location ? ` &mdash; ${exp.location}` : ''}</div>` : ''}
+  ${(exp.company || exp.location) ? `<div class="exp-company"><span ${_editable(`experience.${i}.company`)}>${exp.company || ''}</span>${(exp.location) ? ` &mdash; <span ${_editable(`experience.${i}.location`)}>${exp.location || ''}</span>` : ''}</div>` : ''}
   ${exp.description ? `<p class="exp-desc" ${_editable(`experience.${i}.description`, true)}>${exp.description}</p>` : ''}
   ${exp.key_points?.length ? `<div class="exp-points" ${_listEditable(`experience.${i}.key_points`)}>${exp.key_points.map(k => `<div class="exp-point">${k}</div>`).join('')}</div>` : ''}
 </div>
@@ -604,10 +606,10 @@ ${v.projects.map((p, i) => {
 		p.project_url ? `<a href="${p.project_url}" class="plink" target="_blank" rel="noopener noreferrer">Live</a>` : '',
 	].filter(Boolean).join('');
 	const responsibilities = p.responsibilities?.length
-		? `<div class="exp-points" ${_listEditable(`projects.${i}.responsibilities`)}>${p.responsibilities.slice(0, 3).map(r => `<div class="exp-point">${r}</div>`).join('')}</div>`
+		? `<div class="exp-points" ${_listEditable(`projects.${i}.responsibilities`)}>${p.responsibilities.map(r => `<div class="exp-point">${r}</div>`).join('')}</div>`
 		: '';
 	const outcomes = p.measurable_outcomes?.length
-		? `<div class="project-outcomes">${p.measurable_outcomes.slice(0, 2).map(o => `<div class="project-outcome">&#10003; ${o}</div>`).join('')}</div>`
+		? `<div class="project-outcomes">${p.measurable_outcomes.map(o => `<div class="project-outcome">&#10003; ${o}</div>`).join('')}</div>`
 		: '';
 	const catLabel = p.project_category?.toUpperCase() || 'PROJECT';
 	const gradient = bannerGradient(p);
@@ -615,7 +617,7 @@ ${v.projects.map((p, i) => {
 	const bannerImg = p.images?.[0];
 	return `<div class="project-card fade-in${i > 0 ? ' delay-' + Math.min(i % 3, 3) : ''}" data-item-wrap>
 <button class="del-btn ce-del-btn" data-del-section="projects" data-del-index="${i}">&#x2715;</button>
-<div class="project-banner"${bannerImg ? '' : ` style="background:${gradient}"`}>
+<div class="project-banner" ${_imgUpload(`projects.${i}.images`, v.edit_mode, 'Upload image')}${bannerImg ? '' : ` style="background:${gradient}"`}>
   ${bannerImg ? `<img class="project-banner-img" src="${bannerImg}" alt="${p.title}">` : ''}
   <div class="project-banner-bg"></div>
   ${bannerImg ? '' : `<div class="project-banner-icon">${bannerIcon}</div>`}
@@ -650,10 +652,10 @@ ${v.education.map((edu, i) => `<div class="edu-card fade-in" data-item-wrap>
 <div class="edu-icon">${i + 1}</div>
 <div>
   <div class="edu-meta">
-    <span class="edu-degree" ${_editable(`education.${i}.degree`)}>${[edu.degree, edu.field_of_study].filter(Boolean).join(' — ')}</span>
-    ${edu.year_range ? `<span class="edu-year" ${_editable(`education.${i}.year_range`)}>${edu.year_range}</span>` : ''}
+    <span class="edu-degree">${_pairEditable(`education.${i}.degree`, edu.degree, `education.${i}.field_of_study`, edu.field_of_study, v.edit_mode, ' — ')}</span>
+    ${_rangeEditable(`education.${i}.start_year`, edu.start_year, `education.${i}.end_year`, edu.end_year, v.edit_mode, '–') ? `<span class="edu-year">${_rangeEditable(`education.${i}.start_year`, edu.start_year, `education.${i}.end_year`, edu.end_year, v.edit_mode, '–')}</span>` : ''}
   </div>
-  ${edu.institution ? `<div class="edu-inst" ${_editable(`education.${i}.institution`)}>${edu.institution}${edu.location ? `, ${edu.location}` : ''}</div>` : ''}
+  ${(edu.institution || edu.location) ? `<div class="edu-inst"><span ${_editable(`education.${i}.institution`)}>${edu.institution || ''}</span>${(edu.location) ? `, <span ${_editable(`education.${i}.location`)}>${edu.location || ''}</span>` : ''}</div>` : ''}
   ${edu.grade_or_score ? `<div class="edu-grade" ${_editable(`education.${i}.grade_or_score`)}>${edu.grade_or_score}</div>` : ''}
 </div>
 </div>`).join('\n')}
@@ -673,7 +675,7 @@ ${v.certifications.map((c, i) => `<div class="cert-card fade-in" data-item-wrap>
 <button class="del-btn ce-del-btn" data-del-section="certifications" data-del-index="${i}">&#x2715;</button>
 <div class="cert-icon">&#9670;</div>
 <div>
-  <div class="cert-name">${c.url ? `<a href="${c.url}" target="_blank" rel="noopener noreferrer">${c.name}</a>` : c.name}</div>
+  <div class="cert-name"${!c.url ? ` ${_editable(`certifications.${i}.name`)}` : ''}>${c.url ? `<a href="${c.url}" target="_blank" rel="noopener noreferrer">${c.name}</a>` : c.name}</div>
   ${c.issuer ? `<div class="cert-org" ${_editable(`certifications.${i}.issuer`)}>${c.issuer}</div>` : ''}
   ${c.year ? `<div class="cert-year" ${_editable(`certifications.${i}.year`)}>${c.year}</div>` : ''}
 </div>
@@ -781,7 +783,7 @@ ${p.performance_return ? `<div class="inv-ret">Return: ${p.performance_return}</
   <p class="section-tag">Design</p>
   <h2 class="section-title">Design Philosophy</h2>
 </div>
-<p class="dp-text fade-in" ${_editable('portfolio.design_philosophy', true)}>${v.design_philosophy}</p>
+<p class="dp-text fade-in" ${_editable('design_philosophy', true)}>${v.design_philosophy}</p>
 </section>` : '';
 
 	// Software proficiency
@@ -820,24 +822,38 @@ ${p.performance_return ? `<div class="inv-ret">Return: ${p.performance_return}</
 	const customSectionsHtml = !hidden.has('custom_sections') && (v.custom_sections?.length ?? 0) > 0
 		? (v.custom_sections ?? []).map((cs, csIdx) => {
 			if (!cs.items?.length) return '';
-			const items = cs.items.map((item, i) => `<div class="card fade-in" data-item-wrap>
-<button class="ce-del-btn" data-del-section="custom_sections" data-del-index="${i}">&#x2715;</button>
-${item.label ? `<div class="card-title">${item.label}</div>` : ''}
-${item.subtitle ? `<div class="card-sub">${item.subtitle}</div>` : ''}
-${item.value ? `<p class="card-desc">${item.value}</p>` : ''}
-${item.tags?.length ? `<div style="display:flex;flex-wrap:wrap;gap:.4rem;margin-top:.6rem">${item.tags.map((t) => `<span class="tech-tag">${t}</span>`).join('')}</div>` : ''}
-${item.url ? `<a href="${item.url}" style="color:var(--accent);font-size:.85rem;margin-top:.5rem;display:inline-block" target="_blank" rel="noopener noreferrer">View &#8599;</a>` : ''}
+			const items = cs.items.map((item, i) => `<div class="project-card fade-in" data-item-wrap data-cs-idx="${csIdx}">
+<button class="del-btn ce-del-btn" data-del-section="custom_sections.${csIdx}" data-del-index="${i}">&#x2715;</button>
+<div class="project-body">
+${item.label ? `<div class="project-title" ${_editable(`custom_sections.${csIdx}.items.${i}.label`)}>${item.label}</div>` : ''}
+${item.subtitle ? `<p class="project-desc" style="color:var(--accent);font-size:.8rem;margin-bottom:.35rem" ${_editable(`custom_sections.${csIdx}.items.${i}.subtitle`)}>${item.subtitle}</p>` : ''}
+${item.value ? `<p class="project-desc" ${_editable(`custom_sections.${csIdx}.items.${i}.value`, true)}>${item.value}</p>` : ''}
+${item.tags?.length ? `<div class="project-tags" style="margin-top:.5rem" ${_listEditable(`custom_sections.${csIdx}.items.${i}.tags`)}>${item.tags.map((t) => `<span class="ptag">${t}</span>`).join('')}</div>` : ''}
+${item.url ? `<a href="${item.url}" class="plink" style="margin-top:.5rem;display:inline-block" target="_blank" rel="noopener noreferrer">View &#8599;</a>` : ''}
+</div>
+</div>`).join('\n');
+			const tlItems = cs.items.map((item, i) => `<div class="exp-item fade-in" data-item-wrap data-cs-idx="${csIdx}">
+<button class="del-btn ce-del-btn" data-del-section="custom_sections.${csIdx}" data-del-index="${i}">&#x2715;</button>
+<div class="exp-dot"></div>
+<div class="exp-card">
+${(item.label || item.subtitle) ? `<div class="exp-header"><span class="exp-title" ${_editable(`custom_sections.${csIdx}.items.${i}.label`)}>${item.label}</span>${item.subtitle ? `<span class="exp-period" ${_editable(`custom_sections.${csIdx}.items.${i}.subtitle`)}>${item.subtitle}</span>` : ''}</div>` : ''}
+${item.value ? `<p class="exp-desc" ${_editable(`custom_sections.${csIdx}.items.${i}.value`, true)}>${item.value}</p>` : ''}
+${item.tags?.length ? `<div class="project-tags" style="margin-top:.5rem" ${_listEditable(`custom_sections.${csIdx}.items.${i}.tags`)}>${item.tags.map((t) => `<span class="ptag">${t}</span>`).join('')}</div>` : ''}
+${item.url ? `<a href="${item.url}" class="plink" style="margin-top:.5rem;display:inline-block" target="_blank" rel="noopener noreferrer">View &#8599;</a>` : ''}
+</div>
 </div>`).join('\n');
 			const grid = cs.display_type === 'cards'
-				? `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:1.5rem">${items}</div>`
+				? `<div class="projects-grid">${items}</div>`
+				: cs.display_type === 'timeline'
+				? `<div class="exp-timeline">${tlItems}</div>`
 				: `<div style="display:flex;flex-direction:column;gap:1rem">${items}</div>`;
 			return `<section id="${cs.section_id}">
 <div class="section-header fade-in">
-  <p class="section-tag">${cs.display_type}</p>
+  <p class="section-tag">${cs.title}</p>
   <h2 class="section-title">${cs.title}</h2>
 </div>
 ${grid}
-<button class="ce-add-btn" data-add-section="custom_sections.${csIdx}.items">+ Add Item</button>
+<button class="add-btn ce-add-btn" data-add-section="custom_sections.${csIdx}.items">+ Add Item</button>
 </section>`;
 		}).filter(Boolean).join('\n')
 		: '';
@@ -890,7 +906,7 @@ ${CIRCUIT_SVG}
 <div class="hero-inner">
   <div class="hero-content">
     <p class="hero-label fade-in"><span class="hero-blink">&#9632;</span> Available for opportunities</p>
-    <h1 class="hero-name fade-in delay-1" ${_editable('profile.name')}>${v.name}</h1>
+    <h1 class="hero-name fade-in delay-1" ${_editable('profile.full_name')}>${v.name}</h1>
     ${v.headline ? `<p class="hero-title fade-in delay-2" ${_editable('portfolio.headline')}>${v.headline}</p>` : ''}
     ${v.bio ? `<p class="hero-desc fade-in delay-2" ${_editable('portfolio.bio', true)}>${v.bio}</p>` : ''}
     <div class="hero-btns fade-in delay-3">
@@ -903,7 +919,7 @@ ${CIRCUIT_SVG}
     <div class="hexagon-wrapper">
       <div class="hex-frame"></div>
       <div class="hex-bg"></div>
-      <div class="hex-inner">${avatarHtml}</div>
+      <div class="hex-inner" ${_imgUpload('profile.profile_image', v.edit_mode)}>${avatarHtml}</div>
       ${bubble1}
       ${bubble2}
     </div>

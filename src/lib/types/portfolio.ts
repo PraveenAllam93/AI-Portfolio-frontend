@@ -140,6 +140,9 @@ export interface ParsedData {
 		location?: string;
 		social_links?: Record<string, string>;
 		profile_image?: string;
+		summary_image?: string;
+		contact_tagline?: string;
+		core_expertise?: string;
 	};
 	skills?: SkillGroup[];
 	experience?: ExperienceItem[];
@@ -165,11 +168,13 @@ export interface PortfolioData {
 	templateId?: string;
 	sectionOrder?: string[];
 	hiddenSections?: string[];
+	templateOverrides?: Record<string, number | null>;
 }
 
 export interface PortfolioConfig {
 	sectionOrder: string[];
 	hiddenSections: string[];
+	templateId?: string;
 }
 
 export const DEFAULT_SECTION_ORDER: string[] = [

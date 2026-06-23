@@ -3,13 +3,15 @@
  * Auth is handled server-side via HttpOnly cookies — no token handling here.
  */
 
-export type ResumeCategory = 'software_engineer' | 'designer' | 'marketing' | 'finance';
+export type ResumeCategory = 'software_engineer' | 'designer' | 'marketing' | 'finance' | 'civil_engineer' | 'mechanical_engineer';
 
 export interface PresignedUrlRequest {
 	filename: string;
 	contentType: string;
-	category: ResumeCategory;
-	templateId: string;
+	// category / templateId are deferred: the resume is uploaded first, its
+	// profession auto-detected, then the user confirms and start-generation runs.
+	category?: ResumeCategory;
+	templateId?: string;
 }
 
 export interface UploadResult {
@@ -74,10 +76,14 @@ async function getPresignedUrl(request: PresignedUrlRequest): Promise<PresignedU
 	};
 }
 
-export async function uploadResume(
+/**
+ * Step 1 of the new flow: upload the resume WITHOUT a category/template.
+ * The backend pipeline then validates, extracts text and auto-detects the
+ * profession, pausing at AWAITING_SELECTION. Returns the uploadId so the wizard
+ * can poll for the detection result.
+ */
+export async function startUpload(
 	file: File,
-	category: ResumeCategory,
-	templateId: string,
 	onProgress?: (percent: number) => void
 ): Promise<UploadResult> {
 	try {
@@ -88,13 +94,12 @@ export async function uploadResume(
 			};
 		}
 
-		// 1. Get presigned URL + uploadId via server proxy (auth via cookie)
+		// 1. Get presigned URL + uploadId via server proxy (auth via cookie).
+		//    category/template are omitted — chosen after auto-detection.
 		onProgress?.(10);
 		const { uploadUrl, uploadId } = await getPresignedUrl({
 			filename: file.name,
-			contentType: file.type,
-			category,
-			templateId
+			contentType: file.type
 		});
 
 		// 2. Upload file directly to S3 via the presigned URL
@@ -113,6 +118,50 @@ export async function uploadResume(
 		return { success: true, uploadId };
 	} catch (err) {
 		const message = err instanceof Error ? err.message : 'Upload failed. Please try again.';
+		return { success: false, error: message };
+	}
+}
+
+/**
+ * Step 2 of the new flow: after the user confirms the (auto-detected) profession
+ * and picks a template, resume the pipeline — the backend queues AI processing.
+ */
+export async function startGeneration(
+	uploadId: string,
+	category: ResumeCategory,
+	templateId: string
+): Promise<{ success: boolean; error?: string }> {
+	try {
+		const response = await fetch(
+			`/api/resume/${encodeURIComponent(uploadId)}/start-generation`,
+			{
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ category, templateId })
+			}
+		);
+
+		if (!response.ok) {
+			let message = 'Could not start portfolio generation. Please try again.';
+			try {
+				const data = await response.json();
+				const key = (data.error || data.message || '') as string;
+				if (key.includes('template')) {
+					message = 'The selected template is not available. Please choose a different one.';
+				} else if (key.includes('category')) {
+					message = 'Invalid profession selected. Please go back and choose again.';
+				} else if (key.includes('not ready') || key.includes('not available')) {
+					message = 'Your resume is still being prepared. Please wait a moment and try again.';
+				}
+			} catch {
+				/* ignore parse errors */
+			}
+			return { success: false, error: message };
+		}
+
+		return { success: true };
+	} catch (err) {
+		const message = err instanceof Error ? err.message : 'Could not start generation. Please try again.';
 		return { success: false, error: message };
 	}
 }

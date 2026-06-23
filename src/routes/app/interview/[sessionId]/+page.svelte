@@ -5,7 +5,7 @@
 	import { submitAnswer, exitInterview } from '$lib/services/interview';
 	import Spinner from '$lib/components/common/Spinner.svelte';
 
-	const sessionId = $derived($page.params.sessionId);
+	const sessionId = $derived($page.params.sessionId ?? '');
 
 	const navState = $derived(($page.state as Record<string, unknown>) ?? {});
 

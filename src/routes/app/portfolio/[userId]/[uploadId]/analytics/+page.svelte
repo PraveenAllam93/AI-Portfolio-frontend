@@ -1,4 +1,4 @@
-<script lang="ts">
+﻿<script lang="ts">
 	import { onMount } from 'svelte';
 	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
@@ -13,6 +13,7 @@
 	import type { PortfolioAnalytics, AnalyticsTimeline } from '$lib/types/portfolio';
 
 	const userId: string = $derived($page.params.userId ?? '');
+	const uploadId: string = $derived($page.params.uploadId ?? '');
 
 	$effect(() => {
 		const authUser = $authStore.user;
@@ -154,7 +155,7 @@
 	async function loadAnalytics() {
 		loadingStatus = 'loading';
 		errorMsg = '';
-		const result = await getPortfolioAnalytics(userId);
+		const result = await getPortfolioAnalytics(userId, uploadId);
 		if (result.ok && result.data) {
 			analytics = result.data as ExtendedAnalytics;
 			const tl = result.data.timeline || [];
@@ -548,7 +549,7 @@
 								<li>
 									<div class="mb-2 flex items-center justify-between text-sm">
 										<span class="font-bold text-ink flex items-center gap-2">
-											<span class="text-lg leading-none">{new Intl.DisplayNames(['en'], {type: 'region'}).of(code) !== code ? String.fromCodePoint(...code.toUpperCase().split('').map(char => 127397 + char.charCodeAt(0))) : '🌐'}</span>
+											<span class="text-lg leading-none">{new Intl.DisplayNames(['en'], {type: 'region'}).of(code) !== code ? String.fromCodePoint(...code.toUpperCase().split('').map(char => 127397 + char.charCodeAt(0))) : 'ðŸŒ'}</span>
 											{countryDisplayName(code)}
 										</span>
 										<span class="font-bold text-ink-soft">{pct(count, countryTotal)}%</span>

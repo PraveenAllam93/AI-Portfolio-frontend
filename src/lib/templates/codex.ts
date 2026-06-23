@@ -8,7 +8,7 @@
  */
 
 import type { NormalizedData } from './base';
-import { DEFAULT_SECTION_ORDER, _editable, _listEditable, EDITOR_SCRIPT } from './base';
+import { DEFAULT_SECTION_ORDER, _editable, _listEditable, _rangeEditable, _pairEditable, _imgUpload, EDITOR_SCRIPT } from './base';
 
 const FONTS_URL =
 	'https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&family=Roboto+Mono:wght@300;400&display=swap';
@@ -309,7 +309,7 @@ ${v.bio ? `<p class="hero-text" ${_editable('portfolio.bio', true)}>${v.bio}</p>
 <div class="hero-image">
 <div class="profile-img-container">
     <div class="profile-img-bg"></div>
-    <div class="profile-initials">${v.profile_image ? `<img src="${v.profile_image}" alt="${v.name}" class="profile-photo">` : inits}</div>
+    <div class="profile-initials" ${_imgUpload('profile.profile_image', v.edit_mode)}>${v.profile_image ? `<img src="${v.profile_image}" alt="${v.name}" class="profile-photo">` : inits}</div>
 </div>
 </div>
 </div>
@@ -345,7 +345,7 @@ ${v.experience
 <h3 class="experience-title" ${_editable(`experience.${i}.role`)}>${exp.role}</h3>
 ${exp.company ? `<p class="experience-company" ${_editable(`experience.${i}.company`)}>${exp.company}</p>` : ''}
 </div>
-${exp.duration ? `<span class="experience-date" ${_editable(`experience.${i}.duration`)}>${exp.duration}</span>` : ''}
+${_rangeEditable(`experience.${i}.start_date`, exp.start_date, `experience.${i}.end_date`, exp.end_date, v.edit_mode) ? `<span class="experience-date">${_rangeEditable(`experience.${i}.start_date`, exp.start_date, `experience.${i}.end_date`, exp.end_date, v.edit_mode)}</span>` : ''}
 </div>
 ${exp.description ? `<p class="experience-description" ${_editable(`experience.${i}.description`, true)}>${exp.description}</p>` : ''}
 ${exp.key_points?.length ? `<div class="experience-tech" ${_listEditable(`experience.${i}.key_points`)}>${exp.key_points.map((k) => `<span class="tech-tag">${k}</span>`).join('')}</div>` : ''}
@@ -431,13 +431,11 @@ ${links ? `<div class="project-links">${links}</div>` : ''}
 ${v.education
 	.map(
 		(edu, i) => {
-			const degField = [edu.degree, edu.field_of_study].filter(Boolean).join(' in ');
-			const title = degField || edu.institution;
 			return `<div class="education-card" data-item-wrap>
 <button class="ce-del-btn" data-del-section="education" data-del-index="${i}">&#x2715;</button>
-<h3 class="education-degree" ${_editable(`education.${i}.degree`)}>${title}</h3>
-${edu.institution ? `<p class="education-institution" ${_editable(`education.${i}.institution`)}>${edu.institution}</p>` : ''}
-${edu.year_range ? `<p class="education-year" ${_editable(`education.${i}.year_range`)}>${edu.year_range}</p>` : ''}
+<h3 class="education-degree">${_pairEditable(`education.${i}.degree`, edu.degree, `education.${i}.field_of_study`, edu.field_of_study, v.edit_mode, ' in ')}</h3>
+${(edu.institution) ? `<p class="education-institution" ${_editable(`education.${i}.institution`)}>${edu.institution || ''}</p>` : ''}
+${_rangeEditable(`education.${i}.start_year`, edu.start_year, `education.${i}.end_year`, edu.end_year, v.edit_mode, '–') ? `<p class="education-year">${_rangeEditable(`education.${i}.start_year`, edu.start_year, `education.${i}.end_year`, edu.end_year, v.edit_mode, '–')}</p>` : ''}
 ${edu.grade_or_score ? `<p class="education-grade" ${_editable(`education.${i}.grade_or_score`)}>${edu.grade_or_score}</p>` : ''}
 </div>`;
 		}
@@ -466,7 +464,7 @@ ${v.certifications
 <div class="certification-header">
 <div class="certification-icon">&#127942;</div>
 <div>
-<h3 class="certification-title">${nameHtml}</h3>
+<h3 class="certification-title"${!c.url ? ` ${_editable(`certifications.${i}.name`)}` : ''}>${nameHtml}</h3>
 ${c.issuer ? `<p class="certification-issuer" ${_editable(`certifications.${i}.issuer`)}>${c.issuer}</p>` : ''}
 ${c.year ? `<p class="certification-date" ${_editable(`certifications.${i}.year`)}>${c.year}</p>` : ''}
 </div>
@@ -526,18 +524,47 @@ ${socialHtml ? `<div class="links-container"><div class="links-grid">${socialHtm
 	const customSectionsHtml = !hidden.has('custom_sections') && (v.custom_sections?.length ?? 0) > 0
 		? (v.custom_sections ?? []).map((cs, csIdx) => {
 			if (!cs.items?.length) return '';
-			const items = cs.items.map((item, i) => `<div class="project-card" data-item-wrap>
-<button class="ce-del-btn" data-del-section="custom_sections" data-del-index="${i}">&#x2715;</button>
-${item.label ? `<h3 class="project-title">${item.label}</h3>` : ''}
-${item.subtitle ? `<p class="project-description">${item.subtitle}</p>` : ''}
-${item.value ? `<p class="project-description">${item.value}</p>` : ''}
-${item.tags?.length ? `<div class="project-tech">${item.tags.map((t) => `<span class="tech-tag">${t}</span>`).join('')}</div>` : ''}
+			const cardItems = cs.items.map((item, i) => `<div class="project-card" data-item-wrap data-cs-idx="${csIdx}">
+<button class="ce-del-btn" data-del-section="custom_sections.${csIdx}" data-del-index="${i}">&#x2715;</button>
+<div class="project-content">
+${item.label ? `<h3 class="project-title" ${_editable(`custom_sections.${csIdx}.items.${i}.label`)}>${item.label}</h3>` : ''}
+${item.subtitle ? `<p class="project-description" style="color:var(--primary);font-size:.85rem;margin-bottom:6px" ${_editable(`custom_sections.${csIdx}.items.${i}.subtitle`)}>${item.subtitle}</p>` : ''}
+${item.value ? `<p class="project-description" ${_editable(`custom_sections.${csIdx}.items.${i}.value`, true)}>${item.value}</p>` : ''}
+${item.tags?.length ? `<div class="project-tech" ${_listEditable(`custom_sections.${csIdx}.items.${i}.tags`)}>${item.tags.map((t) => `<span class="tech-tag">${t}</span>`).join('')}</div>` : ''}
 ${item.url ? `<a href="${item.url}" class="project-link" target="_blank" rel="noopener noreferrer">View &#8599;</a>` : ''}
+</div>
 </div>`).join('\n');
-			return `<section id="${cs.section_id}">
-<div class="section-header"><h2>${cs.title}</h2></div>
-<div class="projects-grid">${items}</div>
+			const listItems = cs.items.map((item, i) => `<div class="achievement-card" data-item-wrap data-cs-idx="${csIdx}">
+<button class="ce-del-btn" data-del-section="custom_sections.${csIdx}" data-del-index="${i}">&#x2715;</button>
+${item.label ? `<p class="achievement-title" ${_editable(`custom_sections.${csIdx}.items.${i}.label`)}>${item.label}</p>` : ''}
+${item.subtitle ? `<span class="achievement-year" ${_editable(`custom_sections.${csIdx}.items.${i}.subtitle`)}>${item.subtitle}</span>` : ''}
+${item.value ? `<p class="achievement-desc" ${_editable(`custom_sections.${csIdx}.items.${i}.value`, true)}>${item.value}</p>` : ''}
+${item.tags?.length ? `<div class="experience-tech" style="margin-top:8px" ${_listEditable(`custom_sections.${csIdx}.items.${i}.tags`)}>${item.tags.map((t) => `<span class="tech-tag">${t}</span>`).join('')}</div>` : ''}
+</div>`).join('\n');
+			const tlItems = cs.items.map((item, i) => `<div class="timeline-item" data-item-wrap data-cs-idx="${csIdx}">
+<button class="ce-del-btn" data-del-section="custom_sections.${csIdx}" data-del-index="${i}">&#x2715;</button>
+<div class="timeline-dot"></div>
+<div class="experience-card">
+<div class="experience-header">
+${item.label ? `<h3 class="experience-title" ${_editable(`custom_sections.${csIdx}.items.${i}.label`)}>${item.label}</h3>` : ''}
+${item.subtitle ? `<span class="experience-date" ${_editable(`custom_sections.${csIdx}.items.${i}.subtitle`)}>${item.subtitle}</span>` : ''}
+</div>
+${item.value ? `<p class="experience-description" ${_editable(`custom_sections.${csIdx}.items.${i}.value`, true)}>${item.value}</p>` : ''}
+${item.tags?.length ? `<div class="experience-tech" ${_listEditable(`custom_sections.${csIdx}.items.${i}.tags`)}>${item.tags.map((t) => `<span class="tech-tag">${t}</span>`).join('')}</div>` : ''}
+${item.url ? `<a href="${item.url}" class="project-link" target="_blank" rel="noopener noreferrer">View &#8599;</a>` : ''}
+</div>
+</div>`).join('\n');
+			const grid = cs.display_type === 'cards'
+				? `<div class="projects-grid">${cardItems}</div>`
+				: cs.display_type === 'timeline'
+				? `<div class="timeline">${tlItems}</div>`
+				: `<div class="achievements-grid">${listItems}</div>`;
+			return `<section id="${cs.section_id}" class="section">
+<div class="container">
+<h2 class="section-title">${cs.title}</h2>
+${grid}
 <button class="ce-add-btn" data-add-section="custom_sections.${csIdx}.items">+ Add Item</button>
+</div>
 </section>`;
 		}).filter(Boolean).join('\n')
 		: '';

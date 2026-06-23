@@ -2,11 +2,13 @@
 	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
 	import { onMount, onDestroy } from 'svelte';
-	import { fly, fade, scale } from 'svelte/transition';
+	import { fly, scale } from 'svelte/transition';
 	import { elasticOut, cubicOut } from 'svelte/easing';
 	import { resumeProcessing } from '$lib/stores/resumeProcessing';
+	import { authStore } from '$lib/stores/auth';
 	import Spinner from '$lib/components/common/Spinner.svelte';
 	import BreadcrumbHeader from '$lib/components/common/BreadcrumbHeader.svelte';
+	import ProcessingSteps from '$lib/components/common/ProcessingSteps.svelte';
 	import type { FailureStage } from '$lib/services/resumeStatus';
 
 	const uploadId: string = $page.params.uploadId ?? '';
@@ -50,24 +52,7 @@
 		}
 	] as const;
 
-	// ─── Helpers ─────────────────────────────────────────────────────────────────
-	function activeStepIndex(status: string | null): number {
-		if (!status) return 0;
-		const idx = STEPS.findIndex((s) => (s.statuses as readonly string[]).includes(status));
-		return idx === -1 ? 0 : idx;
-	}
-
-	function isStepDone(i: number, status: string | null): boolean {
-		// COMPLETE means all steps finished — every step shows a checkmark
-		if (status === 'COMPLETE') return true;
-		return activeStepIndex(status) > i;
-	}
-
-	function isStepActive(i: number, status: string | null): boolean {
-		// COMPLETE has no active step — avoids last step showing a spinner
-		if (status === 'COMPLETE') return false;
-		return activeStepIndex(status) === i;
-	}
+	// Step active/done logic now lives in the shared <ProcessingSteps> component.
 
 	// Maps failureStage to a short badge label
 	const STAGE_LABELS: Record<FailureStage, string> = {
@@ -87,6 +72,25 @@
 			// clipboard access denied — silently ignore
 		}
 	}
+
+	// Auto-redirect to edit page 2 s after portfolio is ready
+	let redirectCountdown = $state(2);
+	$effect(() => {
+		if ($resumeProcessing.status !== 'COMPLETE') return;
+		const userId = $authStore.user?.userId;
+		if (!userId) return;
+
+		const editUrl = `/app/portfolio/${userId}/${uploadId}/edit`;
+		const tick = setInterval(() => {
+			redirectCountdown -= 1;
+			if (redirectCountdown <= 0) {
+				clearInterval(tick);
+				goto(editUrl);
+			}
+		}, 1000);
+
+		return () => clearInterval(tick);
+	});
 
 	// ─── Cancel ──────────────────────────────────────────────────────────────────
 	async function handleCancel() {
@@ -224,10 +228,10 @@
 						{#if $resumeProcessing.status === 'COMPLETE'}
 							<div in:scale={{ duration: 400, easing: elasticOut, start: 0.8 }}>
 								<p class="text-xs font-bold tracking-widest text-emerald-500 uppercase">
-									All done
+									Deployed
 								</p>
 								<h1 class="mt-2 font-display text-3xl font-bold text-ink" style="letter-spacing:-0.02em">
-									Your portfolio is live!
+									Portfolio ready!
 								</h1>
 							</div>
 						{:else}
@@ -240,159 +244,58 @@
 						{/if}
 					</div>
 
-					<!-- Step list -->
-					<ol class="space-y-0">
-						{#each STEPS as step, i}
-							{@const done = isStepDone(i, $resumeProcessing.status)}
-							{@const active = isStepActive(i, $resumeProcessing.status)}
-							<li class="flex gap-5">
-								<div class="flex flex-col items-center">
-									<div
-										class="relative flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl transition-all duration-500 border
-										{done ? 'bg-brand border-brand text-white shadow-md' : active ? 'bg-brand border-brand text-white' : 'bg-surface-subtle border-surface-muted text-ink-muted'}"
-									>
-										{#if done}
-											<span class="check-pop">
-												<svg
-													fill="none"
-													viewBox="0 0 24 24"
-													stroke-width="2.5"
-													stroke="currentColor"
-													class="h-6 w-6"
-												>
-													<path
-														stroke-linecap="round"
-														stroke-linejoin="round"
-														d="m4.5 12.75 6 6 9-13.5"
-													/>
-												</svg>
-											</span>
-										{:else if active}
-											<Spinner size="sm" />
-										{:else}
-											<svg
-												fill="none"
-												viewBox="0 0 24 24"
-												stroke-width="1.5"
-												stroke="currentColor"
-												class="h-5 w-5"
-											>
-												<path stroke-linecap="round" stroke-linejoin="round" d={step.iconPath} />
-											</svg>
-										{/if}
-									</div>
+					<!-- Step list (shared with the upload wizard's analyzing view) -->
+					<ProcessingSteps
+						steps={STEPS}
+						status={$resumeProcessing.status}
+						message={$resumeProcessing.message}
+						allDone={$resumeProcessing.status === 'COMPLETE'}
+					/>
 
-									{#if i < STEPS.length - 1}
-										<div
-											class="my-2 w-0.5 flex-1 overflow-hidden rounded-full bg-surface-muted"
-											style="min-height: 2rem;"
-										>
-											<div
-												class="w-full rounded-full transition-all duration-700 ease-out bg-brand"
-												style="height: {done ? '100%' : '0%'};"
-											></div>
-										</div>
-									{/if}
-								</div>
-
-								<div class="pb-8 {i === STEPS.length - 1 ? 'pb-2' : ''}">
-									<p
-										class="mt-3 text-base font-bold transition-colors duration-300
-										{done ? 'text-ink' : active ? 'text-ink' : 'text-ink-muted'}"
-									>
-										{step.label}
-									</p>
-									{#if active}
-										<p
-											in:fade={{ duration: 250 }}
-											class="mt-1 text-sm leading-relaxed text-ink-soft"
-										>
-											{$resumeProcessing.message ?? step.fallback}
-										</p>
-										{#if $resumeProcessing.status !== 'COMPLETE'}
-											<div class="mt-3 flex gap-1.5">
-												{#each [0, 1, 2] as dot}
-													<div
-														class="dot-bounce h-1.5 w-1.5 rounded-full bg-brand/50"
-														style="animation-delay: {dot * 0.18}s"
-													></div>
-												{/each}
-											</div>
-										{/if}
-									{:else if done}
-										<p class="mt-1 text-sm text-ink-soft">{step.fallback}</p>
-									{/if}
-								</div>
-							</li>
-						{/each}
-					</ol>
-
-					<!-- Portfolio URL reveal -->
-					{#if $resumeProcessing.status === 'COMPLETE' && $resumeProcessing.portfolioPath}
+					<!-- Complete: deployed confirmation + auto-redirect -->
+					{#if $resumeProcessing.status === 'COMPLETE'}
 						<div
 							in:fly={{ y: 20, duration: 450, easing: cubicOut }}
-							class="mt-6 overflow-hidden rounded-2xl border border-surface-muted bg-surface-subtle p-6"
+							class="mt-6 overflow-hidden rounded-2xl border border-emerald-100 bg-emerald-50 p-6 text-center"
 						>
-							<p class="mb-3 text-xs font-bold tracking-widest text-ink-soft uppercase">
-								Your portfolio URL
-							</p>
-							<div
-								class="flex items-center gap-3 rounded-xl border border-surface-muted bg-white px-4 py-3 shadow-sm"
-							>
-								<svg
-									xmlns="http://www.w3.org/2000/svg"
-									fill="none"
-									viewBox="0 0 24 24"
-									stroke-width="2"
-									stroke="currentColor"
-									class="h-5 w-5 shrink-0 text-ink-muted"
-								>
-									<path
-										stroke-linecap="round"
-										stroke-linejoin="round"
-										d="M13.19 8.688a4.5 4.5 0 0 1 1.242 7.244l-4.5 4.5a4.5 4.5 0 0 1-6.364-6.364l1.757-1.757m13.35-.622 1.757-1.757a4.5 4.5 0 0 0-6.364-6.364l-4.5 4.5a4.5 4.5 0 0 0 1.242 7.244"
-									/>
+							<!-- Deployed icon -->
+							<div class="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-emerald-500 text-white shadow-md">
+								<svg fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="h-6 w-6">
+									<path stroke-linecap="round" stroke-linejoin="round" d="M12 21a9.004 9.004 0 0 0 8.716-6.747M12 21a9.004 9.004 0 0 1-8.716-6.747M12 21c2.485 0 4.5-4.03 4.5-9S14.485 3 12 3m0 18c-2.485 0-4.5-4.03-4.5-9S9.515 3 12 3m0 0a8.997 8.997 0 0 1 7.843 4.582M12 3a8.997 8.997 0 0 0-7.843 4.582m15.686 0A11.953 11.953 0 0 1 12 10.5c-2.998 0-5.74-1.1-7.843-2.918m15.686 0A8.959 8.959 0 0 1 21 12c0 .778-.099 1.533-.284 2.253M3 12c0 .778.099 1.533.284 2.253" />
 								</svg>
-								<span class="flex-1 truncate text-sm font-bold text-ink">
-									{$resumeProcessing.portfolioPath}
-								</span>
-								<button
-									onclick={() => copyUrl($resumeProcessing.portfolioPath!)}
-									class="shrink-0 rounded-lg px-3 py-1.5 text-xs font-bold transition-all
-									{copied ? 'bg-emerald-100 text-emerald-700' : 'bg-surface-muted text-ink-soft hover:bg-surface-muted hover:text-ink'}"
-								>
-									{copied ? 'Copied!' : 'Copy'}
-								</button>
 							</div>
-							<div class="mt-5 flex flex-col gap-3 sm:flex-row">
-								<a
-									href={$resumeProcessing.portfolioPath}
-									target="_blank"
-									rel="noopener noreferrer"
-									class="flex flex-1 items-center justify-center gap-2 rounded-xl bg-brand py-3 text-sm font-bold text-white shadow-md transition-all hover:bg-brand-dark active:scale-95"
-								>
-									Visit Portfolio
-									<svg
-										xmlns="http://www.w3.org/2000/svg"
-										fill="none"
-										viewBox="0 0 24 24"
-										stroke-width="2.5"
-										stroke="currentColor"
-										class="h-4 w-4"
+							<p class="mt-3 text-sm font-bold text-emerald-700">Portfolio deployed & live</p>
+							<p class="mt-1 text-xs text-emerald-600">
+								Opening editor in {redirectCountdown}s…
+							</p>
+
+							<div class="mt-5 flex flex-col gap-3 sm:flex-row sm:justify-center">
+								<!-- Open public portfolio in new tab -->
+								{#if $resumeProcessing.portfolioPath}
+									<a
+										href={$resumeProcessing.portfolioPath}
+										target="_blank"
+										rel="noopener noreferrer"
+										class="inline-flex items-center justify-center gap-2 rounded-xl border border-emerald-200 bg-white px-5 py-2.5 text-sm font-bold text-emerald-700 transition-all hover:bg-emerald-50 active:scale-95"
 									>
-										<path
-											stroke-linecap="round"
-											stroke-linejoin="round"
-											d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3"
-										/>
-									</svg>
-								</a>
-								<a
-									href="/app/dashboard"
-									class="flex items-center justify-center rounded-xl border border-surface-muted bg-white px-6 py-3 text-sm font-bold text-ink-soft transition-colors hover:border-brand/30 hover:bg-surface-subtle hover:text-ink"
-								>
-									Dashboard
-								</a>
+										<svg fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="h-4 w-4">
+											<path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3" />
+										</svg>
+										Open Portfolio
+									</a>
+								{/if}
+								<!-- Go to editor immediately -->
+								{#if $authStore.user?.userId}
+									<button
+										onclick={() => goto(`/app/portfolio/${$authStore.user!.userId}/${uploadId}/edit`)}
+										class="inline-flex items-center justify-center gap-2 rounded-xl bg-brand px-5 py-2.5 text-sm font-bold text-white shadow-md transition-all hover:bg-brand-dark active:scale-95"
+									>
+										<svg fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="h-4 w-4">
+											<path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Z" />
+										</svg>
+										Go to Editor
+									</button>
+								{/if}
 							</div>
 						</div>
 					{:else if $resumeProcessing.polling}
@@ -441,40 +344,6 @@
 		}
 		100% {
 			background-position: 200% 0;
-		}
-	}
-
-	.check-pop {
-		display: flex;
-		animation: pop-in 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) both;
-	}
-	@keyframes pop-in {
-		0% {
-			transform: scale(0) rotate(-30deg);
-			opacity: 0;
-		}
-		70% {
-			transform: scale(1.2) rotate(5deg);
-		}
-		100% {
-			transform: scale(1) rotate(0deg);
-			opacity: 1;
-		}
-	}
-
-	.dot-bounce {
-		animation: dot-bounce 1.2s ease-in-out infinite;
-	}
-	@keyframes dot-bounce {
-		0%,
-		80%,
-		100% {
-			transform: translateY(0);
-			opacity: 0.4;
-		}
-		40% {
-			transform: translateY(-5px);
-			opacity: 1;
 		}
 	}
 </style>

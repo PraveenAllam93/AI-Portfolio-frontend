@@ -22,6 +22,32 @@ export const GET: RequestHandler = async ({ params, cookies }) => {
 		throw error(503, 'Portfolio service unavailable');
 	}
 
-	if (!upstream.ok) throw error(upstream.status, 'Failed to fetch portfolio');
-	return json(await upstream.json());
+	if (!upstream.ok) throw error(upstream.status, 'Failed to list portfolios');
+
+	const raw = await upstream.json();
+
+	// Back-compat shim: old backend returns a single portfolio object, not { portfolios: [] }.
+	// Remove once list_portfolios Lambda is deployed.
+	if (!Array.isArray(raw.portfolios) && raw.status !== undefined) {
+		return json({
+			portfolios: [
+				{
+					uploadId: raw.uploadId ?? 'current',
+					templateId: raw.templateId ?? 'minimal',
+					status: raw.status,
+					portfolioPath: raw.portfolioPath ?? '',
+					activeVersion: raw.activeVersion ?? null,
+					portfolioUrl: null,
+					isLive: raw.isLive ?? false,
+					category: raw.category ?? 'software_engineer',
+					version: raw.version ?? null,
+					createdAt: raw.createdAt ?? new Date().toISOString(),
+					updatedAt: raw.updatedAt ?? null
+				}
+			],
+			total: 1
+		});
+	}
+
+	return json(raw);
 };

@@ -8,7 +8,7 @@
  */
 
 import type { NormalizedData } from './base';
-import { DEFAULT_SECTION_ORDER, _editable, _listEditable, EDITOR_SCRIPT } from './base';
+import { DEFAULT_SECTION_ORDER, _editable, _listEditable, _rangeEditable, _pairEditable, _imgUpload, EDITOR_SCRIPT } from './base';
 
 const FONTS_URL =
 	'https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700;900&family=Exo+2:ital,wght@0,300;0,400;0,600;1,300&family=Space+Mono:wght@400;700&display=swap';
@@ -94,13 +94,6 @@ const COSMOS_SCRIPT = `<script>
     // reveal
     var ro=new IntersectionObserver(function(entries){entries.forEach(function(e){if(e.isIntersecting){e.target.classList.add('visible');ro.unobserve(e.target);}});},{threshold:.12});
     document.querySelectorAll('.reveal,.tl-item,.exp-card,.project-card,.ach-stat-card,.award-item').forEach(function(el){ro.observe(el);});
-    // skill bars
-    var so=new IntersectionObserver(function(entries){
-      entries.forEach(function(e){
-        if(e.isIntersecting){e.target.querySelectorAll('.skill-fill[data-width]').forEach(function(b){b.style.width=b.getAttribute('data-width')+'%';});so.unobserve(e.target);}
-      });
-    },{threshold:.3});
-    document.querySelectorAll('#skills').forEach(function(el){so.observe(el);});
   }
   // ── STAGGER DELAYS ──
   document.querySelectorAll('.exp-card').forEach(function(el,i){el.style.transitionDelay=(i*.1)+'s';});
@@ -284,12 +277,9 @@ section{position:relative;z-index:1}
 #skills{background:linear-gradient(180deg,transparent,rgba(139,92,246,.03) 50%,transparent)}
 .skills-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:3rem}
 .skill-cat-title{font-family:'Orbitron',sans-serif;font-size:.85rem;color:var(--cyan);letter-spacing:.1em;text-transform:uppercase;margin-bottom:1.5rem;padding-bottom:.5rem;border-bottom:1px solid var(--border)}
-.skill-item{margin-bottom:1.2rem}
-.skill-header{display:flex;justify-content:space-between;margin-bottom:.4rem}
-.skill-name{font-size:.9rem;letter-spacing:.02em}
-.skill-pct{font-family:'Space Mono',monospace;font-size:.75rem;color:var(--cyan)}
-.skill-bar{height:4px;background:rgba(255,255,255,.06);position:relative;overflow:hidden}
-.skill-fill{position:absolute;left:0;top:0;height:100%;background:linear-gradient(90deg,var(--cyan),var(--purple));width:0;transition:width 1.2s ease;box-shadow:0 0 10px rgba(0,245,255,.5)}
+.skill-tags{display:flex;flex-wrap:wrap;gap:.5rem}
+.skill-tag{padding:5px 12px;background:rgba(0,245,255,.05);border:1px solid rgba(0,245,255,.12);font-family:'Space Mono',monospace;font-size:.7rem;color:var(--muted);letter-spacing:.04em;transition:all .3s}
+.skill-tag:hover{border-color:var(--cyan);color:var(--cyan)}
 /* Tech marquee */
 .tech-wrap{margin-top:3rem}
 .tech-scroll-title{font-family:'Orbitron',sans-serif;font-size:.85rem;color:var(--cyan);letter-spacing:.1em;text-transform:uppercase;margin-bottom:1.2rem}
@@ -379,7 +369,7 @@ export function html(v: NormalizedData): string {
 	};
 
 	const navAnchors: [string, string][] = [];
-	if (v.bio || v.location || v.email || v.phone) navAnchors.push(['about', 'About']);
+	if (v.bio || v.skill_groups?.length) navAnchors.push(['about', 'About']);
 	for (const key of order) {
 		if (hidden.has(key)) continue;
 		if (key === 'custom_sections') {
@@ -401,14 +391,15 @@ export function html(v: NormalizedData): string {
 	const lastName = nameParts.slice(1).join(' ') || nameParts[0];
 	const firstName = nameParts[0];
 
-	// Hero stats
-	const yrs = yearsExperience(v.experience);
-	const projCount = v.projects?.length ?? 0;
-	const certCount = v.certifications?.length ?? 0;
+	// Hero stats — use manual overrides if set, fall back to auto-computed values
+	const yrs = v.template_overrides?.years_experience ?? yearsExperience(v.experience);
+	const projCount = v.template_overrides?.projects_count ?? (v.projects?.length ?? 0);
+	const certCount = v.template_overrides?.certifications_count ?? (v.certifications?.length ?? 0);
+	const ted = (key: string) => v.edit_mode ? `contenteditable="true" data-path="template_overrides.${key}"` : '';
 	const statChips = [
-		yrs > 0 ? `<div class="stat-chip"><strong>${yrs}+</strong>Years Exp</div>` : '',
-		projCount > 0 ? `<div class="stat-chip"><strong>${projCount}+</strong>Projects</div>` : '',
-		certCount > 0 ? `<div class="stat-chip"><strong>${certCount}</strong>Certs</div>` : '',
+		yrs > 0 ? `<div class="stat-chip"><strong><span ${ted('years_experience')}>${yrs}</span>+</strong>Years Exp</div>` : '',
+		projCount > 0 ? `<div class="stat-chip"><strong><span ${ted('projects_count')}>${projCount}</span>+</strong>Projects</div>` : '',
+		certCount > 0 ? `<div class="stat-chip"><strong><span ${ted('certifications_count')}>${certCount}</span></strong>Certs</div>` : '',
 	].filter(Boolean).join('');
 
 	// About tags — all unique skills flattened
@@ -417,7 +408,7 @@ export function html(v: NormalizedData): string {
 		? `<div class="about-tags">${allSkills.map((s) => `<span class="about-tag">${s}</span>`).join('')}</div>` : '';
 
 	// About section
-	const aboutHtml = v.bio || v.email || v.phone || v.location
+	const aboutHtml = v.bio || allSkills.length > 0
 		? `<section id="about">
 <div class="section-wrap"><div class="sw-inner">
 <div class="section-label">About Me</div>
@@ -432,7 +423,6 @@ export function html(v: NormalizedData): string {
 </div>
 <div class="about-text">
 ${v.bio ? `<p ${_editable('portfolio.bio', true)}>${v.bio}</p>` : ''}
-${v.location ? `<p>&#128205; ${v.location}</p>` : ''}
 ${aboutTagsHtml}
 </div>
 </div>
@@ -453,7 +443,7 @@ ${v.experience.map((exp, i) => {
 <div class="exp-icon">${roleInitial}</div>
 <div class="exp-role" ${_editable(`experience.${i}.role`)}>${exp.role}</div>
 ${exp.company ? `<div class="exp-company" ${_editable(`experience.${i}.company`)}>${exp.company}</div>` : ''}
-${exp.duration ? `<div class="exp-period" ${_editable(`experience.${i}.duration`)}>${exp.duration}</div>` : ''}
+${_rangeEditable(`experience.${i}.start_date`, exp.start_date, `experience.${i}.end_date`, exp.end_date, v.edit_mode) ? `<div class="exp-period">${_rangeEditable(`experience.${i}.start_date`, exp.start_date, `experience.${i}.end_date`, exp.end_date, v.edit_mode)}</div>` : ''}
 ${exp.description ? `<ul class="exp-bullets"><li ${_editable(`experience.${i}.description`, true)}>${exp.description}</li></ul>` : ''}
 ${exp.key_points?.length ? `<ul class="exp-bullets" ${_listEditable(`experience.${i}.key_points`)}>${exp.key_points.map((k) => `<li>${k}</li>`).join('')}</ul>` : ''}
 </div>`;
@@ -475,8 +465,8 @@ ${v.education.map((edu, i) => `<div class="tl-item" data-item-wrap>
 <div class="tl-dot">&#127891;</div>
 <div class="tl-content">
 <div class="tl-meta">
-<span class="tl-title" ${_editable(`education.${i}.degree`)}>${[edu.degree, edu.field_of_study].filter(Boolean).join(' in ')}</span>
-${edu.year_range ? `<span class="tl-date" ${_editable(`education.${i}.year_range`)}>${edu.year_range}</span>` : ''}
+<span class="tl-title">${_pairEditable(`education.${i}.degree`, edu.degree, `education.${i}.field_of_study`, edu.field_of_study, v.edit_mode, ' in ')}</span>
+${_rangeEditable(`education.${i}.start_year`, edu.start_year, `education.${i}.end_year`, edu.end_year, v.edit_mode, '–') ? `<span class="tl-date">${_rangeEditable(`education.${i}.start_year`, edu.start_year, `education.${i}.end_year`, edu.end_year, v.edit_mode, '–')}</span>` : ''}
 </div>
 ${edu.institution ? `<div class="tl-place" ${_editable(`education.${i}.institution`)}>${edu.institution}</div>` : ''}
 ${edu.grade_or_score ? `<div class="tl-desc" ${_editable(`education.${i}.grade_or_score`)}>${edu.grade_or_score}</div>` : ''}
@@ -501,11 +491,11 @@ ${v.projects.map((p, i) => {
 	const iconInitial = (p.title[0] ?? 'P').toUpperCase();
 	const thumbImg = p.images?.[0];
 	const respHtml = p.responsibilities?.length
-		? `<ul class="exp-bullets" ${_listEditable(`projects.${i}.responsibilities`)}>${p.responsibilities.slice(0, 3).map(r => `<li>${r}</li>`).join('')}</ul>`
+		? `<ul class="exp-bullets" ${_listEditable(`projects.${i}.responsibilities`)}>${p.responsibilities.map(r => `<li>${r}</li>`).join('')}</ul>`
 		: '';
 	return `<div class="project-card" data-item-wrap>
 <button class="del-btn ce-del-btn" data-del-section="projects" data-del-index="${i}">&#x2715;</button>
-<div class="proj-thumb">
+<div class="proj-thumb" ${_imgUpload(`projects.${i}.images`, v.edit_mode, 'Upload image')}>
 ${thumbImg ? `<img class="proj-thumb-img" src="${thumbImg}" alt="${p.title}">` : ''}
 <div class="proj-thumb-bg" style="background:${bg}"></div>
 ${thumbImg ? '' : `<div class="proj-thumb-icon">${iconInitial}</div>`}
@@ -525,7 +515,7 @@ ${url ? `<div class="proj-links"><a href="${url}" class="proj-link" target="_bla
 </div></div>
 </section>` : '';
 
-	// Skills — bars + tech marquee
+	// Skills — tags + tech marquee
 	const allTechs = [...new Set(v.skill_groups?.flatMap((g) => g.skills) ?? [])];
 	const techChipsHtml = allTechs.length
 		? `<div class="tech-wrap">
@@ -542,14 +532,11 @@ ${url ? `<div class="proj-links"><a href="${url}" class="proj-link" target="_bla
 <h2 class="section-title">Technical <span>Arsenal</span></h2>
 <div class="skills-grid">
 ${v.skill_groups.map((g, i) => {
-	const pcts = [95, 90, 88, 85, 82, 78, 75, 72].slice(0, g.skills.length);
+	const tags = g.skills.map((s) => `<span class="skill-tag">${s}</span>`).join('');
 	return `<div data-item-wrap>
 <button class="del-btn ce-del-btn" data-del-section="skills" data-del-index="${i}">&#x2715;</button>
 <div class="skill-cat-title" ${_editable(`skills.${i}.category`)}>${g.category}</div>
-${g.skills.map((s, si) => `<div class="skill-item">
-<div class="skill-header"><span class="skill-name">${s}</span><span class="skill-pct">${pcts[si] ?? 65}%</span></div>
-<div class="skill-bar"><div class="skill-fill" data-width="${pcts[si] ?? 65}" style="width:0"></div></div>
-</div>`).join('')}
+<div class="skill-tags" ${_listEditable(`skills.${i}.skills`)}>${tags}</div>
 </div>`;
 }).join('\n')}
 </div>
@@ -568,8 +555,7 @@ ${yrs > 0 || projCount > 0 || certCount > 0 ? `<div class="ach-grid">
 ${yrs > 0 ? `<div class="ach-stat-card"><div class="ach-num">${yrs}+</div><div class="ach-label">Years Experience</div></div>` : ''}
 ${projCount > 0 ? `<div class="ach-stat-card"><div class="ach-num">${projCount}+</div><div class="ach-label">Projects Shipped</div></div>` : ''}
 ${certCount > 0 ? `<div class="ach-stat-card"><div class="ach-num">${certCount}</div><div class="ach-label">Certifications</div></div>` : ''}
-<div class="ach-stat-card"><div class="ach-num">${v.achievements.length}</div><div class="ach-label">Achievements</div></div>
-</div>` : ''}
+<div class="ach-stat-card"><div class="ach-num">${v.achievements.length}</div><div class="ach-label">Achievements</div></div></div>` : ''}
 <div class="awards-grid">
 ${v.achievements.map((a, i) => `<div class="award-item" data-item-wrap>
 <button class="del-btn ce-del-btn" data-del-section="achievements" data-del-index="${i}">&#x2715;</button>
@@ -616,7 +602,7 @@ ${v.certifications.map((c, i) => `<div class="cert-card" data-item-wrap>
 <button class="del-btn ce-del-btn" data-del-section="certifications" data-del-index="${i}">&#x2715;</button>
 <div class="cert-ico">&#10003;</div>
 <div>
-<div class="cert-name">${c.url ? `<a href="${c.url}" target="_blank" rel="noopener noreferrer">${c.name}</a>` : c.name}</div>
+<div class="cert-name"${!c.url ? ` ${_editable(`certifications.${i}.name`)}` : ''}>${c.url ? `<a href="${c.url}" target="_blank" rel="noopener noreferrer">${c.name}</a>` : c.name}</div>
 ${c.issuer ? `<div class="cert-issuer" ${_editable(`certifications.${i}.issuer`)}>${c.issuer}</div>` : ''}
 ${c.year ? `<div class="cert-year" ${_editable(`certifications.${i}.year`)}>${c.year}</div>` : ''}
 </div>
@@ -702,9 +688,7 @@ ${v.github_url ? `<a href="${v.github_url}" class="social-link" target="_blank" 
 </div>
 </div>
 <div class="contact-info-cards">
-${v.email ? `<div class="contact-card-item"><div class="contact-card-label">Email</div><div class="contact-card-val">${v.email}</div></div>` : ''}
-${v.location ? `<div class="contact-card-item"><div class="contact-card-label">Location</div><div class="contact-card-val">${v.location}</div></div>` : ''}
-${v.headline ? `<div class="contact-card-item"><div class="contact-card-label">Role</div><div class="contact-card-val">${v.headline}</div></div>` : ''}
+${v.profile_headline ? `<div class="contact-card-item"><div class="contact-card-label">Role</div><div class="contact-card-val" ${_editable('profile.headline')}>${v.profile_headline}</div></div>` : ''}
 </div>
 </div>
 </div></div>
@@ -713,22 +697,37 @@ ${v.headline ? `<div class="contact-card-item"><div class="contact-card-label">R
 	const customSectionsHtml = !hidden.has('custom_sections') && (v.custom_sections?.length ?? 0) > 0
 		? (v.custom_sections ?? []).map((cs, csIdx) => {
 			if (!cs.items?.length) return '';
-			const items = cs.items.map((item, i) => `<div class="exp-card" data-item-wrap>
-<button class="ce-del-btn" data-del-section="custom_sections" data-del-index="${i}">&#x2715;</button>
-${item.label ? `<h3 class="exp-role">${item.label}</h3>` : ''}
-${item.subtitle ? `<p class="exp-company">${item.subtitle}</p>` : ''}
-${item.value ? `<p class="exp-desc">${item.value}</p>` : ''}
-${item.tags?.length ? `<div class="exp-tags">${item.tags.map((t) => `<span class="tag">${t}</span>`).join('')}</div>` : ''}
+			const items = cs.items.map((item, i) => `<div class="exp-card" data-item-wrap data-cs-idx="${csIdx}">
+<button class="del-btn ce-del-btn" data-del-section="custom_sections.${csIdx}" data-del-index="${i}">&#x2715;</button>
+${item.label ? `<div class="exp-role" ${_editable(`custom_sections.${csIdx}.items.${i}.label`)}>${item.label}</div>` : ''}
+${item.subtitle ? `<div class="exp-company" ${_editable(`custom_sections.${csIdx}.items.${i}.subtitle`)}>${item.subtitle}</div>` : ''}
+${item.value ? `<p class="tl-desc" ${_editable(`custom_sections.${csIdx}.items.${i}.value`, true)}>${item.value}</p>` : ''}
+${item.tags?.length ? `<div class="proj-stack" ${_listEditable(`custom_sections.${csIdx}.items.${i}.tags`)}>${item.tags.map((t) => `<span class="stack-pill">${t}</span>`).join('')}</div>` : ''}
 ${item.url ? `<a href="${item.url}" class="proj-link" target="_blank" rel="noopener noreferrer">View &#8599;</a>` : ''}
 </div>`).join('\n');
+			const tlItems = cs.items.map((item, i) => `<div class="tl-item visible" data-item-wrap data-cs-idx="${csIdx}">
+<button class="del-btn ce-del-btn" data-del-section="custom_sections.${csIdx}" data-del-index="${i}">&#x2715;</button>
+<div class="tl-dot">&#9679;</div>
+<div class="tl-content">
+${item.label ? `<div class="exp-role" ${_editable(`custom_sections.${csIdx}.items.${i}.label`)}>${item.label}</div>` : ''}
+${item.subtitle ? `<div class="exp-company" ${_editable(`custom_sections.${csIdx}.items.${i}.subtitle`)}>${item.subtitle}</div>` : ''}
+${item.value ? `<p class="tl-desc" ${_editable(`custom_sections.${csIdx}.items.${i}.value`, true)}>${item.value}</p>` : ''}
+${item.tags?.length ? `<div class="proj-stack" ${_listEditable(`custom_sections.${csIdx}.items.${i}.tags`)}>${item.tags.map((t) => `<span class="stack-pill">${t}</span>`).join('')}</div>` : ''}
+${item.url ? `<a href="${item.url}" class="proj-link" target="_blank" rel="noopener noreferrer">View &#8599;</a>` : ''}
+</div>
+</div>`).join('\n');
 			const grid = cs.display_type === 'cards'
-				? `<div class="projects-grid">${items}</div>`
-				: `<div class="exp-list">${items}</div>`;
+				? `<div class="exp-grid">${items}</div>`
+				: cs.display_type === 'timeline'
+				? `<div class="tl">${tlItems}</div>`
+				: `<div style="display:flex;flex-direction:column;gap:1.5rem">${items}</div>`;
 			return `<section id="${cs.section_id}">
-<div class="section-label">${cs.display_type}</div>
+<div class="section-wrap"><div class="sw-inner">
+<div class="section-label">${cs.title}</div>
 <h2 class="section-title">${cs.title}</h2>
 ${grid}
 <button class="ce-add-btn" data-add-section="custom_sections.${csIdx}.items">+ Add Item</button>
+</div></div>
 </section>`;
 		}).filter(Boolean).join('\n')
 		: '';
@@ -774,8 +773,8 @@ ${v.email ? `<a href="mailto:${v.email}" class="nav-cta">Hire Me</a>` : ''}
 <section id="hero">
 <div class="hero-inner">
 <div>
-<div class="hero-badge">${v.headline || 'Software Engineer'}</div>
-<h1 class="hero-name">
+<div class="hero-badge" ${_editable('profile.headline')}>${v.headline || 'Software Engineer'}</div>
+<h1 class="hero-name" ${_editable('profile.full_name')}>
 <span class="line1">${firstName}</span>
 <span class="line2">${lastName || firstName}</span>
 </h1>
