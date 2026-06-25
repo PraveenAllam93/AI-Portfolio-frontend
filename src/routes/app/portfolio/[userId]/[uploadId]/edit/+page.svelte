@@ -2576,8 +2576,11 @@
 			switch (d.type) {
 				case 'field-focus': {
 					paused = true;
-					// Snapshot the pre-edit value so blur can tell if anything actually changed.
-					focusBaseline = { path: d.path as string, value: _currentValueForPath(d.path as string) };
+					// Snapshot the field's value exactly as the in-iframe editor reports it
+					// (getValue), so blur can compare editor-value to editor-value. This
+					// avoids state/normalization mismatches that made an unchanged field read
+					// as "changed" on repeated clicks.
+					focusBaseline = { path: d.path as string, value: (d.value as string) ?? '' };
 					// Cancel any pending re-render timer started before focus.
 					// Without this, a 300ms timer fires mid-edit and wipes the iframe.
 					if (timer) { clearTimeout(timer); timer = null; }
@@ -2653,10 +2656,12 @@
 					// with an UNCHANGED value. Compare against the focus-time baseline (state
 					// is already live-synced by field-change) and only save + mark dirty on a
 					// real change — otherwise just clicking sections activates Publish.
-					const baseline = focusBaseline && focusBaseline.path === d.path
-						? focusBaseline.value
-						: _currentValueForPath(d.path);
-					const changed = _incomingInlineValue(d.path, d.value) !== baseline;
+					// Primary check: compare the editor's blur value against the editor's
+					// focus value (both from getValue) — only a real keystroke makes them
+					// differ. Fall back to state comparison only if no baseline was captured.
+					const changed = focusBaseline && focusBaseline.path === d.path
+						? (d.value as string) !== focusBaseline.value
+						: _incomingInlineValue(d.path, d.value) !== _currentValueForPath(d.path);
 					focusBaseline = null;
 					updateFieldFromIframe(d.path, d.value);
 					paused = false;

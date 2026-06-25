@@ -207,7 +207,7 @@ export const EDITOR_JS = `(function(){
   document.addEventListener('focusin',function(e){
     var el=e.target.closest('[data-path]');
     if(!el)return;
-    window.parent.postMessage({type:'field-focus',path:el.dataset.path},'*');
+    window.parent.postMessage({type:'field-focus',path:el.dataset.path,value:getValue(el)},'*');
   });
 
   document.addEventListener('input',function(e){
