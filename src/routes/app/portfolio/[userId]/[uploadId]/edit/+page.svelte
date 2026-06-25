@@ -2139,6 +2139,42 @@
 		}
 	}
 
+	// Reads the current in-state value for an inline-edit path, so field-blur can
+	// detect whether the contenteditable value actually changed before saving.
+	// Mirrors the path → state mapping in updateFieldFromIframe.
+	function _currentValueForPath(path: string): string {
+		const parts = path.split('.');
+		const [ns, idxOrKey, field] = parts;
+		if (ns === 'profile') return (rawProfile as unknown as Record<string, string>)[idxOrKey] ?? '';
+		if (ns === 'portfolio') return profileFields[idxOrKey as EditableField]?.value ?? '';
+		if (ns === 'skills') return field === 'category' ? (skillGroups[parseInt(idxOrKey)]?.category ?? '') : '';
+		if (ns === 'design_philosophy') return stringSections.design_philosophy ?? '';
+		if (ns === 'template_overrides') {
+			const v = templateOverrides[idxOrKey];
+			return v == null ? '' : String(v);
+		}
+		if (ns === 'custom_sections') {
+			const csIdx = parseInt(idxOrKey);
+			const itemIdx = parseInt(parts[3]);
+			const csField = parts[4];
+			const item = customSections[csIdx]?.items?.[itemIdx] as Record<string, unknown> | undefined;
+			const cur = item?.[csField];
+			return typeof cur === 'string' ? cur : (cur == null ? '' : String(cur));
+		}
+		const idx = parseInt(idxOrKey);
+		const data = sections[ns]?.[idx]?.data as Record<string, unknown> | undefined;
+		const val = data?.[field];
+		return typeof val === 'string' ? val : (val == null ? '' : String(val));
+	}
+
+	// Normalizes the incoming contenteditable value the same way the comparison
+	// target is stored, so an unchanged field doesn't read as "changed".
+	function _incomingInlineValue(path: string, rawValue: string): string {
+		return path.split('.')[0] === 'template_overrides'
+			? String(rawValue).replace(/\D/g, '')
+			: _normalizeInlineValue(path, rawValue);
+	}
+
 	// Debounced per-field save after inline edit blur
 	const _saveTimers: Record<string, ReturnType<typeof setTimeout>> = {};
 
@@ -2492,6 +2528,10 @@
 		let timer: ReturnType<typeof setTimeout> | null = null;
 		let pendingHtml: string | null = null;
 		let paused = false;
+		// Value of the focused inline field at focus time. field-change live-syncs state
+		// on every keystroke, so at blur we compare against this baseline (not current
+		// state) to decide whether a real edit happened.
+		let focusBaseline: { path: string; value: string } | null = null;
 		// Tracks the pending scroll-to-card timer from a focus-item event.
 		let focusItemTimer: ReturnType<typeof setTimeout> | null = null;
 		// When a field-specific click (field-focus / open-list-editor) is detected,
@@ -2536,6 +2576,8 @@
 			switch (d.type) {
 				case 'field-focus': {
 					paused = true;
+					// Snapshot the pre-edit value so blur can tell if anything actually changed.
+					focusBaseline = { path: d.path as string, value: _currentValueForPath(d.path as string) };
 					// Cancel any pending re-render timer started before focus.
 					// Without this, a 300ms timer fires mid-edit and wipes the iframe.
 					if (timer) { clearTimeout(timer); timer = null; }
@@ -2605,12 +2647,23 @@
 				case 'field-change':
 					updateFieldFromIframe(d.path, d.value);
 					break;
-				case 'field-blur':
+				case 'field-blur': {
+					// The preview is fully contenteditable, so merely clicking into a field
+					// and clicking away (e.g. navigating between sections) fires field-blur
+					// with an UNCHANGED value. Compare against the focus-time baseline (state
+					// is already live-synced by field-change) and only save + mark dirty on a
+					// real change — otherwise just clicking sections activates Publish.
+					const baseline = focusBaseline && focusBaseline.path === d.path
+						? focusBaseline.value
+						: _currentValueForPath(d.path);
+					const changed = _incomingInlineValue(d.path, d.value) !== baseline;
+					focusBaseline = null;
 					updateFieldFromIframe(d.path, d.value);
 					paused = false;
 					if (pendingHtml) { const h = pendingHtml; pendingHtml = null; paint(h); }
-					scheduleSaveFromIframe(d.path);
+					if (changed) scheduleSaveFromIframe(d.path);
 					break;
+				}
 				case 'selection':
 					aiToolbar = {
 						path: d.path, selectedText: d.text,
