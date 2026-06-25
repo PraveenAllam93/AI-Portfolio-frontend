@@ -362,6 +362,9 @@
 	// ── Custom sections ─────────────────────────────────────────────────────────
 
 	let customSections = $state<CustomSection[]>([]);
+	// JSON snapshot of customSections as last loaded/saved — used to skip no-op saves
+	// (e.g. focusing then blurring a field without changing anything).
+	let customSectionsOriginal = '[]';
 	let csExpanded = $state<Record<number, boolean>>({});
 	let csSaveStatus = $state<'idle' | 'saving' | 'saved' | 'error'>('idle');
 	let csSaveError = $state('');
@@ -1003,6 +1006,8 @@
 				allowedDt.includes(cs.display_type) ? cs : { ...cs, display_type: allowedDt[0] }
 			);
 		}
+		// Snapshot the loaded (and normalized) custom sections so a no-op blur doesn't save.
+		customSectionsOriginal = JSON.stringify(customSections);
 
 		// Build dndItems from visible sections in order
 		const visibleKeys = Object.entries(SECTION_CONFIG)
@@ -1815,10 +1820,15 @@
 	// ── Custom sections ──────────────────────────────────────────────────────────
 
 	async function saveCustomSections() {
+		// Skip no-op saves (e.g. focusing then blurring a field with no change),
+		// otherwise the Publish button flips on without a real edit.
+		const snapshot = JSON.stringify(customSections);
+		if (snapshot === customSectionsOriginal) return;
 		csSaveStatus = 'saving';
 		csSaveError = '';
 		const result = await savePortfolioSection(userId, uploadId, 'custom_sections', customSections);
 		if (result.ok) {
+			customSectionsOriginal = snapshot;
 			csSaveStatus = 'saved';
 			queuePreviewRefresh();
 			// Ensure custom_sections is in the section order so the portfolio generator renders it.
@@ -1992,7 +2002,13 @@
 
 	async function handleDndFinalize(e: CustomEvent<{ items: DndItem[] }>) {
 		dndItems = e.detail.items;
-		sectionOrder = dndItems.map(i => i.id);
+		const newOrder = dndItems.map(i => i.id);
+		// svelte-dnd-action fires `finalize` even on a plain click (a zero-distance
+		// drag) when navigating between sections. Only persist + mark dirty when the
+		// order actually changed — otherwise just clicking sections flips the Publish
+		// button on with no real edit.
+		if (JSON.stringify(newOrder) === JSON.stringify(sectionOrder)) return;
+		sectionOrder = newOrder;
 		await updatePortfolioConfig(userId, uploadId, { sectionOrder });
 		queuePreviewRefresh();
 	}
@@ -2007,9 +2023,11 @@
 	}
 
 	async function applyTemplate(newId: string) {
-		templateId = newId;
 		hoverTemplateId = null;
 		templateDropdownOpen = false;
+		// Re-selecting the already-active template is a no-op — don't save or mark dirty.
+		if (newId === templateId) return;
+		templateId = newId;
 		await updatePortfolioConfig(userId, uploadId, { templateId: newId });
 		queuePreviewRefresh();
 	}
