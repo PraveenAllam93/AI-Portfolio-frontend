@@ -23,6 +23,33 @@ export const DEFAULT_SECTION_ORDER: string[] = [
 	'custom_sections'
 ];
 
+// Profession-specific sections and the categories they belong to. Any section
+// key NOT listed here is universal (rendered for every profession). This mirrors
+// the edit page's SECTION_CONFIG categories and the backend per-category parse
+// models. It is the single guard that keeps foreign-profession sections (e.g.
+// finance's financial_modeling, marketing's campaigns) out of a portfolio that
+// doesn't belong to that profession — for EVERY template and the published site,
+// even when stale cross-profession data or a kitchen-sink template would
+// otherwise surface an empty "+ Add" scaffold in edit mode.
+const SECTION_CATEGORIES: Record<string, string[]> = {
+	projects:              ['software_engineer', 'designer', 'civil_engineer', 'mechanical_engineer'],
+	awards:                ['designer'],
+	design_philosophy:     ['designer'],
+	software_proficiency:  ['designer', 'civil_engineer', 'mechanical_engineer'],
+	campaigns:             ['marketing'],
+	financial_modeling:    ['finance'],
+	investment_portfolios: ['finance'],
+};
+
+/** True when `key` is a universal section or belongs to `category`.
+ *  An empty/unknown category is treated permissively (no filtering) so we never
+ *  hide legitimate sections on records that predate category tagging. */
+export function sectionAllowedForCategory(key: string, category: string): boolean {
+	if (!category) return true;
+	const cats = SECTION_CATEGORIES[key];
+	return !cats || cats.includes(category);
+}
+
 const _ALLOWED_URL_RE = /^https?:\/\//i;
 
 export function _e(value: unknown): string {
@@ -619,7 +646,9 @@ export function normalize(
 		custom_sections,
 		template_overrides: templateOverrides ?? {},
 		category,
-		section_order: sectionOrder ?? DEFAULT_SECTION_ORDER,
+		section_order: (sectionOrder ?? DEFAULT_SECTION_ORDER).filter((k) =>
+			sectionAllowedForCategory(k, category)
+		),
 		hidden_sections: hidden,
 		edit_mode: editMode
 	};

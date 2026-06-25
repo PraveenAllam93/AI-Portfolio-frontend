@@ -399,6 +399,19 @@
 	// ── Live preview (client-side rendering) ───────────────────────────────────
 	// Reconstruct ParsedData from in-memory editor state so the preview re-renders
 	// instantly on every keystroke without any server round-trip.
+	// A section belongs to this portfolio only if its profession matches the
+	// current category (or it applies to all via '*'). Keys not in SECTION_CONFIG
+	// (profile, skills, custom_sections) are always allowed. This is the single
+	// source of truth that keeps foreign-profession sections (e.g. campaigns on a
+	// software-engineer portfolio, left behind by an old cross-profession parse)
+	// out of BOTH the section manager and the rendered preview, regardless of
+	// whether stale data exists for them.
+	function sectionMatchesCategory(key: string): boolean {
+		const cfg = SECTION_CONFIG[key];
+		if (!cfg) return true;
+		return cfg.categories.includes('*') || cfg.categories.includes(category);
+	}
+
 	const liveParsedData = $derived<ParsedData>({
 		profile: {
 			full_name:     rawProfile.full_name,
@@ -423,23 +436,25 @@
 		// eslint-disable-next-line @typescript-eslint/no-explicit-any
 		experience:           (sections.experience           ?? []).filter(it => !it.hidden).map(it => it.data as any),
 		// eslint-disable-next-line @typescript-eslint/no-explicit-any
-		projects:             (sections.projects             ?? []).filter(it => !it.hidden).map(it => it.data as any),
+		projects:             sectionMatchesCategory('projects') ? (sections.projects ?? []).filter(it => !it.hidden).map(it => it.data as any) : [],
 		// eslint-disable-next-line @typescript-eslint/no-explicit-any
 		education:            (sections.education            ?? []).filter(it => !it.hidden).map(it => it.data as any),
 		// eslint-disable-next-line @typescript-eslint/no-explicit-any
 		certifications:       (sections.certifications       ?? []).filter(it => !it.hidden).map(it => it.data as any),
 		// eslint-disable-next-line @typescript-eslint/no-explicit-any
 		achievements:         (sections.achievements         ?? []).filter(it => !it.hidden).map(it => it.data as any),
+		// Profession-specific sections: emptied when they don't belong to this
+		// category, so stale cross-profession data never renders or gets re-saved.
 		// eslint-disable-next-line @typescript-eslint/no-explicit-any
-		awards:               (sections.awards               ?? []).filter(it => !it.hidden).map(it => it.data as any),
+		awards:               sectionMatchesCategory('awards') ? (sections.awards ?? []).filter(it => !it.hidden).map(it => it.data as any) : [],
 		// eslint-disable-next-line @typescript-eslint/no-explicit-any
-		campaigns:            (sections.campaigns            ?? []).filter(it => !it.hidden).map(it => it.data as any),
+		campaigns:            sectionMatchesCategory('campaigns') ? (sections.campaigns ?? []).filter(it => !it.hidden).map(it => it.data as any) : [],
 		// eslint-disable-next-line @typescript-eslint/no-explicit-any
-		financial_modeling:   (sections.financial_modeling   ?? []).filter(it => !it.hidden).map(it => it.data as any),
+		financial_modeling:   sectionMatchesCategory('financial_modeling') ? (sections.financial_modeling ?? []).filter(it => !it.hidden).map(it => it.data as any) : [],
 		// eslint-disable-next-line @typescript-eslint/no-explicit-any
-		investment_portfolios:(sections.investment_portfolios?? []).filter(it => !it.hidden).map(it => it.data as any),
-		design_philosophy:    stringSections.design_philosophy ?? '',
-		software_proficiency: (stringSections.software_proficiency ?? '').split('\n').map(s => s.trim()).filter(Boolean),
+		investment_portfolios:sectionMatchesCategory('investment_portfolios') ? (sections.investment_portfolios ?? []).filter(it => !it.hidden).map(it => it.data as any) : [],
+		design_philosophy:    sectionMatchesCategory('design_philosophy') ? (stringSections.design_philosophy ?? '') : '',
+		software_proficiency: sectionMatchesCategory('software_proficiency') ? (stringSections.software_proficiency ?? '').split('\n').map(s => s.trim()).filter(Boolean) : [],
 		// eslint-disable-next-line @typescript-eslint/no-explicit-any
 		custom_sections:      customSections as any,
 	});
@@ -873,14 +888,13 @@
 		}, 200);
 	}
 
+	// Sections are gated strictly by profession. A foreign-profession section
+	// (e.g. financial_modeling on a software-engineer portfolio) must never
+	// appear even if stale data exists for it — that stale data is what the
+	// cache-contamination bug produced, and surfacing it is the symptom.
 	const visibleSectionKeys = $derived(
 		Object.entries(SECTION_CONFIG)
-			.filter(([key, cfg]) => {
-				const cats: string[] = cfg.categories;
-				const matchCat = cats.includes('*') || cats.includes(category);
-				const hasData = parsedDataRef != null && key in parsedDataRef;
-				return matchCat || hasData;
-			})
+			.filter(([key]) => sectionMatchesCategory(key))
 			.map(([key]) => key)
 	);
 
@@ -972,6 +986,15 @@
 		if (result.data?.hiddenSections) hiddenSections = new Set(result.data.hiddenSections);
 		if (result.data?.templateOverrides) templateOverrides = result.data.templateOverrides;
 
+		// The draft has unpublished changes if it was edited after the last publish.
+		// Both timestamps are ISO-UTC strings, so a lexicographic compare is correct.
+		// Survives reloads: an edit made and then refreshed before publishing stays dirty.
+		{
+			const u = result.data?.updatedAt;
+			const p = result.data?.lastPublishedAt;
+			hasUnpublishedChanges = !!u && !!p && u > p;
+		}
+
 		// Normalize any stored display_type the current template can't render,
 		// so the dropdown shows a valid option and the preview matches it.
 		{
@@ -985,7 +1008,7 @@
 		const visibleKeys = Object.entries(SECTION_CONFIG)
 			.filter(([key, cfg]) => {
 				const cats = cfg.categories;
-				return cats.includes('*') || cats.includes(cat) || (parsedData as Record<string, unknown>)[key] != null;
+				return cats.includes('*') || cats.includes(cat);
 			})
 			.map(([key]) => key);
 		if (!visibleKeys.includes('skills')) visibleKeys.push('skills');
@@ -1988,6 +2011,7 @@
 		hoverTemplateId = null;
 		templateDropdownOpen = false;
 		await updatePortfolioConfig(userId, uploadId, { templateId: newId });
+		queuePreviewRefresh();
 	}
 
 	// ── Publish ──────────────────────────────────────────────────────────────────
@@ -2752,10 +2776,10 @@
 			{/if}
 		</div>
 		<div class="flex flex-shrink-0 items-center gap-2">
-			{#if publishStatus === 'done'}
+			{#if publishStatus === 'done' || (!hasUnpublishedChanges && publishStatus === 'idle')}
 				<span class="hidden rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-600 ring-1 ring-emerald-200 sm:inline">Published ✓</span>
 			{/if}
-			<button onclick={handlePublish} disabled={publishStatus === 'publishing'} class="rounded-xl bg-brand px-4 py-2 text-sm font-bold text-white transition-all hover:bg-brand-dark active:scale-95 disabled:opacity-50">
+			<button onclick={handlePublish} disabled={publishStatus === 'publishing' || !hasUnpublishedChanges} title={hasUnpublishedChanges ? 'Publish your changes' : 'No changes to publish'} class="rounded-xl bg-brand px-4 py-2 text-sm font-bold text-white transition-all hover:bg-brand-dark active:scale-95 disabled:cursor-not-allowed disabled:opacity-50">
 				{publishStatus === 'publishing' ? 'Publishing…' : 'Publish'}
 			</button>
 		</div>

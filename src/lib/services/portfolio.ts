@@ -94,7 +94,9 @@ export async function getPortfolioData(
 				templateId: raw.templateId ?? undefined,
 				sectionOrder: raw.sectionOrder ?? undefined,
 				hiddenSections: raw.hiddenSections ?? undefined,
-				templateOverrides: raw.templateOverrides ?? undefined
+				templateOverrides: raw.templateOverrides ?? undefined,
+				updatedAt: raw.updatedAt ?? null,
+				lastPublishedAt: raw.lastPublishedAt ?? null
 			}
 		};
 	} catch {

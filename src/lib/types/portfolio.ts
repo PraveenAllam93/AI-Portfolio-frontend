@@ -169,6 +169,10 @@ export interface PortfolioData {
 	sectionOrder?: string[];
 	hiddenSections?: string[];
 	templateOverrides?: Record<string, number | null>;
+	/** ISO timestamp of the last content edit (bumped by every patch). */
+	updatedAt?: string | null;
+	/** ISO timestamp of the last publish. If updatedAt > lastPublishedAt, the draft has unpublished changes. */
+	lastPublishedAt?: string | null;
 }
 
 export interface PortfolioConfig {
