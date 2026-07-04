@@ -2054,6 +2054,32 @@
 	let iframeEl = $state<HTMLIFrameElement | null>(null);
 	let _forcePaint: ((h: string) => void) | null = null;
 
+	// ── Desktop-accurate preview ────────────────────────────────────────────────
+	// The published site is a desktop layout. The edit preview panel is narrow, so
+	// rendering the iframe at panel width triggers templates' mobile breakpoints
+	// (e.g. marketing hides the hero image column below 900px). To match the real
+	// site we render the iframe at a fixed desktop width and CSS-scale it to fit —
+	// but ONLY on desktop viewports. On phones we keep the native responsive view.
+	const DESKTOP_PREVIEW_W = 1280;
+	let previewContainerW = $state(0);
+	let previewContainerH = $state(0);
+	let isDesktopViewport = $state(false);
+	// Scale factor applied to the iframe (1 = no scaling / native width).
+	const previewScale = $derived(
+		isDesktopViewport && previewContainerW > 0
+			? previewContainerW / DESKTOP_PREVIEW_W
+			: 1
+	);
+	$effect(() => {
+		if (typeof window === 'undefined' || !window.matchMedia) return;
+		// Match the layout breakpoint where the preview panel sits side-by-side (sm).
+		const mq = window.matchMedia('(min-width: 640px)');
+		const apply = () => { isDesktopViewport = mq.matches; };
+		apply();
+		mq.addEventListener('change', apply);
+		return () => mq.removeEventListener('change', apply);
+	});
+
 	interface AiToolbarState {
 		path: string;
 		selectedText: string;
@@ -3060,8 +3086,13 @@
 						<p class="text-sm text-ink-muted">Loading preview…</p>
 					</div>
 				{:else}
-					<div class="absolute inset-4 sm:inset-5 overflow-hidden rounded-2xl shadow-2xl ring-1 ring-black/[0.07]">
-						<iframe use:iframeEditor={renderedHTML} title="Portfolio Preview" class="h-full w-full border-0" style="overflow-y:scroll;scrollbar-width:none;-ms-overflow-style:none;" sandbox="allow-scripts allow-same-origin"></iframe>
+					<div bind:clientWidth={previewContainerW} bind:clientHeight={previewContainerH} class="absolute inset-4 sm:inset-5 overflow-hidden rounded-2xl shadow-2xl ring-1 ring-black/[0.07]">
+						<!-- On desktop, render at a fixed desktop width and scale to fit so the
+						     preview matches the published (non-mobile) layout. On phones
+						     previewScale === 1 → native full-width responsive rendering. -->
+						<iframe use:iframeEditor={renderedHTML} title="Portfolio Preview" class="border-0" style={previewScale !== 1
+							? `width:${DESKTOP_PREVIEW_W}px;height:${previewContainerH / previewScale}px;transform:scale(${previewScale});transform-origin:top left;overflow-y:scroll;scrollbar-width:none;-ms-overflow-style:none;`
+							: 'width:100%;height:100%;overflow-y:scroll;scrollbar-width:none;-ms-overflow-style:none;'} sandbox="allow-scripts allow-same-origin"></iframe>
 					</div>
 				{/if}
 			</div>
@@ -3712,8 +3743,8 @@
 
 <!-- Floating AI toolbar — appears above selected text in preview -->
 {#if aiToolbar}
-	{@const toolbarTop = aiToolbar.iframeRect.top + aiToolbar.selectionRect.top - 64}
-	{@const toolbarLeft = Math.max(8, aiToolbar.iframeRect.left + aiToolbar.selectionRect.left + aiToolbar.selectionRect.width / 2 - 160)}
+	{@const toolbarTop = aiToolbar.iframeRect.top + aiToolbar.selectionRect.top * previewScale - 64}
+	{@const toolbarLeft = Math.max(8, aiToolbar.iframeRect.left + (aiToolbar.selectionRect.left + aiToolbar.selectionRect.width / 2) * previewScale - 160)}
 	<div class="fixed z-50 w-80 rounded-2xl bg-brand p-3 shadow-2xl" style="top:{toolbarTop}px;left:{toolbarLeft}px">
 		<p class="mb-1.5 text-xs font-bold text-white">✦ AI Enhance</p>
 		<p class="mb-2 truncate text-xs text-ink-muted">"{aiToolbar.selectedText.length > 60 ? aiToolbar.selectedText.slice(0, 60) + '…' : aiToolbar.selectedText}"</p>
@@ -3737,8 +3768,8 @@
 
 <!-- Floating list editor — appears near a clicked list in preview -->
 {#if listEditor}
-	{@const listTop = Math.min(listEditor.iframeRect.top + listEditor.fieldRect.top, (typeof window !== 'undefined' ? window.innerHeight : 800) - 380)}
-	{@const listLeft = Math.max(8, listEditor.iframeRect.left + listEditor.fieldRect.left)}
+	{@const listTop = Math.min(listEditor.iframeRect.top + listEditor.fieldRect.top * previewScale, (typeof window !== 'undefined' ? window.innerHeight : 800) - 380)}
+	{@const listLeft = Math.max(8, listEditor.iframeRect.left + listEditor.fieldRect.left * previewScale)}
 	<div bind:this={listEditorEl} class="fixed z-50 w-80 rounded-2xl border border-surface-muted bg-white shadow-2xl" style="top:{Math.max(8, listTop)}px;left:{listLeft}px">
 		<div class="flex items-center justify-between border-b border-surface-muted px-4 py-3">
 			<p class="text-sm font-bold text-ink">Edit items</p>
