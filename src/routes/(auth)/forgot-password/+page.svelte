@@ -3,6 +3,7 @@
 	import { forgotPassword, resetPassword } from '$lib/services/auth';
 	import { reveal } from '$lib/actions/animate';
 	import Spinner from '$lib/components/common/Spinner.svelte';
+	import AuthPanel from '$lib/components/auth/AuthPanel.svelte';
 
 	type Step = 'request' | 'reset' | 'done';
 
@@ -63,44 +64,12 @@
 </svelte:head>
 
 <div class="flex min-h-screen bg-surface-subtle">
-	<!-- Left panel -->
-	<div
-		class="relative hidden flex-col items-center justify-center overflow-hidden border-r border-surface-muted bg-surface-subtle p-12 lg:flex lg:w-[45%]"
-	>
-		<div
-			class="pointer-events-none absolute inset-0 opacity-[0.03]"
-			style="background-image: radial-gradient(circle, #000 1px, transparent 1px); background-size: 40px 40px;"
-		></div>
-
-		<div class="relative z-10 text-center">
-			<a
-				href="/"
-				class="group mb-8 inline-flex items-center gap-1.5 font-display text-4xl font-black tracking-tight text-ink"
-				style="letter-spacing:-0.03em"
-			>
-				<div class="h-3 w-3 rounded-full bg-brand mr-1 shrink-0 transition-transform group-hover:scale-125"></div>
-				Portfolio<span class="text-brand">.ai</span>
-			</a>
-			<p class="mt-4 text-lg leading-relaxed text-ink-soft">
-				Secure password reset.<br />Back to building your portfolio.
-			</p>
-		</div>
-
-		<div class="relative z-10 mt-14 flex flex-col gap-3">
-			{#each [{ text: 'Enter your email address', icon: '📧', active: step === 'request' }, { text: 'Enter the code from email', icon: '🔑', active: step === 'reset' }, { text: 'Set your new password', icon: '✅', active: step === 'done' }] as item}
-				<div
-					class="flex items-center gap-4 rounded-2xl border px-6 py-4 text-sm font-bold shadow-sm transition-all {item.active
-						? 'border-brand bg-brand text-white'
-						: 'border-surface-muted bg-white text-ink-soft'}"
-				>
-					<span class="flex h-8 w-8 items-center justify-center rounded-lg {item.active ? 'bg-white/15' : 'bg-surface-subtle'} text-lg">
-						{item.icon}
-					</span>
-					<span class="tracking-wide">{item.text}</span>
-				</div>
-			{/each}
-		</div>
-	</div>
+	<!-- Left panel — product showcase -->
+	<AuthPanel
+		variant="reset"
+		headline="Locked out? Let's fix that."
+		sub="Reset your password and get back to the portfolio recruiters are looking at."
+	/>
 
 	<!-- Right panel -->
 	<div class="relative flex flex-1 flex-col items-center justify-center bg-white px-6 py-12">

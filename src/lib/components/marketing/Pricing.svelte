@@ -1,8 +1,16 @@
 <script lang="ts">
 	let annual = $state(false);
 
-	const proMonthly = { price: '$7', per: '/month', cta: 'Get Hired at $7/mo' };
-	const proAnnual = { price: '$69', per: '/year', cta: 'Get Hired at $69/yr' };
+	interface ProPricing {
+		price: string;
+		per: string;
+		original: string | null;
+		cta: string;
+	}
+
+	const proMonthly: ProPricing = { price: '$7', per: '/month', original: null, cta: 'Get Hired at $7/mo' };
+	// $7 × 12 = $84 without the annual discount
+	const proAnnual: ProPricing = { price: '$69', per: '/year', original: '$84', cta: 'Get Hired at $69/yr' };
 	const pro = $derived(annual ? proAnnual : proMonthly);
 
 	const freePlan = {
@@ -12,13 +20,11 @@
 		sub: 'See what AI builds from your CV. No card needed.',
 		features: [
 			{ on: true, text: '2 AI-generated portfolios' },
-			{ on: true, text: 'All 4 profession templates' },
+			{ on: true, text: 'All profession templates' },
 			{ on: true, text: 'Shareable live link' },
 			{ on: true, text: 'Basic AI suggestions' },
 			{ on: false, text: 'Recruiter analytics' },
-			{ on: false, text: 'Media upload' },
-			{ on: false, text: 'Job description matching' },
-			{ on: false, text: 'Watermark removed' }
+			{ on: false, text: 'Media upload' }
 		],
 		cta: 'Start for Free',
 		outline: true
@@ -34,8 +40,7 @@
 			{ on: true, text: 'Admin dashboard' },
 			{ on: true, text: 'Student placement tracking' },
 			{ on: true, text: 'Bulk CV uploads' },
-			{ on: true, text: 'White-label option' },
-			{ on: true, text: 'Dedicated support' }
+			{ on: true, text: 'White-label option' }
 		],
 		cta: 'Contact Us',
 		outline: true
@@ -43,14 +48,12 @@
 
 	const proFeatures = [
 		{ on: true, text: 'Unlimited portfolios' },
-		{ on: true, text: 'All 4 profession templates' },
 		{ on: true, text: 'AI work story writer' },
 		{ on: true, text: 'Media upload: images, video, decks' },
 		{ on: true, text: 'Job description matching' },
 		{ on: true, text: 'Recruiter analytics' },
 		{ on: true, text: 'Custom domain' },
-		{ on: true, text: 'No watermark' },
-		{ on: true, text: 'Priority support' }
+		{ on: true, text: 'No watermark' }
 	];
 </script>
 
@@ -68,9 +71,7 @@
 				<div class="tgl-k"></div>
 			</button>
 			<span class="tgl-lbl" class:on={annual}>Annual</span>
-			{#if annual}
-				<span class="save-tag">Save 27%</span>
-			{/if}
+			<span class="save-tag" class:active={annual}>Save 27%</span>
 		</div>
 
 		<div class="price-grid">
@@ -93,7 +94,13 @@
 			<div class="p-card feat">
 				<div class="pop-badge">Most Popular</div>
 				<div class="p-plan">Get Hired</div>
-				<div class="p-amt">{pro.price}<span>{pro.per}</span></div>
+				<div class="p-amt">
+					{#if pro.original}
+						<span class="p-orig">{pro.original}</span><span class="p-disc">{pro.price}</span>
+					{:else}
+						{pro.price}
+					{/if}<span>{pro.per}</span>
+				</div>
 				<div class="p-sub">Everything you need to stand out and track who's paying attention.</div>
 				<ul class="p-feats">
 					{#each proFeatures as f}
@@ -155,7 +162,7 @@
 		border-radius: 50%;
 	}
 	.price-h {
-		font-family: var(--font-display);
+		font-family: var(--font-headline);
 		font-size: clamp(26px, 4vw, 44px);
 		font-weight: 800;
 		letter-spacing: -0.03em;
@@ -210,10 +217,17 @@
 	.save-tag {
 		background: var(--color-warm-mint-bg);
 		color: #008a67;
+		border: 1px solid transparent;
 		font-size: 10px;
 		font-weight: 700;
 		padding: 3px 9px;
 		border-radius: 100px;
+		transition: background 0.2s, color 0.2s, border-color 0.2s;
+	}
+	.save-tag.active {
+		background: var(--color-warm-mint);
+		color: #fff;
+		border-color: var(--color-warm-mint);
 	}
 	.price-grid {
 		display: grid;
@@ -273,6 +287,20 @@
 		font-size: 14px;
 		font-weight: 500;
 		color: var(--color-warm-muted);
+	}
+	.p-amt .p-orig {
+		font-size: 24px;
+		font-weight: 700;
+		color: var(--color-warm-dim);
+		text-decoration: line-through;
+		text-decoration-thickness: 2px;
+		margin-right: 8px;
+	}
+	.p-amt .p-disc {
+		font-size: 42px;
+		font-weight: 800;
+		color: #008a67;
+		letter-spacing: -0.03em;
 	}
 	.teams-price {
 		font-size: 28px !important;

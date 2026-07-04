@@ -1,20 +1,18 @@
 <section id="final">
-	<h2 class="final-h">
-		Stop getting<br /><span class="coral">ignored.</span>
-	</h2>
-	<p class="final-sub">Upload your CV. Get your portfolio. Share the link. In under 60 seconds.</p>
-	<a href="/signup" class="btn-final">✨ Build My Portfolio — It's Free</a>
-	<p class="final-trust">No account needed · No credit card · Your data is never stored</p>
+	<h2 class="final-h">Stop getting <span class="coral">ignored.</span></h2>
+	<p class="final-sub">Build the portfolio that gets you the interview. In 30 seconds.</p>
+	<a href="/signup" class="btn-final">✨ Build My Portfolio Free</a>
+	<p class="final-trust">No account needed · No credit card · Free to start</p>
 </section>
 
 <style>
 	section {
-		background: var(--color-warm-cream);
+		background: var(--color-warm-peach);
 		padding: 104px 48px;
 		text-align: center;
 	}
 	.final-h {
-		font-family: var(--font-display);
+		font-family: var(--font-headline);
 		font-size: clamp(36px, 6vw, 70px);
 		font-weight: 800;
 		line-height: 1.04;
@@ -23,7 +21,7 @@
 		color: var(--color-warm-ink);
 	}
 	.coral {
-		color: #ff5c3a;
+		color: var(--color-warm-coral);
 	}
 	.final-sub {
 		font-size: 16px;

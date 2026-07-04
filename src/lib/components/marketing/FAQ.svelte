@@ -1,62 +1,80 @@
 <script lang="ts">
+	import { reveal } from '$lib/actions/animate';
+
 	const faqs = [
 		{
-			q: 'Do I need any design or coding skills?',
-			a: 'None. Zero. Not even a little. You upload your CV, AI handles the design, layout, writing, and structure. The only thing you do is review and hit publish.'
+			q: 'Is building a portfolio free on Portfolio.ai?',
+			a: 'Yes — you can build, preview, and publish your first portfolio for free. Upgrade only when you want analytics, custom domains, or unlimited portfolios.'
 		},
 		{
-			q: "Why do I need a portfolio? My CV has always worked.",
-			a: "It worked. Until it didn't. A portfolio is not a replacement for your CV. It's what separates you from the 249 other candidates who sent the same CV for the same role. Hiring managers spend 6 seconds on a CV. They spend 3 minutes on a portfolio. That difference is the interview."
+			q: 'Does Portfolio.ai host my portfolio for me?',
+			a: 'Absolutely. Every portfolio gets a fast, secure live link hosted on our edge network — no servers, no DNS, no headaches.'
 		},
 		{
-			q: 'How is this different from Wix, Canva, or Squarespace?',
-			a: "Those tools build websites. We build portfolios designed specifically to get you hired. Every template, every section, every AI suggestion is built around what hiring managers in your field actually look for. Wix doesn't know what a marketing recruiter wants to see. We do."
+			q: 'How is Portfolio.ai better than Wix or Squarespace?',
+			a: "Those are generic website builders. We're a career intelligence tool — AI reads your CV, writes your stories, picks the right sections for your profession, and scores your portfolio against what recruiters look for."
 		},
 		{
-			q: "What professions is this built for?",
-			a: "Marketers, Product Designers, Architects and Interior Designers, and Students or Early Career professionals. Every profession gets its own template. The sections, structure, and tone are built specifically for how hiring works in your field."
+			q: 'How do I showcase my projects?',
+			a: 'Drag & drop images, videos, PDFs, decks, or paste a link. AI writes the case study, captions, and metrics for you. Reorder anything in one click.'
 		},
 		{
-			q: 'How does AI generate my portfolio?',
-			a: "You upload your CV. AI reads your job titles, experience, skills, and achievements. AI detects your profession and builds a complete portfolio with a bio, work stories, KPI callouts, and the right sections for your field. The whole thing takes under 60 seconds."
+			q: 'What kind of content can I display?',
+			a: 'Case studies, KPIs, campaigns, code repos, design files, photo galleries, video reels, writing samples, research, decks — anything that proves your work.'
 		},
 		{
-			q: "What if I don't have much experience?",
-			a: "That's exactly who this is built for. Students and early career professionals often have more to show than they think: coursework, internships, side projects, certifications. AI frames what you have in a way that makes recruiters take you seriously."
+			q: 'How much storage do I get?',
+			a: 'Free plans include generous storage for your first portfolio. Paid plans unlock unlimited media uploads and high-res video hosting.'
 		},
 		{
-			q: 'Is my CV data safe?',
-			a: "Yes. Your resume is processed to generate your portfolio and never stored, shared, or sold. We don't keep your data after your portfolio is built."
+			q: 'Who is Portfolio.ai for?',
+			a: 'Marketers, designers, students, architects, engineers, doctors, founders, executives — every profession. AI tunes layout and tone to your field.'
 		},
 		{
-			q: "Can I edit my portfolio after it's generated?",
-			a: "Completely. Click any text to edit it directly. Add or remove sections. Upload images of your work. The AI builds the first version. You make it yours."
+			q: 'What kind of sites can I build?',
+			a: 'Personal portfolios, case study sites, photo galleries, project showcases, executive bios, and recruiter-targeted profiles. Each one is hire-ready, not just pretty.'
 		}
 	];
 
-	let openIndex = $state<number | null>(null);
+	let openIndex: number | null = $state(0);
 
 	function toggle(i: number) {
 		openIndex = openIndex === i ? null : i;
+	}
+
+	function scrollToUpload() {
+		document.getElementById('upload-cta')?.scrollIntoView({ behavior: 'smooth' });
 	}
 </script>
 
 <section id="faq">
 	<div class="wrap">
-		<div class="sec-lbl"><span class="lbl-dot"></span>FAQ</div>
-		<h2 class="faq-h">Questions worth asking before you apply.</h2>
-		<div class="faq-list">
-			{#each faqs as faq, i}
-				<div class="faq-item" class:open={openIndex === i}>
-					<button class="faq-q" onclick={() => toggle(i)}>
-						{faq.q}
-						<span class="faq-ic">{openIndex === i ? '×' : '+'}</span>
-					</button>
-					{#if openIndex === i}
-						<div class="faq-a">{faq.a}</div>
-					{/if}
+		<div class="faq-card" use:reveal>
+			<div class="faq-left">
+				<h2 class="faq-h-new">
+					<span class="faq-h-orange">Got questions?</span>
+					<span class="faq-h-black">We came prepared.<span class="faq-underline"></span></span>
+				</h2>
+				<p class="faq-lead">
+					Real answers to the things people actually ask before signing up. Still curious? Drop us a
+					line.
+				</p>
+				<div class="faq-btns">
+					<button class="faq-btn-dark" onclick={scrollToUpload}>Get started for free</button>
+					<a class="faq-btn-light" href="mailto:hello@portfolio.ai">Get in touch</a>
 				</div>
-			{/each}
+			</div>
+			<div class="faq-right">
+				{#each faqs as faq, i (faq.q)}
+					<div class="faq-row" class:open={openIndex === i}>
+						<button class="faq-row-q" onclick={() => toggle(i)}>
+							<span>{faq.q}</span>
+							<span class="faq-row-ic" aria-hidden="true">⌄</span>
+						</button>
+						<div class="faq-row-a">{faq.a}</div>
+					</div>
+				{/each}
+			</div>
 		</div>
 	</div>
 </section>
@@ -64,85 +82,166 @@
 <style>
 	section {
 		background: #fff;
-		padding: 88px 48px;
+		padding: 96px 48px;
 	}
 	.wrap {
 		max-width: 1160px;
 		margin: 0 auto;
 	}
-	.sec-lbl {
-		display: inline-flex;
-		align-items: center;
-		gap: 7px;
-		font-size: 10px;
-		font-weight: 700;
-		letter-spacing: 0.14em;
-		text-transform: uppercase;
-		color: var(--color-warm-muted);
-		margin-bottom: 16px;
+	.faq-card {
+		background: #fde8dc;
+		border-radius: 28px;
+		padding: 64px;
+		display: grid;
+		grid-template-columns: 1fr 1.2fr;
+		gap: 64px;
+		align-items: start;
 	}
-	.lbl-dot {
-		width: 5px;
-		height: 5px;
-		background: var(--color-warm-coral);
-		border-radius: 50%;
-	}
-	.faq-h {
+	.faq-h-new {
 		font-family: var(--font-display);
-		font-size: clamp(24px, 3.5vw, 42px);
 		font-weight: 800;
 		letter-spacing: -0.03em;
-		max-width: 440px;
-		margin-bottom: 40px;
-		color: var(--color-warm-ink);
+		line-height: 1.05;
+		display: flex;
+		flex-direction: column;
+		gap: 6px;
+		margin: 0;
 	}
-	.faq-list {
-		max-width: 720px;
+	.faq-h-orange {
+		color: #d8542a;
+		font-style: italic;
+		font-weight: 600;
+		font-size: clamp(38px, 5vw, 62px);
+		font-family: 'Playfair Display', Georgia, serif;
+	}
+	.faq-h-black {
+		color: #111;
+		font-size: clamp(34px, 4.5vw, 56px);
+		font-weight: 700;
+		font-style: italic;
+		font-family: 'Playfair Display', Georgia, serif;
+		position: relative;
+		display: inline-block;
+		width: fit-content;
+	}
+	.faq-underline {
+		display: block;
+		height: 8px;
+		width: 88%;
+		margin-top: -6px;
+		background: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 300 12'><path d='M2 7 Q 80 1 150 6 T 298 5' stroke='%2300b3a4' stroke-width='3' fill='none' stroke-linecap='round'/></svg>")
+			no-repeat center / 100% 100%;
+	}
+	.faq-lead {
+		margin-top: 22px;
+		font-size: 15px;
+		color: #3b2e26;
+		line-height: 1.65;
+		max-width: 380px;
+	}
+	.faq-btns {
+		display: flex;
+		gap: 12px;
+		margin-top: 28px;
+		flex-wrap: wrap;
+	}
+	.faq-btn-dark {
+		background: #111;
+		color: #fff;
+		border: none;
+		padding: 14px 26px;
+		border-radius: 100px;
+		font-size: 14px;
+		font-weight: 600;
+		cursor: pointer;
+		transition: transform 0.2s;
+	}
+	.faq-btn-dark:hover {
+		transform: translateY(-2px);
+	}
+	.faq-btn-light {
+		background: #111;
+		color: #fff;
+		border: none;
+		padding: 14px 26px;
+		border-radius: 100px;
+		font-size: 14px;
+		font-weight: 600;
+		cursor: pointer;
+		opacity: 0.85;
+		text-decoration: none;
+		display: inline-block;
+	}
+	.faq-btn-light:hover {
+		opacity: 1;
+	}
+
+	.faq-right {
 		display: flex;
 		flex-direction: column;
 	}
-	.faq-item {
-		border-bottom: 1px solid var(--color-warm-border);
+	.faq-row {
+		border-bottom: 1px solid rgba(0, 0, 0, 0.12);
 	}
-	.faq-q {
+	.faq-row:first-child {
+		border-top: 1px solid rgba(0, 0, 0, 0.12);
+	}
+	.faq-row-q {
 		width: 100%;
+		background: none;
+		border: none;
+		padding: 22px 4px;
 		display: flex;
 		justify-content: space-between;
 		align-items: center;
-		padding: 18px 0;
-		background: none;
-		border: none;
 		cursor: pointer;
 		text-align: left;
 		font-family: var(--font-display);
-		font-size: 15px;
-		font-weight: 700;
-		color: var(--color-warm-ink);
-		gap: 12px;
+		font-size: 16px;
+		font-weight: 600;
+		color: #111;
 		letter-spacing: -0.01em;
+		gap: 16px;
 	}
-	.faq-q:hover {
-		color: var(--color-warm-coral);
+	.faq-row-q:hover {
+		color: #d8542a;
 	}
-	.faq-ic {
+	.faq-row-ic {
 		font-size: 20px;
-		color: var(--color-warm-dim);
+		color: #111;
+		transition: transform 0.3s ease;
 		flex-shrink: 0;
-		transition: transform 0.2s;
-		font-weight: 400;
+		line-height: 1;
 	}
-	.faq-item.open .faq-ic {
-		color: var(--color-warm-coral);
+	.faq-row.open .faq-row-ic {
+		transform: rotate(180deg);
 	}
-	.faq-a {
+	.faq-row-a {
 		font-size: 14px;
-		color: var(--color-warm-muted);
-		line-height: 1.75;
-		padding: 0 0 18px;
-		max-width: 660px;
+		color: #4a3a30;
+		line-height: 1.7;
+		max-height: 0;
+		overflow: hidden;
+		transition: max-height 0.35s ease, padding 0.3s ease;
+		padding: 0 4px;
+	}
+	.faq-row.open .faq-row-a {
+		max-height: 400px;
+		padding: 0 4px 22px;
 	}
 
 	@media (max-width: 900px) {
-		section { padding: 56px 24px; }
+		section {
+			padding: 48px 16px;
+		}
+		.faq-card {
+			padding: 32px 24px;
+			grid-template-columns: 1fr;
+			gap: 32px;
+			border-radius: 20px;
+		}
+		.faq-underline {
+			width: 100%;
+		}
 	}
 </style>

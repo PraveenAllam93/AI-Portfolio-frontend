@@ -20,8 +20,8 @@
 				</div>
 			</div>
 			<div class="ucta-btns">
-				<a href="/signup" class="btn-gen">✨ Build My Portfolio — Try Now</a>
-				<a href="/app/dashboard" class="btn-eg">👀 See an example portfolio</a>
+				<a href="/signup" class="btn-gen">✨ Build My Portfolio</a>
+				<a href="/app/dashboard" class="btn-eg">👀 See an example</a>
 			</div>
 			<div class="upload-priv">🔒 Your resume is never stored, shared, or sold.</div>
 		</div>
@@ -56,7 +56,7 @@
 		border-radius: 50%;
 	}
 	.ucta-h {
-		font-family: var(--font-display);
+		font-family: var(--font-headline);
 		font-size: clamp(26px, 4vw, 48px);
 		font-weight: 800;
 		letter-spacing: -0.03em;
