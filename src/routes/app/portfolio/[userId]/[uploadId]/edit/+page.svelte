@@ -2895,7 +2895,7 @@
 
 	<div class="flex min-h-0 flex-1 overflow-hidden">
 
-		<aside class="{mobileTab === 'sections' ? 'flex' : 'hidden'} sm:flex w-full sm:w-80 flex-col flex-shrink-0 overflow-hidden border-r border-surface-muted bg-surface-subtle sm:bg-surface-subtle sm:p-0 sm:pt-3">
+		<aside class="{mobileTab === 'sections' ? 'flex' : 'hidden'} sm:flex w-full sm:w-80 flex-col flex-shrink-0 overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden border-r border-surface-muted bg-surface-subtle sm:bg-surface-subtle sm:p-0 sm:pt-3">
 			<div class="flex-shrink-0 p-3 space-y-0.5 sm:mx-3 sm:rounded-2xl sm:border sm:border-surface-muted sm:bg-white sm:shadow-md sm:p-3 sm:mb-2">
 				<button onclick={() => { activeTab = 'profile'; mobileTab = 'edit'; }} class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm font-medium transition-colors {activeTab === 'profile' ? 'bg-brand text-white' : 'text-ink-soft hover:bg-surface-muted'}">
 					Profile
@@ -2929,7 +2929,7 @@
 
 			{#if !pageLoading}
 			<!-- AI Insights panel -->
-			<div class="flex-1 min-h-0 mx-3 mb-3 mt-2 rounded-2xl border border-surface-muted bg-white shadow-md overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+			<div class="grow shrink-0 mx-3 mb-3 mt-2 rounded-2xl border border-surface-muted bg-white shadow-md">
 				<!-- Header -->
 				<div class="flex items-center gap-2 border-b border-surface-muted px-4 py-3">
 					<span class="text-sm font-bold text-ink">✦ AI Insights</span>
