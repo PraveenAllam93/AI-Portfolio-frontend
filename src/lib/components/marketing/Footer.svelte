@@ -8,7 +8,7 @@
 			<a href="/privacy">Privacy</a>
 			<a href="/terms">Terms</a>
 		</div>
-		<div class="foot-r">Powered by Claude AI · Your data is never stored or shared.</div>
+		<div class="foot-r">© 2026 Portfolio.ai · Your data is never stored or shared.</div>
 	</div>
 </footer>
 

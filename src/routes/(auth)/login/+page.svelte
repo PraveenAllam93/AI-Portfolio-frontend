@@ -4,6 +4,7 @@
 	import { authStore } from '$lib/stores/auth';
 	import { reveal } from '$lib/actions/animate';
 	import Spinner from '$lib/components/common/Spinner.svelte';
+	import AuthPanel from '$lib/components/auth/AuthPanel.svelte';
 
 	let email = $state('');
 	let password = $state('');
@@ -33,44 +34,12 @@
 </svelte:head>
 
 <div class="flex min-h-screen bg-surface-subtle">
-	<!-- Left panel — Brand Side -->
-	<div
-		class="relative hidden flex-col items-center justify-center overflow-hidden border-r border-surface-muted bg-surface-subtle p-12 lg:flex lg:w-[45%]"
-	>
-		<!-- Background dot grid -->
-		<div
-			class="pointer-events-none absolute inset-0 opacity-[0.03]"
-			style="background-image: radial-gradient(circle, #000 1px, transparent 1px); background-size: 40px 40px;"
-		></div>
-
-		<div class="relative z-10 text-center">
-			<a
-				href="/"
-				class="group mb-8 inline-flex items-center gap-1.5 font-display text-4xl font-black tracking-tight text-ink"
-				style="letter-spacing:-0.03em"
-			>
-				<div class="h-3 w-3 rounded-full bg-brand mr-1 shrink-0 transition-transform group-hover:scale-125"></div>
-				Portfolio<span class="text-brand">.ai</span>
-			</a>
-			<p class="mt-4 text-lg leading-relaxed text-ink-soft">
-				The easiest way to build your<br />professional presence online.
-			</p>
-		</div>
-
-		<!-- Feature pills -->
-		<div class="relative z-10 mt-14 flex flex-col gap-3">
-			{#each [{ text: 'Upload your resume', icon: '📄' }, { text: 'AI writes your content', icon: '✨' }, { text: 'Instant public URL', icon: '🌐' }] as item}
-				<div
-					class="flex items-center gap-4 rounded-2xl border border-surface-muted bg-white px-6 py-4 text-sm font-bold text-ink-soft shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md"
-				>
-					<span class="flex h-8 w-8 items-center justify-center rounded-lg bg-surface-subtle text-lg">
-						{item.icon}
-					</span>
-					<span class="tracking-wide">{item.text}</span>
-				</div>
-			{/each}
-		</div>
-	</div>
+	<!-- Left panel — product showcase -->
+	<AuthPanel
+		variant="login"
+		headline="Your portfolio kept working while you were away."
+		sub="Log back in to see who's been looking — and what AI suggests you improve next."
+	/>
 
 	<!-- Right panel — Form -->
 	<div class="relative flex flex-1 flex-col items-center justify-center bg-surface-subtle px-6 py-12">

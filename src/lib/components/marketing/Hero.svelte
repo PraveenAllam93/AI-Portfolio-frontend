@@ -55,7 +55,7 @@
 			<h1 class="hero-h1">Your resume gets you <em>read.</em><br>A portfolio gets you the interview.</h1>
 			<p class="hero-sub">
 				Upload your CV. AI reads it, writes your story, and builds a stunning portfolio in under 30
-				seconds. No design skills needed.
+				seconds.
 			</p>
 			<div class="chips">
 				<div class="chip">
@@ -67,8 +67,8 @@
 					<div class="chip-l">Design or coding skills needed</div>
 				</div>
 				<div class="chip">
-					<div class="chip-v">71%</div>
-					<div class="chip-l">Higher interview callback rate*</div>
+					<div class="chip-v">–</div>
+					<div class="chip-l">Higher interview callback rate</div>
 				</div>
 				<div class="chip">
 					<div class="chip-v">Free</div>
@@ -76,18 +76,17 @@
 				</div>
 			</div>
 			<div class="hero-btns">
-				<a href="/try" class="btn-primary">✨ Build My Portfolio — Try Now</a>
+				<a href="/try" class="btn-primary">✨ Build My Portfolio</a>
 				<a
-					href="#how"
+					href="#who"
 					class="btn-outline"
 					onclick={(e) => {
 						e.preventDefault();
-						document.getElementById('how')?.scrollIntoView({ behavior: 'smooth' });
-					}}>See how it works →</a
+						document.getElementById('who')?.scrollIntoView({ behavior: 'smooth' });
+					}}>See who it's for →</a
 				>
 			</div>
 			<p class="hero-trust">No account needed · No credit card · Your data is never stored</p>
-			<p class="hero-fn">*ResumeGo study, 10,000+ applications</p>
 		</div>
 
 		<!-- Right: hero card mockup -->
@@ -159,7 +158,7 @@
 				<div class="fc fc-1">
 					<div class="fc-ico">✦</div>
 					<div class="fc-ttl">Case Study Written</div>
-					<div class="fc-bd">Grew ROAS by 230% through A/B creative testing across Meta & Google.</div>
+					<div class="fc-bd">Grew ROAS by 230% through A/B creative testing.</div>
 				</div>
 				<div class="fc fc-2">
 					<div class="fc-ico">📊</div>
@@ -204,15 +203,23 @@
 		margin-bottom: 20px;
 	}
 	.hero-h1 {
-		font-family: var(--font-display);
-		font-size: clamp(40px, 5.5vw, 66px);
+		font-family: var(--font-headline);
+		font-size: clamp(40px, 5.5vw, 64px);
 		font-weight: 800;
-		line-height: 1.04;
-		letter-spacing: -0.03em;
+		line-height: 1.06;
+		letter-spacing: -0.035em;
 		margin-bottom: 16px;
 		color: var(--color-warm-ink);
 	}
-	.hero-h1 em{font-style:italic;color:#ff5c3a}
+	/* Playfair for the accent — a real italic (Inter/Space Grotesk fake theirs) */
+	.hero-h1 em {
+		font-family: var(--font-serif);
+		font-style: italic;
+		font-weight: 600;
+		font-size: 1.03em;
+		letter-spacing: -0.01em;
+		color: var(--color-warm-coral);
+	}
 	.hero-sub {
 		font-size: 16px;
 		color: var(--color-warm-muted);
@@ -291,11 +298,6 @@
 		font-size: 11px;
 		color: var(--color-warm-dim);
 		margin-top: 12px;
-	}
-	.hero-fn {
-		font-size: 10px;
-		color: var(--color-warm-dim);
-		margin-top: 5px;
 	}
 
 	/* Hero right: card + floaters */
@@ -451,7 +453,7 @@
 		background: linear-gradient(135deg, #ff5c3a, #f5a623);
 	}
 	.hc-img-2 {
-		background: linear-gradient(135deg, #f5a623, #10b981);
+		background: linear-gradient(135deg, var(--color-warm-indigo), #8b73ff);
 	}
 	.hc-img span {
 		font-size: 14px;
@@ -490,8 +492,8 @@
 		color: var(--color-warm-muted);
 		line-height: 1.4;
 	}
-	.hc-p-peach { background: #fff5f2; }
-	.hc-p-lav { background: #fffbf0; }
+	.hc-p-peach { background: var(--color-warm-peach); }
+	.hc-p-lav { background: var(--color-warm-lav); }
 
 	/* Floating cards */
 	.fc {

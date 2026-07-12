@@ -4,6 +4,7 @@
 	import { authStore } from '$lib/stores/auth';
 	import { reveal } from '$lib/actions/animate';
 	import Spinner from '$lib/components/common/Spinner.svelte';
+	import AuthPanel from '$lib/components/auth/AuthPanel.svelte';
 
 	let step: 'register' | 'confirm' = $state('register');
 	let name = $state('');
@@ -87,70 +88,21 @@
 </svelte:head>
 
 <div class="flex min-h-screen bg-surface-subtle">
-	<!-- Left panel — Brand Side -->
-	<div
-		class="relative hidden flex-col items-center justify-center overflow-hidden border-r border-surface-muted bg-surface-subtle p-12 lg:flex lg:w-[45%]"
-	>
-		<!-- Background dot grid -->
-		<div
-			class="pointer-events-none absolute inset-0 opacity-[0.03]"
-			style="background-image: radial-gradient(circle, #000 1px, transparent 1px); background-size: 40px 40px;"
-		></div>
-
-		{#if step === 'register'}
-			<div class="relative z-10 text-center">
-				<a
-					href="/"
-					class="group mb-8 inline-flex items-center gap-1.5 font-display text-4xl font-black tracking-tight text-ink"
-					style="letter-spacing:-0.03em"
-				>
-					<div class="h-3 w-3 rounded-full bg-brand mr-1 shrink-0 transition-transform group-hover:scale-125"></div>
-					Portfolio<span class="text-brand">.ai</span>
-				</a>
-				<p class="mt-4 text-lg leading-relaxed text-ink-soft">
-					Create your professional online<br />presence in seconds.
-				</p>
-			</div>
-
-			<div class="relative z-10 mt-14 flex flex-col gap-3">
-				{#each [{ icon: '01', label: 'Upload your resume', desc: 'PDF or Word file' }, { icon: '02', label: 'Pick a template', desc: 'Tailored for your role' }, { icon: '03', label: 'Go live instantly', desc: 'Hosted on our fast edge network' }] as item}
-					<div class="flex items-center gap-5 rounded-2xl border border-surface-muted bg-white p-5 shadow-sm">
-						<div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand/10 text-xs font-bold text-brand">
-							{item.icon}
-						</div>
-						<div>
-							<p class="text-sm font-bold text-ink">{item.label}</p>
-							<p class="text-xs text-ink-soft">{item.desc}</p>
-						</div>
-					</div>
-				{/each}
-			</div>
-		{:else}
-			<div class="relative z-10 text-center">
-				<div class="mx-auto mb-8 flex h-24 w-24 items-center justify-center rounded-3xl bg-brand/10 border border-brand/20">
-					<svg
-						xmlns="http://www.w3.org/2000/svg"
-						fill="none"
-						viewBox="0 0 24 24"
-						stroke-width="1.5"
-						stroke="currentColor"
-						class="h-10 w-10 text-brand"
-					>
-						<path
-							stroke-linecap="round"
-							stroke-linejoin="round"
-							d="M21.75 6.75v10.5a2.25 2.25 0 0 1-2.25 2.25h-15a2.25 2.25 0 0 1-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25m19.5 0v.243a2.25 2.25 0 0 1-1.07 1.916l-7.5 4.615a2.25 2.25 0 0 1-2.36 0L3.32 8.91a2.25 2.25 0 0 1-1.07-1.916V6.75"
-						/>
-					</svg>
-				</div>
-				<p class="font-display text-4xl font-bold text-ink" style="letter-spacing:-0.02em">Verify Email</p>
-				<p class="mt-4 text-lg text-ink-soft">
-					A 6-digit verification code<br />
-					was sent to <span class="font-bold text-ink">{email}</span>
-				</p>
-			</div>
-		{/if}
-	</div>
+	<!-- Left panel — product showcase / verify state -->
+	{#if step === 'register'}
+		<AuthPanel
+			variant="signup"
+			headline="Your CV becomes a portfolio. In 30 seconds."
+			sub="Create a free account — AI reads your resume, writes your story, and puts it live on a link you can share."
+			steps={[
+				{ n: '01', label: 'Upload your resume', desc: 'PDF or Word file' },
+				{ n: '02', label: 'AI builds your portfolio', desc: 'Layout, copy, and case studies — done for you' },
+				{ n: '03', label: 'Go live instantly', desc: 'Hosted on our fast edge network' }
+			]}
+		/>
+	{:else}
+		<AuthPanel mode="verify" {email} />
+	{/if}
 
 	<!-- Right panel — Form -->
 	<div class="relative flex flex-1 flex-col items-center justify-center bg-surface-subtle px-6 py-12">

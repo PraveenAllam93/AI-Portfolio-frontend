@@ -6,6 +6,7 @@
 	--font-serif: 'Playfair Display', serif;
 	--font-sans: 'DM Sans', 'Inter', system-ui, sans-serif;
 	--font-display: 'Space Grotesk', sans-serif;
+	--font-headline: 'Inter', system-ui, sans-serif; /* marketing hero + section headings */
 	--font-body-dm: 'DM Sans', sans-serif;
 
 	/* Brand */
@@ -29,22 +30,22 @@
 	--color-accent-rose: #f43f5e;
 	--color-accent-cyan: #06b6d4;
 
-	/* Marketing palette — pure neutral (matches reference screenshots) */
-	--color-warm-ink: #111111;           /* pure near-black */
-	--color-warm-muted: #666666;         /* neutral mid-gray */
-	--color-warm-dim: #999999;           /* neutral light-gray */
+	/* Marketing palette — matches reference landing page (coral/indigo on warm cream) */
+	--color-warm-ink: #1a1a1a;           /* near-black */
+	--color-warm-muted: #6b6b7b;         /* mid-gray with slight cool cast */
+	--color-warm-dim: #9999aa;           /* light-gray */
 	--color-warm-cream: #f5f0ea;         /* warm parchment — main section bg */
-	--color-warm-cream2: #ede8e1;        /* warm parchment-2 — subtle section bg */
-	--color-warm-border: #e0d9d0;        /* warm parchment border */
-	--color-warm-border-dark: #d4d4d4;   /* neutral-300 border */
-	--color-warm-coral: #7c3aed;         /* brand purple */
-	--color-warm-amber: #f59e0b;         /* accent-amber */
-	--color-warm-mint: #10b981;          /* accent-emerald */
-	--color-warm-indigo: #7c3aed;        /* brand purple */
-	--color-warm-peach: #fff5f2;         /* coral tint — light warm bg */
-	--color-warm-mint-bg: #f0fdf4;       /* emerald-50 */
-	--color-warm-lav: #fffbf0;           /* amber tint — light warm bg */
-	--color-warm-yellow: #fefce8;        /* amber-50 — light yellow bg (architect cards) */
+	--color-warm-cream2: #f0ebe3;        /* warm parchment-2 — subtle section bg */
+	--color-warm-border: #e2ddd6;        /* warm parchment border */
+	--color-warm-border-dark: #c8c2b8;   /* darker warm border */
+	--color-warm-coral: #ff5c3a;         /* coral — primary marketing accent */
+	--color-warm-amber: #f5a623;         /* amber */
+	--color-warm-mint: #00c896;          /* mint */
+	--color-warm-indigo: #5b3fd4;        /* indigo */
+	--color-warm-peach: #fdf0ea;         /* peach tint bg */
+	--color-warm-mint-bg: #eaf7f2;       /* mint tint bg */
+	--color-warm-lav: #eeeaf8;           /* lavender tint bg */
+	--color-warm-yellow: #fdf6e3;        /* yellow tint bg */
 }
 
 html {
