@@ -95,6 +95,7 @@ export async function getPortfolioData(
 				sectionOrder: raw.sectionOrder ?? undefined,
 				hiddenSections: raw.hiddenSections ?? undefined,
 				templateOverrides: raw.templateOverrides ?? undefined,
+				fieldVisibility: raw.fieldVisibility ?? undefined,
 				updatedAt: raw.updatedAt ?? null,
 				lastPublishedAt: raw.lastPublishedAt ?? null
 			}

@@ -12,11 +12,25 @@ import {
 	ResendConfirmationCodeCommand,
 	ForgotPasswordCommand,
 	ConfirmForgotPasswordCommand,
+	AdminCreateUserCommand,
+	AdminSetUserPasswordCommand,
 	type AuthenticationResultType
 } from '@aws-sdk/client-cognito-identity-provider';
+import { randomUUID, randomBytes } from 'node:crypto';
 import { dev } from '$app/environment';
 import { env } from '$env/dynamic/private';
 import type { Cookies } from '@sveltejs/kit';
+
+/**
+ * Reserved, non-routable email domain for anonymous "Try for free" guests.
+ * Guest Cognito users are `guest-<uuid>@<GUEST_EMAIL_DOMAIN>`. MUST match the
+ * backend GUEST_EMAIL_DOMAIN (terraform var of the same name).
+ */
+export const GUEST_EMAIL_DOMAIN = env.GUEST_EMAIL_DOMAIN ?? 'guest.aifolio.internal';
+
+export function isGuestEmail(email: string | undefined | null): boolean {
+	return !!email && email.toLowerCase().endsWith('@' + GUEST_EMAIL_DOMAIN);
+}
 
 // ─── Cognito client ───────────────────────────────────────────────────────────
 
@@ -112,12 +126,87 @@ export async function cognitoResetPassword(email: string, code: string, newPassw
 	);
 }
 
+// ─── Anonymous guest ("Try for free") ─────────────────────────────────────────
+
+/** Generate a strong random password that satisfies the pool's password policy. */
+function randomPassword(): string {
+	// Guarantee one of each class the policy may require, then pad with entropy.
+	const upper = 'ABCDEFGHJKMNPQRSTUVWXYZ';
+	const lower = 'abcdefghijkmnpqrstuvwxyz';
+	const digit = '23456789';
+	const symbol = '!@#$%^&*-_';
+	const pick = (set: string) => set[randomBytes(1)[0] % set.length];
+	const filler = randomBytes(24).toString('base64').replace(/[^A-Za-z0-9]/g, '');
+	return pick(upper) + pick(lower) + pick(digit) + pick(symbol) + filler;
+}
+
+/**
+ * Create an anonymous guest and return an authenticated session for them.
+ *
+ * The guest is a real Cognito user with a reserved, non-routable placeholder
+ * email (`guest-<uuid>@GUEST_EMAIL_DOMAIN`). Because MessageAction is SUPPRESS
+ * and email_verified is set manually, no mail is ever sent and the address need
+ * not be real. The whole validated pipeline then runs unchanged for the guest;
+ * only publishing is gated (draft-only) until they create a real account.
+ *
+ * Returns the AuthenticationResult (id/access/refresh tokens) plus the guest's
+ * email so the caller can persist it.
+ */
+export async function cognitoCreateGuest(): Promise<{
+	result: AuthenticationResultType;
+	email: string;
+}> {
+	const client = getClient();
+	const email = `guest-${randomUUID()}@${GUEST_EMAIL_DOMAIN}`;
+	const password = randomPassword();
+
+	await client.send(
+		new AdminCreateUserCommand({
+			UserPoolId: userPoolId(),
+			Username: email,
+			MessageAction: 'SUPPRESS', // never email the placeholder address
+			UserAttributes: [
+				{ Name: 'email', Value: email },
+				{ Name: 'email_verified', Value: 'true' },
+				{ Name: 'name', Value: 'Guest' }
+			]
+		})
+	);
+
+	// AdminCreateUser leaves the user in FORCE_CHANGE_PASSWORD; set a permanent
+	// password so ADMIN_USER_PASSWORD_AUTH succeeds immediately.
+	await client.send(
+		new AdminSetUserPasswordCommand({
+			UserPoolId: userPoolId(),
+			Username: email,
+			Password: password,
+			Permanent: true
+		})
+	);
+
+	const auth = await client.send(
+		new AdminInitiateAuthCommand({
+			AuthFlow: 'ADMIN_USER_PASSWORD_AUTH',
+			ClientId: clientId(),
+			UserPoolId: userPoolId(),
+			AuthParameters: { USERNAME: email, PASSWORD: password }
+		})
+	);
+
+	if (!auth.AuthenticationResult) {
+		throw new Error('Guest authentication failed');
+	}
+	return { result: auth.AuthenticationResult, email };
+}
+
 // ─── Token helpers ────────────────────────────────────────────────────────────
 
 export interface SessionUser {
 	userId: string;
 	email: string;
 	name: string;
+	/** True when this is an anonymous "Try for free" guest (placeholder email). */
+	isGuest: boolean;
 }
 
 /** Decode JWT payload without verifying signature (payload is plain Base64url JSON). */
@@ -133,15 +222,15 @@ function decodeJwt(token: string): Record<string, unknown> | null {
 export function decodeIdToken(token: string): SessionUser | null {
 	const payload = decodeJwt(token);
 	if (!payload || typeof payload.sub !== 'string') return null;
+	const email = typeof payload.email === 'string' ? payload.email : '';
 	return {
 		userId: payload.sub,
-		email: typeof payload.email === 'string' ? payload.email : '',
+		email,
 		name:
 			typeof payload.name === 'string'
 				? payload.name
-				: typeof payload.email === 'string'
-					? payload.email
-					: ''
+				: email || '',
+		isGuest: isGuestEmail(email)
 	};
 }
 
@@ -172,6 +261,26 @@ export function clearAuthCookies(cookies: Cookies) {
 	for (const name of ['id_token', 'access_token', 'refresh_token']) {
 		cookies.delete(name, { path: '/' });
 	}
+}
+
+// The guest's Cognito sub, persisted separately from the auth cookies so it
+// survives them being overwritten when the guest later logs in as a real user.
+// The claim step reads this to know which guest namespace to migrate.
+const GUEST_UID_COOKIE = 'guest_uid';
+
+export function setGuestUid(cookies: Cookies, guestSub: string) {
+	cookies.set(GUEST_UID_COOKIE, guestSub, {
+		...BASE_OPTS,
+		maxAge: 3 * 24 * 60 * 60 // 3 days — matches the backend guest reaper TTL
+	});
+}
+
+export function getGuestUid(cookies: Cookies): string | undefined {
+	return cookies.get(GUEST_UID_COOKIE);
+}
+
+export function clearGuestUid(cookies: Cookies) {
+	cookies.delete(GUEST_UID_COOKIE, { path: '/' });
 }
 
 /**

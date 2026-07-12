@@ -9,7 +9,7 @@
  */
 
 import type { NormalizedData } from './base';
-import { DEFAULT_SECTION_ORDER, _editable, _listEditable, _rangeEditable, _pairEditable, _imgUpload, EDITOR_SCRIPT } from './base';
+import { DEFAULT_SECTION_ORDER, _editable, _listEditable, _rangeEditable, _pairEditable, _imgUpload, EDITOR_SCRIPT, statShown } from './base';
 
 const FONTS_URL =
 	'https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&family=Open+Sans:wght@400;600&display=swap';
@@ -544,7 +544,7 @@ ${v.awards.map((a, i) => `<div class="gen-card" data-item-wrap><button class="de
         ${avatar}
         <h1 ${_editable('profile.full_name')}>${v.name}</h1>
         ${v.headline ? `<div class="designation" ${_editable('portfolio.headline')}>${v.headline}</div>` : ''}
-        ${years > 0 ? `<div class="experience-line"><span ${ted('years_experience')}>${years}</span>+ Years of Professional Experience</div>` : ''}
+        ${statShown(v, 'years_experience', years) ? `<div class="experience-line"><span ${ted('years_experience')}>${years}</span>+ Years of Professional Experience</div>` : ''}
       </div>
       ${socials ? `<div class="hero-socials">${socials}</div>` : ''}
     </div>

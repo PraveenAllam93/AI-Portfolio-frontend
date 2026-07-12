@@ -8,7 +8,7 @@
  */
 
 import type { NormalizedData } from './base';
-import { DEFAULT_SECTION_ORDER, _editable, _listEditable, _rangeEditable, _pairEditable, _imgUpload, EDITOR_SCRIPT } from './base';
+import { DEFAULT_SECTION_ORDER, _editable, _listEditable, _rangeEditable, _pairEditable, _imgUpload, EDITOR_SCRIPT, statShown } from './base';
 
 const FONTS_URL =
 	'https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700;900&family=Exo+2:ital,wght@0,300;0,400;0,600;1,300&family=Space+Mono:wght@400;700&display=swap';
@@ -397,9 +397,9 @@ export function html(v: NormalizedData): string {
 	const certCount = v.template_overrides?.certifications_count ?? (v.certifications?.length ?? 0);
 	const ted = (key: string) => v.edit_mode ? `contenteditable="true" data-path="template_overrides.${key}"` : '';
 	const statChips = [
-		yrs > 0 ? `<div class="stat-chip"><strong><span ${ted('years_experience')}>${yrs}</span>+</strong>Years Exp</div>` : '',
-		projCount > 0 ? `<div class="stat-chip"><strong><span ${ted('projects_count')}>${projCount}</span>+</strong>Projects</div>` : '',
-		certCount > 0 ? `<div class="stat-chip"><strong><span ${ted('certifications_count')}>${certCount}</span></strong>Certs</div>` : '',
+		statShown(v, 'years_experience', yrs) ? `<div class="stat-chip"><strong><span ${ted('years_experience')}>${yrs}</span>+</strong>Years Exp</div>` : '',
+		statShown(v, 'projects_count', projCount) ? `<div class="stat-chip"><strong><span ${ted('projects_count')}>${projCount}</span>+</strong>Projects</div>` : '',
+		statShown(v, 'certifications_count', certCount) ? `<div class="stat-chip"><strong><span ${ted('certifications_count')}>${certCount}</span></strong>Certs</div>` : '',
 	].filter(Boolean).join('');
 
 	// About tags — all unique skills flattened
@@ -551,10 +551,10 @@ ${techChipsHtml}
 <div class="section-wrap"><div class="sw-inner">
 <div class="section-label">Achievements</div>
 <h2 class="section-title">Mission <span>Milestones</span></h2>
-${yrs > 0 || projCount > 0 || certCount > 0 ? `<div class="ach-grid">
-${yrs > 0 ? `<div class="ach-stat-card"><div class="ach-num">${yrs}+</div><div class="ach-label">Years Experience</div></div>` : ''}
-${projCount > 0 ? `<div class="ach-stat-card"><div class="ach-num">${projCount}+</div><div class="ach-label">Projects Shipped</div></div>` : ''}
-${certCount > 0 ? `<div class="ach-stat-card"><div class="ach-num">${certCount}</div><div class="ach-label">Certifications</div></div>` : ''}
+${statShown(v, 'years_experience', yrs) || statShown(v, 'projects_count', projCount) || statShown(v, 'certifications_count', certCount) ? `<div class="ach-grid">
+${statShown(v, 'years_experience', yrs) ? `<div class="ach-stat-card"><div class="ach-num">${yrs}+</div><div class="ach-label">Years Experience</div></div>` : ''}
+${statShown(v, 'projects_count', projCount) ? `<div class="ach-stat-card"><div class="ach-num">${projCount}+</div><div class="ach-label">Projects Shipped</div></div>` : ''}
+${statShown(v, 'certifications_count', certCount) ? `<div class="ach-stat-card"><div class="ach-num">${certCount}</div><div class="ach-label">Certifications</div></div>` : ''}
 <div class="ach-stat-card"><div class="ach-num">${v.achievements.length}</div><div class="ach-label">Achievements</div></div></div>` : ''}
 <div class="awards-grid">
 ${v.achievements.map((a, i) => `<div class="award-item" data-item-wrap>

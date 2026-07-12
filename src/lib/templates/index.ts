@@ -217,11 +217,12 @@ export function renderPortfolio(
 	sectionOrder?: string[],
 	hiddenSections?: string[],
 	templateOverrides?: Record<string, number | null>,
+	fieldVisibility?: Record<string, boolean>,
 	publishMode?: boolean
 ): string {
 	const id = (templateId ?? '').toLowerCase().trim();
 	const renderer = TEMPLATES[id] ?? TEMPLATES[DEFAULT_TEMPLATE];
-	const v = normalize(parsedData, portfolioContent, category, sectionOrder, hiddenSections, !(publishMode ?? false), templateOverrides);
+	const v = normalize(parsedData, portfolioContent, category, sectionOrder, hiddenSections, !(publishMode ?? false), templateOverrides, fieldVisibility);
 	const rendered = renderer(v);
 	return publishMode ? stripEditingUi(rendered) : rendered;
 }

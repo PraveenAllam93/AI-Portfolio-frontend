@@ -6,6 +6,7 @@
 	import Spinner from '$lib/components/common/Spinner.svelte';
 	import AppHeader from '$lib/components/common/AppHeader.svelte';
 	import LoadingState from '$lib/components/common/LoadingState.svelte';
+	import GuestPublishModal from '$lib/components/portfolio/GuestPublishModal.svelte';
 	import {
 		getPortfolioData,
 		savePortfolioContent,
@@ -39,9 +40,12 @@
 	const userId: string = $derived($page.params.userId ?? '');
 	const uploadId: string = $derived($page.params.uploadId ?? '');
 
-	// Ownership guard
+	// Ownership guard. Skipped while a guest is converting to a real account —
+	// during that window the session is already the real user but the URL still
+	// carries the guest userId, and onGuestPublished handles navigation.
 	$effect(() => {
 		const authUser = $authStore.user;
+		if (converting) return;
 		if (!$authStore.loading && authUser && authUser.userId !== userId) {
 			goto('/app/dashboard');
 		}
@@ -399,6 +403,10 @@
 	let templateOverridesStatus = $state<'idle' | 'saving' | 'saved' | 'error'>('idle');
 	let templateOverridesError = $state('');
 
+	// ── Per-stat-field show/hide (Portfolio Fields tab) ───────────────────────
+	// key → explicit bool. Absent = auto (shown only when the stat's value > 0).
+	let fieldVisibility = $state<Record<string, boolean>>({});
+
 	// ── Live preview (client-side rendering) ───────────────────────────────────
 	// Reconstruct ParsedData from in-memory editor state so the preview re-renders
 	// instantly on every keystroke without any server round-trip.
@@ -472,7 +480,7 @@
 	let hoverTemplateId = $state<string | null>(null);
 
 	const renderedHTML = $derived(
-		renderPortfolio(hoverTemplateId ?? templateId, liveParsedData, livePortfolioContent, category, sectionOrder, [...hiddenSections], templateOverrides)
+		renderPortfolio(hoverTemplateId ?? templateId, liveParsedData, livePortfolioContent, category, sectionOrder, [...hiddenSections], templateOverrides, fieldVisibility)
 	);
 
 	// ── Delete confirmation modal ──────────────────────────────────────────────
@@ -541,6 +549,21 @@
 	let hasUnpublishedChanges = $state(false);
 	let publishStatus = $state<'idle' | 'publishing' | 'done' | 'error'>('idle');
 	let publishToast = $state('');
+
+	// Anonymous "Try for free" guest: Publish opens the account-creation wall
+	// instead of publishing directly. `converting` suppresses the ownership guard
+	// during the brief window where we're authenticated as the real user but the
+	// URL still carries the guest userId.
+	const isGuest = $derived($authStore.user?.isGuest === true);
+	let showGuestPublish = $state(false);
+	let converting = $state(false);
+
+	function onGuestPublished(realUserId: string) {
+		converting = true;
+		showGuestPublish = false;
+		// The portfolio now lives under the real account and is publishing live.
+		goto(`/app/portfolio/${realUserId}/${uploadId}/edit`);
+	}
 
 	// ── Mobile layout ──────────────────────────────────────────────────────────
 	let mobileTab = $state<'sections' | 'preview' | 'edit'>('edit');
@@ -988,6 +1011,7 @@
 		if (result.data?.sectionOrder) sectionOrder = result.data.sectionOrder;
 		if (result.data?.hiddenSections) hiddenSections = new Set(result.data.hiddenSections);
 		if (result.data?.templateOverrides) templateOverrides = result.data.templateOverrides;
+		if (result.data?.fieldVisibility) fieldVisibility = result.data.fieldVisibility;
 
 		// The draft has unpublished changes if it was edited after the last publish.
 		// Both timestamps are ISO-UTC strings, so a lexicographic compare is correct.
@@ -1880,6 +1904,62 @@
 		templateOverrides = rest;
 		if (_formSaveTimers[`tov_${key}`]) clearTimeout(_formSaveTimers[`tov_${key}`]);
 		_formSaveTimers[`tov_${key}`] = setTimeout(saveTemplateOverridesFromForm, 800);
+	}
+
+	// ── Portfolio-field visibility ────────────────────────────────────────────
+	// Mirror each template's auto-computed stat value so the eye toggle's default
+	// state (and the "no value" hint) match what the preview actually renders.
+	function _earliestExpYear(experience: Array<Record<string, unknown>>): number {
+		let earliest = new Date().getFullYear();
+		let found = false;
+		for (const exp of experience) {
+			const hay = `${exp.start_date ?? ''} ${exp.end_date ?? ''} ${exp.duration ?? ''}`;
+			const m = hay.match(/\b(19|20)\d{2}\b/);
+			if (m) { const y = parseInt(m[0], 10); if (y < earliest) { earliest = y; found = true; } }
+		}
+		return found ? Math.max(1, new Date().getFullYear() - earliest) : 0;
+	}
+	function _deriveRoas(campaigns: Array<Record<string, unknown>>): number {
+		for (const c of campaigns) {
+			for (const m of (c.performance_metrics as string[] | undefined) ?? []) {
+				const mt = String(m).match(/(\d+(?:\.\d+)?)\s*[x×]/i);
+				if (mt) return Math.round(parseFloat(mt[1]));
+			}
+		}
+		return 0;
+	}
+	/** Auto-computed value for a stat key (before any manual numeric override). */
+	function fieldAutoValue(key: string): number {
+		const pd = liveParsedData;
+		// eslint-disable-next-line @typescript-eslint/no-explicit-any
+		const exp = (pd.experience ?? []) as any[];
+		switch (key) {
+			case 'projects_count':       return (pd.projects ?? []).length;
+			case 'certifications_count': return (pd.certifications ?? []).length;
+			case 'roles_count':          return exp.length;
+			case 'achievements_count':   return (pd.achievements ?? []).length;
+			case 'campaigns_count':      return (pd.campaigns ?? []).length;
+			case 'clients_count':        return exp.length ? Math.max(3, exp.length + 2) : 0;
+			case 'years_experience':     return _earliestExpYear(exp);
+			// eslint-disable-next-line @typescript-eslint/no-explicit-any
+			case 'avg_roas':             return _deriveRoas((pd.campaigns ?? []) as any[]);
+			default:                     return 0;
+		}
+	}
+	/** Effective stat value shown in the preview (manual override wins). */
+	function fieldEffectiveValue(key: string): number {
+		const ov = templateOverrides[key];
+		return ov != null ? ov : fieldAutoValue(key);
+	}
+	/** Whether the stat is currently visible in the preview (mirrors statShown). */
+	function fieldShown(key: string): boolean {
+		const explicit = fieldVisibility[key];
+		return explicit === undefined ? fieldEffectiveValue(key) > 0 : explicit;
+	}
+	async function toggleFieldVisibility(key: string) {
+		fieldVisibility = { ...fieldVisibility, [key]: !fieldShown(key) };
+		await updatePortfolioConfig(userId, uploadId, { fieldVisibility });
+		queuePreviewRefresh();
 	}
 
 	function updateCsItem(csIdx: number, itemIdx: number, field: keyof CustomSectionItem, val: string) {
@@ -2864,6 +2944,14 @@
 	</div>
 {/if}
 
+{#if showGuestPublish}
+	<GuestPublishModal
+		{uploadId}
+		onClose={() => (showGuestPublish = false)}
+		onPublished={onGuestPublished}
+	/>
+{/if}
+
 <div class="flex h-screen flex-col bg-surface-subtle">
 	<AppHeader />
 
@@ -2878,12 +2966,18 @@
 			{/if}
 		</div>
 		<div class="flex flex-shrink-0 items-center gap-2">
-			{#if publishStatus === 'done' || (!hasUnpublishedChanges && publishStatus === 'idle')}
+			{#if !isGuest && (publishStatus === 'done' || (!hasUnpublishedChanges && publishStatus === 'idle'))}
 				<span class="hidden rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-600 ring-1 ring-emerald-200 sm:inline">Published ✓</span>
 			{/if}
-			<button onclick={handlePublish} disabled={publishStatus === 'publishing' || !hasUnpublishedChanges} title={hasUnpublishedChanges ? 'Publish your changes' : 'No changes to publish'} class="rounded-xl bg-brand px-4 py-2 text-sm font-bold text-white transition-all hover:bg-brand-dark active:scale-95 disabled:cursor-not-allowed disabled:opacity-50">
-				{publishStatus === 'publishing' ? 'Publishing…' : 'Publish'}
-			</button>
+			{#if isGuest}
+				<button onclick={() => (showGuestPublish = true)} title="Create an account to publish your portfolio live" class="rounded-xl bg-brand px-4 py-2 text-sm font-bold text-white transition-all hover:bg-brand-dark active:scale-95">
+					Publish live
+				</button>
+			{:else}
+				<button onclick={handlePublish} disabled={publishStatus === 'publishing' || !hasUnpublishedChanges} title={hasUnpublishedChanges ? 'Publish your changes' : 'No changes to publish'} class="rounded-xl bg-brand px-4 py-2 text-sm font-bold text-white transition-all hover:bg-brand-dark active:scale-95 disabled:cursor-not-allowed disabled:opacity-50">
+					{publishStatus === 'publishing' ? 'Publishing…' : 'Publish'}
+				</button>
+			{/if}
 		</div>
 	</div>
 
@@ -3526,14 +3620,31 @@
 							{:else if templateOverridesStatus === 'error'}<span class="flex-shrink-0 rounded-full bg-red-50 px-3 py-1 text-xs font-bold text-red-600 ring-1 ring-red-100">Error</span>{/if}
 						</div>
 						{#if tplFields.length > 0}
+							<p class="mb-4 -mt-1 text-xs text-ink-muted">Use the eye toggle to show or hide a stat. Stats with no value are hidden automatically — enter a number or toggle it on to show it.</p>
 							<div class="space-y-5">
 								{#each tplFields as field}
 									{@const currentVal = templateOverrides[field.key]}
-									<div id="tov-{field.key}">
-										<div class="mb-1 flex items-center justify-between">
-											<label for="tov-input-{field.key}" class="text-xs font-bold uppercase tracking-widest text-ink-soft">{field.label}</label>
+									{@const shown = fieldShown(field.key)}
+									{@const effVal = fieldEffectiveValue(field.key)}
+									<div id="tov-{field.key}" class="transition-opacity {shown ? '' : 'opacity-55'}">
+										<div class="mb-1 flex items-center justify-between gap-2">
+											<div class="flex min-w-0 items-center gap-2">
+												<button
+													type="button"
+													onclick={() => toggleFieldVisibility(field.key)}
+													class="flex-shrink-0 rounded p-1 opacity-70 transition-opacity hover:opacity-100"
+													title={shown ? 'Hide this stat' : 'Show this stat'}
+												>
+													{#if shown}
+														<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="h-4 w-4 text-brand"><path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" /><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" /></svg>
+													{:else}
+														<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="h-4 w-4 text-ink-muted"><path stroke-linecap="round" stroke-linejoin="round" d="M3.98 8.223A10.477 10.477 0 0 0 1.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.451 10.451 0 0 1 12 4.5c4.756 0 8.773 3.162 10.065 7.498a10.522 10.522 0 0 1-4.293 5.774M6.228 6.228 3 3m3.228 3.228 3.65 3.65m7.894 7.894L21 21m-3.228-3.228-3.65-3.65m0 0a3 3 0 1 0-4.243-4.243m4.242 4.242L9.88 9.88" /></svg>
+													{/if}
+												</button>
+												<label for="tov-input-{field.key}" class="truncate text-xs font-bold uppercase tracking-widest text-ink-soft">{field.label}</label>
+											</div>
 											{#if currentVal != null}
-												<button onclick={() => clearTemplateOverride(field.key)} class="text-xs text-ink-muted hover:text-red-500 transition-colors" title="Reset to auto">Reset to auto</button>
+												<button onclick={() => clearTemplateOverride(field.key)} class="flex-shrink-0 text-xs text-ink-muted hover:text-red-500 transition-colors" title="Reset to auto">Reset to auto</button>
 											{/if}
 										</div>
 										<input
@@ -3546,7 +3657,11 @@
 											oninput={(e) => updateTemplateOverride(field.key, (e.target as HTMLInputElement).value)}
 											class="w-full rounded-xl border border-surface-muted bg-surface-subtle/50 px-4 py-3 text-sm text-ink outline-none focus:border-brand/60 focus:ring-2 focus:ring-brand/15"
 										/>
-										<p class="mt-1 text-xs text-ink-muted">{field.hint}</p>
+										{#if !shown}
+											<p class="mt-1 text-xs font-semibold text-amber-600">Hidden{effVal <= 0 ? ' — no value found. Enter a number or toggle on to show it.' : '.'}</p>
+										{:else}
+											<p class="mt-1 text-xs text-ink-muted">{field.hint}</p>
+										{/if}
 									</div>
 								{/each}
 							</div>

@@ -3,7 +3,7 @@
 		Stop getting<br /><span class="coral">ignored.</span>
 	</h2>
 	<p class="final-sub">Upload your CV. Get your portfolio. Share the link. In under 60 seconds.</p>
-	<a href="/signup" class="btn-final">✨ Build My Portfolio — It's Free</a>
+	<a href="/try" class="btn-final">✨ Build My Portfolio — It's Free</a>
 	<p class="final-trust">No account needed · No credit card · Your data is never stored</p>
 </section>
 

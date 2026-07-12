@@ -20,6 +20,7 @@ export type ProcessingStatus =
 	| 'AI_COMPLETE'
 	| 'GENERATING'
 	| 'COMPLETE'
+	| 'DRAFT_READY'
 	| 'FAILED'
 	| 'AI_FAILED'
 	| 'INVALID_DOCUMENT'
@@ -52,8 +53,10 @@ export interface StatusResponse {
 	failureStage?: FailureStage;
 	/** true on failure states, false on COMPLETE — drives the retry button */
 	canRetry: boolean;
-	/** Present only when status === 'COMPLETE' */
+	/** Present when status === 'COMPLETE' or 'DRAFT_READY' */
 	portfolioPath?: string;
+	/** True when status === 'DRAFT_READY' — a guest preview, not yet published live */
+	isDraft?: boolean;
 	/** Auto-detected profession — present when status === 'AWAITING_SELECTION'. Advisory. */
 	predictedProfession?: PredictedProfession | null;
 	/** Classifier confidence 0–100 for the predicted profession. */

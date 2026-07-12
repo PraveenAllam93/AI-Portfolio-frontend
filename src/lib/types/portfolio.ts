@@ -169,6 +169,8 @@ export interface PortfolioData {
 	sectionOrder?: string[];
 	hiddenSections?: string[];
 	templateOverrides?: Record<string, number | null>;
+	/** Per-stat-field show/hide overrides (key → explicit bool; absent = auto). */
+	fieldVisibility?: Record<string, boolean>;
 	/** ISO timestamp of the last content edit (bumped by every patch). */
 	updatedAt?: string | null;
 	/** ISO timestamp of the last publish. If updatedAt > lastPublishedAt, the draft has unpublished changes. */
@@ -178,6 +180,7 @@ export interface PortfolioData {
 export interface PortfolioConfig {
 	sectionOrder: string[];
 	hiddenSections: string[];
+	fieldVisibility: Record<string, boolean>;
 	templateId?: string;
 }
 

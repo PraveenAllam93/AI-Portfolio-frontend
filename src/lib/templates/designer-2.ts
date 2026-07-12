@@ -6,7 +6,7 @@
  */
 
 import type { NormalizedData } from './base';
-import { DEFAULT_SECTION_ORDER, _editable, _listEditable, _rangeEditable, _pairEditable, _imgUpload, EDITOR_SCRIPT } from './base';
+import { DEFAULT_SECTION_ORDER, _editable, _listEditable, _rangeEditable, _pairEditable, _imgUpload, EDITOR_SCRIPT, statShown } from './base';
 
 const FONTS_URL =
 	'https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,300&display=swap';
@@ -572,15 +572,15 @@ ${v.email ? `<a href="mailto:${v.email}" class="nav-cta">Hire me</a>` : ''}
 <div class="hero-bottom">
 <p class="hero-desc" ${ed('portfolio.bio', true)}>${v.bio || 'Creative professional building thoughtful digital experiences.'}</p>
 <div class="hero-stats">
-${yearsExp ? `<div class="stat-item">
+${statShown(v, 'years_experience', yearsExp) ? `<div class="stat-item">
 <div class="stat-num" ${ed('template_overrides.years_experience')}>${yearsExp}+</div>
 <div class="stat-label">Years active</div>
 </div>` : ''}
-${projectsCount ? `<div class="stat-item">
+${statShown(v, 'projects_count', projectsCount) ? `<div class="stat-item">
 <div class="stat-num" ${ed('template_overrides.projects_count')}>${projectsCount}+</div>
 <div class="stat-label">Projects</div>
 </div>` : ''}
-${clientsCount ? `<div class="stat-item">
+${statShown(v, 'clients_count', clientsCount) ? `<div class="stat-item">
 <div class="stat-num" ${ed('template_overrides.clients_count')}>${clientsCount}+</div>
 <div class="stat-label">Clients</div>
 </div>` : ''}

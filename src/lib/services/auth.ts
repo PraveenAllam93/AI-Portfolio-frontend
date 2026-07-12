@@ -8,6 +8,8 @@ export interface AuthUser {
 	userId: string;
 	name: string;
 	email: string;
+	/** True for an anonymous "Try for free" guest (not yet a real account). */
+	isGuest?: boolean;
 }
 
 export interface SignUpParams {

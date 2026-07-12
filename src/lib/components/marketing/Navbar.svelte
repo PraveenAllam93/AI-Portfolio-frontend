@@ -33,7 +33,7 @@
 
 		<div class="nav-r">
 			<a href="/login" class="btn-ghost-sm">Log in</a>
-			<a href="/signup" class="btn-nav">Get Started Free</a>
+			<a href="/try" class="btn-nav">Get Started Free</a>
 		</div>
 
 		<button
@@ -61,7 +61,7 @@
 			<a href="#pricing" onclick={() => smoothScroll('pricing')}>Pricing</a>
 			<div class="mobile-divider"></div>
 			<a href="/login" class="mobile-login">Log in</a>
-			<a href="/signup" class="mobile-cta">Get Started Free</a>
+			<a href="/try" class="mobile-cta">Get Started Free</a>
 		</div>
 	{/if}
 </nav>

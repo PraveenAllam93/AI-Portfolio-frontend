@@ -10,7 +10,7 @@
  */
 
 import type { NormalizedData } from './base';
-import { DEFAULT_SECTION_ORDER, _editable, _listEditable, _rangeEditable, _pairEditable, _imgUpload, EDITOR_SCRIPT } from './base';
+import { DEFAULT_SECTION_ORDER, _editable, _listEditable, _rangeEditable, _pairEditable, _imgUpload, EDITOR_SCRIPT, statShown } from './base';
 
 const FONTS_URL =
 	'https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@300;400;500;600;700;800&family=Lora:ital,wght@0,400;0,500;0,600;1,400&family=Barlow:wght@300;400;500;600&display=swap';
@@ -289,9 +289,9 @@ export function html(v: NormalizedData): string {
 	const avatar = v.profile_image ? `<img src="${v.profile_image}" alt="${v.name}">` : inits;
 
 	const stats = [
-		years > 0 ? `<div class="stat-item"><span class="stat-num"><span ${ted('years_experience')}>${years}</span>+</span><span class="stat-label">Years Experience</span></div>` : '',
-		projCount > 0 ? `<div class="stat-item"><span class="stat-num"><span ${ted('projects_count')}>${projCount}</span></span><span class="stat-label">Projects Delivered</span></div>` : '',
-		certCount > 0 ? `<div class="stat-item"><span class="stat-num"><span ${ted('certifications_count')}>${certCount}</span></span><span class="stat-label">Certifications</span></div>` : '',
+		statShown(v, 'years_experience', years) ? `<div class="stat-item"><span class="stat-num"><span ${ted('years_experience')}>${years}</span>+</span><span class="stat-label">Years Experience</span></div>` : '',
+		statShown(v, 'projects_count', projCount) ? `<div class="stat-item"><span class="stat-num"><span ${ted('projects_count')}>${projCount}</span></span><span class="stat-label">Projects Delivered</span></div>` : '',
+		statShown(v, 'certifications_count', certCount) ? `<div class="stat-item"><span class="stat-num"><span ${ted('certifications_count')}>${certCount}</span></span><span class="stat-label">Certifications</span></div>` : '',
 	].filter(Boolean).join('');
 
 	// SUMMARY (about) — bio + Core Expertise.

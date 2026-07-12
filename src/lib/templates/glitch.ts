@@ -9,7 +9,7 @@
  */
 
 import type { NormalizedData } from './base';
-import { DEFAULT_SECTION_ORDER, _editable, _listEditable, _rangeEditable, _pairEditable, _imgUpload, EDITOR_SCRIPT } from './base';
+import { DEFAULT_SECTION_ORDER, _editable, _listEditable, _rangeEditable, _pairEditable, _imgUpload, EDITOR_SCRIPT, statShown } from './base';
 
 const FONTS_URL =
 	'https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=Space+Mono:ital,wght@0,400;0,700;1,400&family=DM+Sans:wght@300;400;500&display=swap';
@@ -409,7 +409,7 @@ export function html(v: NormalizedData): string {
 
 	const heroMeta = [
 		v.location ? `<div class="hero-meta-item"><span class="dot" style="background:var(--accent)"></span><span ${_editable('profile.location')}>${v.location}</span></div>` : '',
-		years > 0 ? `<div class="hero-meta-item"><span class="dot" style="background:var(--accent3)"></span><span ${ted('years_experience')}>${years}</span>+ Years Experience</div>` : '',
+		statShown(v, 'years_experience', years) ? `<div class="hero-meta-item"><span class="dot" style="background:var(--accent3)"></span><span ${ted('years_experience')}>${years}</span>+ Years Experience</div>` : '',
 		v.email ? `<div class="hero-meta-item"><span class="dot" style="background:var(--accent4)"></span><span ${_editable('profile.email')}>${v.email}</span></div>` : '',
 	].filter(Boolean).join('');
 
@@ -421,30 +421,31 @@ export function html(v: NormalizedData): string {
 	// ── ABOUT ──
 	const aboutHtml = v.bio || v.skill_groups?.length
 		? (() => {
-			const statsHtml = `
-<div class="stat-card reveal">
-  <div class="stat-num"><span ${ted('years_experience')}>${years > 0 ? years : '—'}</span>${years > 0 ? '+' : ''}</div>
+			const statsHtml = [
+				statShown(v, 'years_experience', years) ? `<div class="stat-card reveal">
+  <div class="stat-num"><span ${ted('years_experience')}>${years}</span>+</div>
   <div class="stat-label">Years Building</div>
-</div>
-<div class="stat-card reveal d1">
-  <div class="stat-num"><span ${ted('projects_count')}>${projCount > 0 ? projCount : '—'}</span>${projCount > 0 ? '+' : ''}</div>
+</div>` : '',
+				statShown(v, 'projects_count', projCount) ? `<div class="stat-card reveal d1">
+  <div class="stat-num"><span ${ted('projects_count')}>${projCount}</span>+</div>
   <div class="stat-label">Projects Shipped</div>
-</div>
-<div class="stat-card reveal d2">
-  <div class="stat-num"><span ${ted('certifications_count')}>${certCount > 0 ? certCount : '—'}</span></div>
+</div>` : '',
+				statShown(v, 'certifications_count', certCount) ? `<div class="stat-card reveal d2">
+  <div class="stat-num"><span ${ted('certifications_count')}>${certCount}</span></div>
   <div class="stat-label">Certifications</div>
-</div>
-<div class="stat-card reveal d3">
-  <div class="stat-num"><span ${ted('achievements_count')}>${achCount > 0 ? achCount : '—'}</span></div>
+</div>` : '',
+				statShown(v, 'achievements_count', achCount) ? `<div class="stat-card reveal d3">
+  <div class="stat-num"><span ${ted('achievements_count')}>${achCount}</span></div>
   <div class="stat-label">Achievements</div>
-</div>`;
+</div>` : '',
+			].filter(Boolean).join('');
 			return `<section id="about"><div class="wrap"><div class="about-grid">
 <div class="reveal">
   <div class="section-label">${num()} / About</div>
   <h2 class="section-title">WHO IS<br>${inits}?</h2>
   ${v.bio ? `<p class="bio-text" ${_editable('portfolio.bio', true)}>${v.bio}</p>` : ''}
 </div>
-<div class="about-stats">${statsHtml}</div>
+${statsHtml ? `<div class="about-stats">${statsHtml}</div>` : ''}
 </div></div></section>`;
 		})()
 		: '';

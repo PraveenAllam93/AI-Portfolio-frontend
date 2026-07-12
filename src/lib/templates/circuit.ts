@@ -8,7 +8,7 @@
  */
 
 import type { NormalizedData } from './base';
-import { DEFAULT_SECTION_ORDER, _editable, _listEditable, _rangeEditable, _pairEditable, _imgUpload, EDITOR_SCRIPT } from './base';
+import { DEFAULT_SECTION_ORDER, _editable, _listEditable, _rangeEditable, _pairEditable, _imgUpload, EDITOR_SCRIPT, statShown } from './base';
 
 const FONTS_URL =
 	'https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,300&family=JetBrains+Mono:wght@400;500&display=swap';
@@ -494,8 +494,8 @@ export function html(v: NormalizedData): string {
 	].filter(Boolean).join('');
 
 	// Stat bubbles
-	const bubble1 = years > 0 ? `<div class="stat-bubble fade-in"><div><div class="stat-num"><span ${ted('years_experience')}>${years}</span>+</div><div class="stat-label">Years<br>Exp.</div></div></div>` : '';
-	const bubble2 = projCount > 0 ? `<div class="stat-bubble fade-in delay-1"><div><div class="stat-num"><span ${ted('projects_count')}>${projCount}</span>+</div><div class="stat-label">Projects<br>Built</div></div></div>` : '';
+	const bubble1 = statShown(v, 'years_experience', years) ? `<div class="stat-bubble fade-in"><div><div class="stat-num"><span ${ted('years_experience')}>${years}</span>+</div><div class="stat-label">Years<br>Exp.</div></div></div>` : '';
+	const bubble2 = statShown(v, 'projects_count', projCount) ? `<div class="stat-bubble fade-in delay-1"><div><div class="stat-num"><span ${ted('projects_count')}>${projCount}</span>+</div><div class="stat-label">Projects<br>Built</div></div></div>` : '';
 
 	// About section
 	const aboutHtml = v.bio || v.skill_groups?.length
@@ -507,27 +507,28 @@ export function html(v: NormalizedData): string {
 </div>`
 			).join('');
 
-			const statsHtml = `
-<div class="astat">
-  <div class="astat-num"><span ${ted('years_experience')}>${years > 0 ? years : '—'}</span>${years > 0 ? '+' : ''}</div>
+			const statsHtml = [
+				statShown(v, 'years_experience', years) ? `<div class="astat">
+  <div class="astat-num"><span ${ted('years_experience')}>${years}</span>+</div>
   <div class="astat-label">Years Experience</div>
   <div class="astat-note">// industry</div>
-</div>
-<div class="astat">
-  <div class="astat-num"><span ${ted('projects_count')}>${projCount > 0 ? projCount : '—'}</span>${projCount > 0 ? '+' : ''}</div>
+</div>` : '',
+				statShown(v, 'projects_count', projCount) ? `<div class="astat">
+  <div class="astat-num"><span ${ted('projects_count')}>${projCount}</span>+</div>
   <div class="astat-label">Projects Delivered</div>
   <div class="astat-note">// completed</div>
-</div>
-<div class="astat">
-  <div class="astat-num"><span ${ted('certifications_count')}>${certCount > 0 ? certCount : '—'}</span></div>
+</div>` : '',
+				statShown(v, 'certifications_count', certCount) ? `<div class="astat">
+  <div class="astat-num"><span ${ted('certifications_count')}>${certCount}</span></div>
   <div class="astat-label">Certifications</div>
   <div class="astat-note">// certified</div>
-</div>
-<div class="astat">
-  <div class="astat-num">${totalSkills > 0 ? totalSkills + '+' : '—'}</div>
+</div>` : '',
+				totalSkills > 0 ? `<div class="astat">
+  <div class="astat-num">${totalSkills}+</div>
   <div class="astat-label">Skills</div>
   <div class="astat-note">// proficient</div>
-</div>`;
+</div>` : '',
+			].filter(Boolean).join('');
 
 			return `<section id="about">
 <div class="section-header fade-in">
@@ -539,7 +540,7 @@ export function html(v: NormalizedData): string {
     ${v.bio ? `<p ${_editable('portfolio.bio', true)}>${v.bio}</p>` : ''}
     ${highlights ? `<div class="about-highlights">${highlights}</div>` : ''}
   </div>
-  <div class="about-stats fade-in delay-1">${statsHtml}</div>
+  ${statsHtml ? `<div class="about-stats fade-in delay-1">${statsHtml}</div>` : ''}
 </div>
 </section>`;
 		})()

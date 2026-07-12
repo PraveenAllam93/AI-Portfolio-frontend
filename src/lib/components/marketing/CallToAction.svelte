@@ -20,7 +20,7 @@
 				</div>
 			</div>
 			<div class="ucta-btns">
-				<a href="/signup" class="btn-gen">✨ Build My Portfolio — Try Now</a>
+				<a href="/try" class="btn-gen">✨ Build My Portfolio — Try Now</a>
 				<a href="/app/dashboard" class="btn-eg">👀 See an example portfolio</a>
 			</div>
 			<div class="upload-priv">🔒 Your resume is never stored, shared, or sold.</div>

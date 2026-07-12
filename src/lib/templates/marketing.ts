@@ -8,7 +8,7 @@
  */
 
 import type { NormalizedData } from './base';
-import { DEFAULT_SECTION_ORDER, _editable, _listEditable, _rangeEditable, _pairEditable, _imgUpload, EDITOR_SCRIPT } from './base';
+import { DEFAULT_SECTION_ORDER, _editable, _listEditable, _rangeEditable, _pairEditable, _imgUpload, EDITOR_SCRIPT, statShown } from './base';
 
 const FONTS_URL =
 	'https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,700;1,400;1,500&family=Lora:ital,wght@0,300;0,400;0,500;1,300;1,400&family=EB+Garamond:ital,wght@0,400;1,400&display=swap';
@@ -512,6 +512,10 @@ export function html(v: NormalizedData): string {
 	const initials = v.name.split(' ').map((p: string) => p[0] ?? '').join('').slice(0, 2).toUpperCase() || 'MK';
 	// Reusable editable stat number span (maps to template_overrides, which the right pane edits).
 	const statNum = (key: string, val: number): string => `<span ${ed(`template_overrides.${key}`)}>${val}</span>`;
+	// Per-stat visibility: hidden when 0/absent, or when the user toggled it off.
+	const showYears = statShown(v, 'years_experience', yearsExp);
+	const showCampaigns = statShown(v, 'campaigns_count', campaignsCount);
+	const showRoas = statShown(v, 'avg_roas', avgRoas);
 
 	// ── EXPERIENCE ────────────────────────────────────────────────────────────
 	const experienceHtml = !hidden.has('experience') && (v.experience.length || em)
@@ -586,20 +590,23 @@ ${g.skills.map(s => `<span class="soft-tag">${s}</span>`).join('')}
 <div class="orb imp-orb2"></div>
 <div class="sec-tag sec-tag-light reveal">Measurable Results</div>
 <h2 class="sec-heading sec-heading-light reveal d1">Campaign <em>Impact</em></h2>
-<div class="impact-stat-row">
-<div class="imp-stat reveal">
+${(() => {
+	const cells = [
+		showYears ? `<div class="imp-stat reveal">
 <div class="imp-num">${statNum('years_experience', yearsExp)}+</div>
 <div class="imp-lbl">Years Experience</div>
-</div>
-<div class="imp-stat reveal d1">
+</div>` : '',
+		showCampaigns ? `<div class="imp-stat reveal d1">
 <div class="imp-num">${statNum('campaigns_count', campaignsCount)}+</div>
 <div class="imp-lbl">Campaigns Run</div>
-</div>
-<div class="imp-stat reveal d2">
+</div>` : '',
+		showRoas ? `<div class="imp-stat reveal d2">
 <div class="imp-num">${statNum('avg_roas', avgRoas)}&times;</div>
 <div class="imp-lbl">Average ROAS</div>
-</div>
-</div>
+</div>` : '',
+	].filter(Boolean);
+	return cells.length ? `<div class="impact-stat-row" style="grid-template-columns:repeat(${cells.length},1fr)">${cells.join('\n')}</div>` : '';
+})()}
 ${v.campaigns?.length ? `<div class="camp-grid">
 ${(v.campaigns ?? []).map((c, i) => `<div class="camp-card reveal${i > 1 ? ` d${i - 1}` : ''}"${iw}>
 ${delBtn('campaigns', i)}
@@ -769,7 +776,7 @@ Portfolio</a>` : '',
 		(v.location) ? `<div class="ag-cell"><div class="ag-label">Location</div><div class="ag-val" ${ed('profile.location')}>${v.location || ''}</div></div>` : '',
 		(v.email) ? `<div class="ag-cell"><div class="ag-label">Email</div><div class="ag-val" ${ed('profile.email')}>${v.email || ''}</div></div>` : '',
 		(v.phone) ? `<div class="ag-cell"><div class="ag-label">Phone</div><div class="ag-val" ${ed('profile.phone')}>${v.phone || ''}</div></div>` : '',
-		`<div class="ag-cell"><div class="ag-label">Experience</div><div class="ag-val"><span ${ed('template_overrides.years_experience')}>${yearsExp}</span>+ Years</div></div>`,
+		showYears ? `<div class="ag-cell"><div class="ag-label">Experience</div><div class="ag-val"><span ${ed('template_overrides.years_experience')}>${yearsExp}</span>+ Years</div></div>` : '',
 	].filter(Boolean);
 
 	return `<!DOCTYPE html>
@@ -828,18 +835,18 @@ ${v.profile_image
 <span class="photo-placeholder-txt">Profile Photo</span>
 </div>`}
 </div>
-<div class="stat-pill p1">
+${showYears ? `<div class="stat-pill p1">
 <div class="stat-val">${statNum('years_experience', yearsExp)}+</div>
 <div class="stat-lbl">Yrs Experience</div>
-</div>
-<div class="stat-pill p2">
+</div>` : ''}
+${showRoas ? `<div class="stat-pill p2">
 <div class="stat-val">${statNum('avg_roas', avgRoas)}&times;</div>
 <div class="stat-lbl">Avg. ROAS</div>
-</div>
-<div class="stat-pill p3">
+</div>` : ''}
+${showCampaigns ? `<div class="stat-pill p3">
 <div class="stat-val">${statNum('campaigns_count', campaignsCount)}+</div>
 <div class="stat-lbl">Campaigns</div>
-</div>
+</div>` : ''}
 </div>
 </div>
 <div class="scroll-hint">

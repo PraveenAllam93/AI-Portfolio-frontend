@@ -440,11 +440,33 @@ export interface NormalizedData {
 	}>;
 	// Template-specific stat overrides (null/absent = use auto-computed value)
 	template_overrides: Record<string, number | null>;
+	// Per-stat-field visibility override. Key = stat field key (e.g. 'years_experience').
+	//   absent      → auto: stat is shown only when its value > 0
+	//   true        → force-shown (even when value is 0)
+	//   false       → force-hidden (even when value is > 0)
+	field_visibility: Record<string, boolean>;
 	// Metadata
 	category: string;
 	section_order: string[];
 	hidden_sections: Set<string>;
 	edit_mode: boolean;
+}
+
+/**
+ * Whether a template stat field should be rendered.
+ *
+ * Combines the two rules templates need everywhere:
+ *   1. Auto-hide stats with no value (0 or absent from the résumé) so a portfolio
+ *      never shows an ugly "0+" / "0×".
+ *   2. Honor the user's explicit show/hide toggle from the Portfolio Fields panel,
+ *      which can force a non-zero stat off, or force a zero stat on (so the user
+ *      can then type a real number).
+ *
+ * `value` is the effective stat value (override ?? auto-computed).
+ */
+export function statShown(v: NormalizedData, key: string, value: number): boolean {
+	const explicit = v.field_visibility?.[key];
+	return explicit === undefined ? value > 0 : explicit;
 }
 
 export function normalize(
@@ -454,7 +476,8 @@ export function normalize(
 	sectionOrder?: string[],
 	hiddenSections?: string[] | Set<string>,
 	editMode = true,
-	templateOverrides?: Record<string, number | null>
+	templateOverrides?: Record<string, number | null>,
+	fieldVisibility?: Record<string, boolean>
 ): NormalizedData {
 	const profile = parsedData.profile ?? {};
 	const social = profile.social_links ?? {};
@@ -645,6 +668,7 @@ export function normalize(
 		investment_portfolios,
 		custom_sections,
 		template_overrides: templateOverrides ?? {},
+		field_visibility: fieldVisibility ?? {},
 		category,
 		section_order: (sectionOrder ?? DEFAULT_SECTION_ORDER).filter((k) =>
 			sectionAllowedForCategory(k, category)

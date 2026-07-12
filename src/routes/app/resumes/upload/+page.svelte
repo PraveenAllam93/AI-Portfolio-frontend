@@ -605,6 +605,7 @@
 			undefined,
 			undefined,
 			undefined,
+			undefined,
 			true   // publishMode — strips editor chrome
 		).replace(
 			'</head>',

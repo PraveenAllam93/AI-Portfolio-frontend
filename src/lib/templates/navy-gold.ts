@@ -7,7 +7,7 @@
  */
 
 import type { NormalizedData } from './base';
-import { DEFAULT_SECTION_ORDER, _editable, _listEditable, _rangeEditable, _pairEditable, _imgUpload, EDITOR_SCRIPT } from './base';
+import { DEFAULT_SECTION_ORDER, _editable, _listEditable, _rangeEditable, _pairEditable, _imgUpload, EDITOR_SCRIPT, statShown } from './base';
 
 const FONTS_URL =
 	'https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400&display=swap';
@@ -348,11 +348,11 @@ export function html(v: NormalizedData): string {
 	const projCount = v.template_overrides?.projects_count ?? (v.projects?.length ?? 0);
 	const certCount = v.template_overrides?.certifications_count ?? (v.certifications?.length ?? 0);
 	const ted = (key: string) => v.edit_mode ? `contenteditable="true" data-path="template_overrides.${key}"` : '';
-	const heroStats = (yrs > 0 || projCount > 0 || certCount > 0)
+	const heroStats = (statShown(v, 'years_experience', yrs) || statShown(v, 'projects_count', projCount) || statShown(v, 'certifications_count', certCount))
 		? `<div class="hero-stats">
-${yrs > 0 ? `<div class="hero-stat"><span class="hero-stat-num"><span ${ted('years_experience')}>${yrs}</span>+</span><span class="hero-stat-lbl">Years Exp</span></div>` : ''}
-${projCount > 0 ? `<div class="hero-stat"><span class="hero-stat-num"><span ${ted('projects_count')}>${projCount}</span>+</span><span class="hero-stat-lbl">Projects</span></div>` : ''}
-${certCount > 0 ? `<div class="hero-stat"><span class="hero-stat-num"><span ${ted('certifications_count')}>${certCount}</span></span><span class="hero-stat-lbl">Certifications</span></div>` : ''}
+${statShown(v, 'years_experience', yrs) ? `<div class="hero-stat"><span class="hero-stat-num"><span ${ted('years_experience')}>${yrs}</span>+</span><span class="hero-stat-lbl">Years Exp</span></div>` : ''}
+${statShown(v, 'projects_count', projCount) ? `<div class="hero-stat"><span class="hero-stat-num"><span ${ted('projects_count')}>${projCount}</span>+</span><span class="hero-stat-lbl">Projects</span></div>` : ''}
+${statShown(v, 'certifications_count', certCount) ? `<div class="hero-stat"><span class="hero-stat-num"><span ${ted('certifications_count')}>${certCount}</span></span><span class="hero-stat-lbl">Certifications</span></div>` : ''}
 </div>` : '';
 
 	// Experience

@@ -11,7 +11,7 @@
  */
 
 import type { NormalizedData } from './base';
-import { DEFAULT_SECTION_ORDER, _editable, _listEditable, _rangeEditable, _pairEditable, _imgUpload, EDITOR_SCRIPT } from './base';
+import { DEFAULT_SECTION_ORDER, _editable, _listEditable, _rangeEditable, _pairEditable, _imgUpload, EDITOR_SCRIPT, statShown } from './base';
 
 const FONTS_URL =
 	'https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500&family=DM+Mono:wght@400;500&display=swap';
@@ -400,9 +400,9 @@ export function html(v: NormalizedData): string {
 		: `<div class="photo-placeholder"><div class="photo-placeholder-icon">${inits}</div><div class="photo-placeholder-txt">${(v.headline || 'Engineer').slice(0, 24)}</div></div>`;
 
 	const heroStats = [
-		years > 0 ? `<div class="hstat"><div class="sv"><span ${ted('years_experience')}>${years}</span><sup>+</sup></div><div class="sl">Years Experience</div></div>` : '',
-		projCount > 0 ? `<div class="hstat"><div class="sv"><span ${ted('projects_count')}>${projCount}</span><sup>+</sup></div><div class="sl">Projects Delivered</div></div>` : '',
-		certCount > 0 ? `<div class="hstat"><div class="sv"><span ${ted('certifications_count')}>${certCount}</span></div><div class="sl">Certifications</div></div>` : '',
+		statShown(v, 'years_experience', years) ? `<div class="hstat"><div class="sv"><span ${ted('years_experience')}>${years}</span><sup>+</sup></div><div class="sl">Years Experience</div></div>` : '',
+		statShown(v, 'projects_count', projCount) ? `<div class="hstat"><div class="sv"><span ${ted('projects_count')}>${projCount}</span><sup>+</sup></div><div class="sl">Projects Delivered</div></div>` : '',
+		statShown(v, 'certifications_count', certCount) ? `<div class="hstat"><div class="sv"><span ${ted('certifications_count')}>${certCount}</span></div><div class="sl">Certifications</div></div>` : '',
 		totalSkills > 0 ? `<div class="hstat"><div class="sv">${totalSkills}</div><div class="sl">Core Skills</div></div>` : '',
 	].filter(Boolean).join('');
 
@@ -410,7 +410,7 @@ export function html(v: NormalizedData): string {
 	const specRows = [
 		v.headline ? `<div class="arow"><span class="ak">Specialization</span><span class="av" ${_editable('portfolio.headline')}>${v.headline}</span></div>` : '',
 		v.location ? `<div class="arow"><span class="ak">Location</span><span class="av" ${_editable('profile.location')}>${v.location}</span></div>` : '',
-		years > 0 ? `<div class="arow"><span class="ak">Experience</span><span class="av"><span ${ted('years_experience')}>${years}</span>+ Years</span></div>` : '',
+		statShown(v, 'years_experience', years) ? `<div class="arow"><span class="ak">Experience</span><span class="av"><span ${ted('years_experience')}>${years}</span>+ Years</span></div>` : '',
 		v.email ? `<div class="arow"><span class="ak">Email</span><span class="av" ${_editable('profile.email')}>${v.email}</span></div>` : '',
 		`<div class="arow"><span class="ak">Availability</span><span class="av">Open to Opportunities</span></div>`,
 	].filter(Boolean).join('');

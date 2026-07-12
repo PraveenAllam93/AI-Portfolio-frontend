@@ -22,6 +22,8 @@ export interface ResumeProcessingState {
 	polling: boolean;
 	networkError: boolean;
 	cancelling: boolean;
+	/** True when the terminal state is DRAFT_READY (guest preview, not live) */
+	isDraft: boolean;
 }
 
 const initial: ResumeProcessingState = {
@@ -35,7 +37,8 @@ const initial: ResumeProcessingState = {
 	canRetry: false,
 	polling: false,
 	networkError: false,
-	cancelling: false
+	cancelling: false,
+	isDraft: false
 };
 
 function createResumeProcessingStore() {
@@ -76,6 +79,7 @@ function createResumeProcessingStore() {
 				update((s) => ({
 					...applyResponse(s, data),
 					portfolioPath: data.portfolioPath ?? null,
+					isDraft: data.isDraft ?? data.status === 'DRAFT_READY',
 					polling: false
 				}));
 				stopPoll = null;

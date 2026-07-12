@@ -8,7 +8,7 @@
  */
 
 import type { NormalizedData } from './base';
-import { DEFAULT_SECTION_ORDER, _editable, _listEditable, _rangeEditable, _pairEditable, _imgUpload, EDITOR_SCRIPT } from './base';
+import { DEFAULT_SECTION_ORDER, _editable, _listEditable, _rangeEditable, _pairEditable, _imgUpload, EDITOR_SCRIPT, statShown } from './base';
 
 const FONTS_URL =
 	'https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap';
@@ -329,10 +329,10 @@ export function html(v: NormalizedData): string {
 	const ted = (key: string) => v.edit_mode ? `contenteditable="true" data-path="template_overrides.${key}"` : '';
 
 	const stats: string[] = [];
-	if (experienceCount) stats.push(`<div class="stat-card"><span class="stat-number"><span ${ted('roles_count')}>${experienceCount}</span>+</span><span class="stat-label">Roles</span></div>`);
-	if (projectsCount) stats.push(`<div class="stat-card"><span class="stat-number"><span ${ted('projects_count')}>${projectsCount}</span>+</span><span class="stat-label">Projects</span></div>`);
-	if (certsCount) stats.push(`<div class="stat-card"><span class="stat-number"><span ${ted('certifications_count')}>${certsCount}</span></span><span class="stat-label">Certifications</span></div>`);
-	if (achCount) stats.push(`<div class="stat-card"><span class="stat-number"><span ${ted('achievements_count')}>${achCount}</span></span><span class="stat-label">Achievements</span></div>`);
+	if (statShown(v, 'roles_count', experienceCount)) stats.push(`<div class="stat-card"><span class="stat-number"><span ${ted('roles_count')}>${experienceCount}</span>+</span><span class="stat-label">Roles</span></div>`);
+	if (statShown(v, 'projects_count', projectsCount)) stats.push(`<div class="stat-card"><span class="stat-number"><span ${ted('projects_count')}>${projectsCount}</span>+</span><span class="stat-label">Projects</span></div>`);
+	if (statShown(v, 'certifications_count', certsCount)) stats.push(`<div class="stat-card"><span class="stat-number"><span ${ted('certifications_count')}>${certsCount}</span></span><span class="stat-label">Certifications</span></div>`);
+	if (statShown(v, 'achievements_count', achCount)) stats.push(`<div class="stat-card"><span class="stat-number"><span ${ted('achievements_count')}>${achCount}</span></span><span class="stat-label">Achievements</span></div>`);
 
 	const aboutHtml = v.bio
 		? `<section id="about">

@@ -13,6 +13,15 @@
 
 	const uploadId: string = $page.params.uploadId ?? '';
 
+	// COMPLETE = published live (normal users). DRAFT_READY = guest preview that
+	// is generated but NOT publicly live until the guest creates an account.
+	const isReady = $derived(
+		$resumeProcessing.status === 'COMPLETE' || $resumeProcessing.status === 'DRAFT_READY'
+	);
+	const isGuestDraft = $derived(
+		$resumeProcessing.status === 'DRAFT_READY' || $resumeProcessing.isDraft
+	);
+
 	// ─── Step definitions ────────────────────────────────────────────────────────
 	const STEPS = [
 		{
@@ -76,7 +85,7 @@
 	// Auto-redirect to edit page 2 s after portfolio is ready
 	let redirectCountdown = $state(2);
 	$effect(() => {
-		if ($resumeProcessing.status !== 'COMPLETE') return;
+		if (!isReady) return;
 		const userId = $authStore.user?.userId;
 		if (!userId) return;
 
@@ -225,13 +234,13 @@
 				<div class="p-10">
 					<!-- Title -->
 					<div class="mb-10 text-center">
-						{#if $resumeProcessing.status === 'COMPLETE'}
+						{#if isReady}
 							<div in:scale={{ duration: 400, easing: elasticOut, start: 0.8 }}>
 								<p class="text-xs font-bold tracking-widest text-emerald-500 uppercase">
-									Deployed
+									{isGuestDraft ? 'Preview ready' : 'Deployed'}
 								</p>
 								<h1 class="mt-2 font-display text-3xl font-bold text-ink" style="letter-spacing:-0.02em">
-									Portfolio ready!
+									{isGuestDraft ? 'Your preview is ready!' : 'Portfolio ready!'}
 								</h1>
 							</div>
 						{:else}
@@ -249,11 +258,11 @@
 						steps={STEPS}
 						status={$resumeProcessing.status}
 						message={$resumeProcessing.message}
-						allDone={$resumeProcessing.status === 'COMPLETE'}
+						allDone={isReady}
 					/>
 
-					<!-- Complete: deployed confirmation + auto-redirect -->
-					{#if $resumeProcessing.status === 'COMPLETE'}
+					<!-- Ready: confirmation + auto-redirect -->
+					{#if isReady}
 						<div
 							in:fly={{ y: 20, duration: 450, easing: cubicOut }}
 							class="mt-6 overflow-hidden rounded-2xl border border-emerald-100 bg-emerald-50 p-6 text-center"
@@ -264,14 +273,19 @@
 									<path stroke-linecap="round" stroke-linejoin="round" d="M12 21a9.004 9.004 0 0 0 8.716-6.747M12 21a9.004 9.004 0 0 1-8.716-6.747M12 21c2.485 0 4.5-4.03 4.5-9S14.485 3 12 3m0 18c-2.485 0-4.5-4.03-4.5-9S9.515 3 12 3m0 0a8.997 8.997 0 0 1 7.843 4.582M12 3a8.997 8.997 0 0 0-7.843 4.582m15.686 0A11.953 11.953 0 0 1 12 10.5c-2.998 0-5.74-1.1-7.843-2.918m15.686 0A8.959 8.959 0 0 1 21 12c0 .778-.099 1.533-.284 2.253M3 12c0 .778.099 1.533.284 2.253" />
 								</svg>
 							</div>
-							<p class="mt-3 text-sm font-bold text-emerald-700">Portfolio deployed & live</p>
+							<p class="mt-3 text-sm font-bold text-emerald-700">
+								{isGuestDraft ? 'Preview generated' : 'Portfolio deployed & live'}
+							</p>
 							<p class="mt-1 text-xs text-emerald-600">
-								Opening editor in {redirectCountdown}s…
+								{isGuestDraft
+									? `Opening editor in ${redirectCountdown}s — publish when you're ready.`
+									: `Opening editor in ${redirectCountdown}s…`}
 							</p>
 
 							<div class="mt-5 flex flex-col gap-3 sm:flex-row sm:justify-center">
-								<!-- Open public portfolio in new tab -->
-								{#if $resumeProcessing.portfolioPath}
+								<!-- Open public portfolio in new tab (live portfolios only — a
+								     guest draft is not publicly live yet) -->
+								{#if $resumeProcessing.portfolioPath && !isGuestDraft}
 									<a
 										href={$resumeProcessing.portfolioPath}
 										target="_blank"

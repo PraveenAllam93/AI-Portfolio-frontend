@@ -7,7 +7,7 @@
  */
 
 import type { NormalizedData } from './base';
-import { DEFAULT_SECTION_ORDER, _editable, _listEditable, _rangeEditable, _pairEditable, _imgUpload, EDITOR_SCRIPT } from './base';
+import { DEFAULT_SECTION_ORDER, _editable, _listEditable, _rangeEditable, _pairEditable, _imgUpload, EDITOR_SCRIPT, statShown } from './base';
 
 const FONTS_URL =
 	'https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap';
@@ -626,11 +626,11 @@ ${cursorHtml}
 <em>— Manifesto</em>
 <span ${ed('portfolio.bio', true)}>${v.bio || 'Creative professional building thoughtful digital experiences.'}</span>
 </div>
-${yearsExp ? `<div class="d-stat">
+${statShown(v, 'years_experience', yearsExp) ? `<div class="d-stat">
 <span class="n" ${ed('template_overrides.years_experience')}>${yearsExp}</span>
 <span class="l">Years active</span>
 </div>` : ''}
-${projectsCount ? `<div class="d-stat">
+${statShown(v, 'projects_count', projectsCount) ? `<div class="d-stat">
 <span class="n" ${ed('template_overrides.projects_count')}>${projectsCount}</span>
 <span class="l">Shipped projects</span>
 </div>` : ''}

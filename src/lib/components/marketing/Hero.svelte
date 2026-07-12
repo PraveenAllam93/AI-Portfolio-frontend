@@ -76,7 +76,7 @@
 				</div>
 			</div>
 			<div class="hero-btns">
-				<a href="/signup" class="btn-primary">✨ Build My Portfolio — Try Now</a>
+				<a href="/try" class="btn-primary">✨ Build My Portfolio — Try Now</a>
 				<a
 					href="#how"
 					class="btn-outline"

@@ -86,7 +86,7 @@
 						</li>
 					{/each}
 				</ul>
-				<a href="/signup" class="btn-pg">{freePlan.cta}</a>
+				<a href="/try" class="btn-pg">{freePlan.cta}</a>
 			</div>
 
 			<!-- Pro (featured) -->
