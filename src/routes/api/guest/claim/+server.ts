@@ -1,14 +1,15 @@
 import { env } from '$env/dynamic/private';
 import { json, error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import { getSessionUser, getGuestUid, clearGuestUid } from '$lib/server/cognito';
+import { getSessionUser, getValidGuestAccessToken, clearGuestUid } from '$lib/server/cognito';
 
 /**
  * POST /api/guest/claim — after a guest converts to a real account.
  *
  * Migrates the guest's portfolio onto the now-authenticated real account and
- * (optionally) publishes the chosen uploadId. The guest's sub comes from the
- * httpOnly `guest_uid` cookie set when the guest session began; the caller only
+ * (optionally) publishes the chosen uploadId. Ownership of the guest session is
+ * proven by forwarding the guest's own ACCESS token (from an httpOnly cookie the
+ * browser can't read/forge) to the backend, which validates it. The caller only
  * chooses which uploadId to publish.
  */
 export const POST: RequestHandler = async ({ request, cookies }) => {
@@ -21,8 +22,8 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
 		throw error(403, 'Create a real account before publishing.');
 	}
 
-	const guestUserId = getGuestUid(cookies);
-	if (!guestUserId) {
+	const guestAccessToken = await getValidGuestAccessToken(cookies);
+	if (!guestAccessToken) {
 		throw error(400, 'No guest session to claim.');
 	}
 
@@ -46,7 +47,7 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
 			Authorization: idToken,
 			'Content-Type': 'application/json'
 		},
-		body: JSON.stringify({ guestUserId, uploadId })
+		body: JSON.stringify({ guestAccessToken, uploadId })
 	});
 
 	const text = await upstream.text();

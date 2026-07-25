@@ -213,7 +213,13 @@ export const EDITOR_JS = `(function(){
   document.addEventListener('input',function(e){
     var el=e.target.closest('[data-path]');
     if(!el)return;
-    window.parent.postMessage({type:'field-change',path:el.dataset.path,value:getValue(el)},'*');
+    var val=getValue(el);
+    /* A field (e.g. profile.email) can render in several places; keep every
+       other instance in sync live, not just after the blur repaint. */
+    document.querySelectorAll('[data-path="'+el.dataset.path+'"]').forEach(function(other){
+      if(other!==el&&getValue(other)!==val){other.innerText=val;}
+    });
+    window.parent.postMessage({type:'field-change',path:el.dataset.path,value:val},'*');
   });
 
   document.addEventListener('focusout',function(e){
@@ -282,8 +288,11 @@ export const EDITOR_JS = `(function(){
   window.addEventListener('message',function(e){
     if(!e.data)return;
     if(e.data.type==='update-field'){
-      var el=document.querySelector('[data-path="'+e.data.path+'"]');
-      if(el){el.innerText=e.data.value;}
+      /* Update EVERY instance of the path — fields like email render in
+         multiple places (hero + contact) and all must stay in sync. */
+      document.querySelectorAll('[data-path="'+e.data.path+'"]').forEach(function(el){
+        if(el!==document.activeElement){el.innerText=e.data.value;}
+      });
     } else if(e.data.type==='scroll-to-item'){
       var btn=document.querySelector('[data-del-section="'+e.data.section+'"][data-del-index="'+e.data.index+'"]');
       var wrap=btn&&btn.closest('[data-item-wrap]');
@@ -469,6 +478,14 @@ export function statShown(v: NormalizedData, key: string, value: number): boolea
 	return explicit === undefined ? value > 0 : explicit;
 }
 
+/** Items the user hid with the eye toggle carry `_hidden: true` in stored
+ *  parsedData. The edit page filters them before rendering, but the portfolio
+ *  generator Lambda passes raw DynamoDB data — filtering here is what keeps
+ *  hidden items off the PUBLISHED site too. */
+function _visibleItems<T>(arr: T[] | undefined | null): T[] {
+	return (arr ?? []).filter((it) => !(it as unknown as Record<string, unknown>)?.['_hidden']);
+}
+
 export function normalize(
 	parsedData: ParsedData,
 	portfolioContent: PortfolioContent,
@@ -511,7 +528,7 @@ export function normalize(
 			skills: (Array.isArray(g.skills) ? g.skills : []).filter(Boolean).map(_e)
 		}));
 
-	const experience = (parsedData.experience ?? []).map((exp) => {
+	const experience = _visibleItems(parsedData.experience).map((exp) => {
 		const start = String(exp.start_date ?? '');
 		const endRaw = exp.end_date;
 		const end = endRaw ? String(endRaw) : exp.is_current ? 'Present' : '';
@@ -531,7 +548,7 @@ export function normalize(
 		};
 	});
 
-	const projects = (parsedData.projects ?? []).map((p) => ({
+	const projects = _visibleItems(parsedData.projects).map((p) => ({
 		title: _e(p.title),
 		description: _e(p.description),
 		responsibilities: (Array.isArray(p.responsibilities) ? p.responsibilities : []).filter(Boolean).map(_e),
@@ -545,7 +562,7 @@ export function normalize(
 		images: (Array.isArray(p.images) ? p.images : []).map(_safeUrl).filter(Boolean)
 	}));
 
-	const education = (parsedData.education ?? []).map((edu) => {
+	const education = _visibleItems(parsedData.education).map((edu) => {
 		const sy = edu.start_year ?? '';
 		const ey = edu.end_year ?? '';
 		const year_range = sy && ey ? `${sy}–${ey}` : String(ey || sy || '');
@@ -561,7 +578,7 @@ export function normalize(
 		};
 	});
 
-	const certifications = (parsedData.certifications ?? [])
+	const certifications = _visibleItems(parsedData.certifications)
 		.filter((c) => c.name)
 		.map((c) => ({
 			name: _e(c.name),
@@ -570,7 +587,7 @@ export function normalize(
 			url: _safeUrl(c.certification_url)
 		}));
 
-	const achievements = (parsedData.achievements ?? [])
+	const achievements = _visibleItems(parsedData.achievements)
 		.filter((a) => a.title)
 		.map((a) => ({
 			title: _e(a.title),
@@ -582,7 +599,7 @@ export function normalize(
 	const design_philosophy = _e(parsedData.design_philosophy);
 	const software_proficiency = (Array.isArray(parsedData.software_proficiency) ? parsedData.software_proficiency : []).filter(Boolean).map(_e);
 
-	const awards = (parsedData.awards ?? [])
+	const awards = _visibleItems(parsedData.awards)
 		.filter((a) => a.title)
 		.map((a) => ({
 			title: _e(a.title),
@@ -591,7 +608,7 @@ export function normalize(
 			url: _safeUrl(a.award_url)
 		}));
 
-	const campaigns = (parsedData.campaigns ?? [])
+	const campaigns = _visibleItems(parsedData.campaigns)
 		.filter((c) => c.campaign_name)
 		.map((c) => ({
 			campaign_name: _e(c.campaign_name),
@@ -601,7 +618,7 @@ export function normalize(
 			performance_metrics: (c.performance_metrics ?? []).filter(Boolean).map(_e)
 		}));
 
-	const financial_modeling = (parsedData.financial_modeling ?? [])
+	const financial_modeling = _visibleItems(parsedData.financial_modeling)
 		.filter((fm) => fm.model_type)
 		.map((fm) => ({
 			model_type: _e(fm.model_type),
@@ -609,7 +626,7 @@ export function normalize(
 			outcome: _e(fm.outcome)
 		}));
 
-	const investment_portfolios = (parsedData.investment_portfolios ?? [])
+	const investment_portfolios = _visibleItems(parsedData.investment_portfolios)
 		.filter((ip) => ip.portfolio_type)
 		.map((ip) => ({
 			portfolio_type: _e(ip.portfolio_type),

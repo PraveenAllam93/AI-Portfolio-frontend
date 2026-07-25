@@ -105,13 +105,39 @@
 			{ id: 'luxe',      name: 'Luxe',      tag: 'Classy'      },
 			{ id: 'aurora',    name: 'Aurora',    tag: 'Modern'      },
 			{ id: 'quantum',   name: 'Quantum',   tag: 'Futuristic'  },
+			{ id: 'voltage',   name: 'Voltage',   tag: 'Electric'    },
+			{ id: 'nimbus',    name: 'Nimbus',    tag: 'Cloud Navy'  },
+			{ id: 'citrus',    name: 'Citrus',    tag: 'Warm Light'  },
+			{ id: 'console',   name: 'Console',   tag: 'Sky Dev'     },
+			{ id: 'neural',    name: 'Neural',    tag: 'Editorial'   },
+			{ id: 'flux',      name: 'Flux',      tag: 'Neon Grid'   },
+			{ id: 'monolith',  name: 'Monolith',  tag: 'Dark Luxe'   },
+			{ id: 'helix',     name: 'Helix',     tag: 'Orb Glow'    },
+			{ id: 'orbit',     name: 'Orbit',     tag: 'Space'       },
+			{ id: 'iris',      name: 'Iris',      tag: 'Violet Light'},
+			{ id: 'terminal',  name: 'Terminal',  tag: 'QA / Testing'},
+			{ id: 'beacon',    name: 'Beacon',    tag: 'Indigo SaaS' },
 		],
 		designer: [
 			{ id: 'designer',   name: 'Luxe Studio', tag: 'Dark Luxury'  },
 			{ id: 'designer-2', name: 'Clean Slate', tag: 'Modern Clean' },
+			{ id: 'atelier',    name: 'Atelier',     tag: 'Editorial'    },
+			{ id: 'terra',      name: 'Terra',       tag: 'Interior'     },
+			{ id: 'ember',      name: 'Ember',       tag: 'Cinematic'    },
+			{ id: 'folio',      name: 'Folio',       tag: 'Sidebar'      },
+			{ id: 'obsidian',   name: 'Obsidian',    tag: 'Dark Gold'    },
+			{ id: 'muse',       name: 'Muse',        tag: 'Playful'      },
+			{ id: 'prism',      name: 'Prism',       tag: 'Product'      },
+			{ id: 'salon',      name: 'Salon',       tag: 'Luxe'         },
 		],
 		marketing: [
-			{ id: 'marketing', name: 'Campaign', tag: 'Editorial' },
+			{ id: 'marketing', name: 'Campaign',  tag: 'Editorial'   },
+			{ id: 'momentum',  name: 'Momentum',  tag: 'Bold'        },
+			{ id: 'apex',      name: 'Apex',      tag: 'Growth SaaS' },
+			{ id: 'bloom',     name: 'Bloom',     tag: 'Soft Luxury' },
+			{ id: 'signal',    name: 'Signal',    tag: 'Editorial'   },
+			{ id: 'vantage',   name: 'Vantage',   tag: 'Dark Luxe'   },
+			{ id: 'canopy',    name: 'Canopy',    tag: 'Organic'     },
 		],
 		civil_engineer: [
 			{ id: 'blueprint', name: 'Blueprint', tag: 'Navy & Gold' },
@@ -119,6 +145,11 @@
 		],
 		mechanical_engineer: [
 			{ id: 'precision', name: 'Precision', tag: 'Engineering' },
+			{ id: 'torque',    name: 'Torque',    tag: 'Navy & Gold'  },
+		],
+		finance: [
+			{ id: 'ledger',   name: 'Ledger',   tag: 'Editorial' },
+			{ id: 'sterling', name: 'Sterling', tag: 'Executive' },
 		],
 	};
 
@@ -573,6 +604,90 @@
 		uniqueValue: 'I optimise every component for function, cost, and lifecycle — good engineering is invisible when it works.',
 	};
 
+	// Finance mock data — used when profession is 'finance'
+	const FINANCE_DOE_PARSED: ParsedData = {
+		profile: {
+			full_name: 'Meera Anand',
+			headline: 'Chartered Accountant & Financial Consultant',
+			summary: 'Finance professional with 9+ years across accounting, taxation, and business analysis — turning financial complexity into confident decisions.',
+			email: 'meera.anand@example.com',
+			phone: '+971 50 123 4567',
+			location: 'Dubai, UAE',
+			social_links: {
+				linkedin: 'https://linkedin.com/in/meera-anand',
+			},
+		},
+		skills: [
+			{ category: 'Accounting', skills: ['Financial Accounting', 'Bookkeeping', 'General Ledger', 'Bank Reconciliation'] },
+			{ category: 'Financial Analysis', skills: ['Forecasting', 'Budgeting', 'Ratio Analysis', 'Variance Analysis'] },
+			{ category: 'Taxation', skills: ['VAT', 'Corporate Tax', 'Tax Planning'] },
+			{ category: 'Audit', skills: ['Internal Audit', 'Risk Assessment', 'Compliance'] },
+			{ category: 'ERP Software', skills: ['SAP', 'Oracle', 'Tally', 'QuickBooks'] },
+		],
+		experience: [
+			{
+				role: 'Senior Financial Consultant',
+				company: 'Meridian Advisory',
+				location: 'Dubai, UAE',
+				start_date: '2022',
+				is_current: true,
+				description: 'Manage monthly financial reporting for 14 retained clients across retail and logistics.',
+				key_points: [
+					'Reduced average client operational costs by 18% through vendor renegotiation and process audits',
+					'Lead annual budgeting and statutory audit coordination',
+				],
+			},
+			{
+				role: 'Financial Analyst',
+				company: 'Al Fahim Trading Group',
+				location: 'Abu Dhabi, UAE',
+				start_date: '2019',
+				end_date: '2022',
+				description: 'Owned rolling cash-flow modelling and variance analysis for a multi-entity trading group.',
+				key_points: ["Built the group's first rolling 13-week cash flow model, still in use today", 'Identified $1.2M in avoidable annual spend'],
+			},
+			{
+				role: 'Audit Associate',
+				company: 'Kapoor & Associates, Chartered Accountants',
+				location: 'New Delhi, India',
+				start_date: '2016',
+				end_date: '2019',
+				description: 'Executed statutory and internal audits for manufacturing and healthcare clients.',
+				key_points: ['Trained two audit cohorts on risk-based sampling methodology'],
+			},
+		],
+		financial_modeling: [
+			{ model_type: '13-Week Rolling Cash Flow Model', tools_used: ['Excel', 'Power BI', 'SQL'], outcome: 'Zero surprise cash shortfalls across 18 months for a multi-entity trading group.' },
+			{ model_type: 'Three-Statement Operating Model', tools_used: ['Excel', 'SAP'], outcome: 'Board-ready scenario model that cut monthly close from 9 to 4 days.' },
+			{ model_type: 'VAT Automation Template', tools_used: ['QuickBooks', 'Excel'], outcome: 'Reduced quarterly VAT filing time from 6 days to under a day for a five-entity group.' },
+		],
+		investment_portfolios: [
+			{ portfolio_type: 'Balanced Client Retainer Book', assets_under_management: '$46M+', performance_return: '+12% avg. profit margin improvement' },
+			{ portfolio_type: 'Fixed-Income Advisory Mandate', assets_under_management: '$20M', performance_return: '+6.4% net annualised' },
+		],
+		education: [
+			{ degree: 'B.Com', field_of_study: 'Accounting & Finance', institution: 'University of Delhi', location: 'New Delhi, India', start_year: '2012', end_year: '2015', grade_or_score: 'Distinction' },
+			{ degree: 'Chartered Accountancy', field_of_study: 'ICAI', institution: 'Institute of Chartered Accountants of India', start_year: '2015', end_year: '2018' },
+		],
+		certifications: [
+			{ name: 'ACCA', issuer: 'Association of Chartered Certified Accountants', year: '2020' },
+			{ name: 'IFRS Certification', issuer: 'ACCA', year: '2021' },
+			{ name: 'SAP Finance (FICO)', issuer: 'SAP', year: '2022' },
+			{ name: 'FMVA', issuer: 'Corporate Finance Institute', year: '2023' },
+		],
+		achievements: [
+			{ title: 'Finance Excellence Award', description: 'Recognised for group-level cost optimisation and reporting quality.', year: '2024' },
+			{ title: '500+ Tax Filings, Zero Penalties', description: 'Filed over 500 returns across a nine-year career with zero penalty notices.', year: '2023' },
+			{ title: 'Employee of the Year', description: 'Awarded for cash-flow modelling that eliminated recurring shortfalls.', year: '2021' },
+		],
+	};
+
+	const FINANCE_DOE_CONTENT: PortfolioContent = {
+		bio: 'Finance professional with 9+ years across accounting, taxation, and business analysis. I help ambitious companies turn financial complexity into confident decisions — through precise reporting, sharp forecasting, and audits that hold up to scrutiny.',
+		headline: 'Chartered Accountant & Financial Consultant',
+		uniqueValue: "Good accounting doesn't just record the past — it gives a business the confidence to plan its next move.",
+	};
+
 	// Derived: templates visible for the selected profession
 	const currentTemplates = $derived(
 		TEMPLATES_BY_PROFESSION[selectedTypeId as string] ?? TEMPLATES_BY_PROFESSION['software_engineer']
@@ -583,13 +698,15 @@
 		selectedTypeId === 'designer'            ? DESIGNER_DOE_PARSED  :
 		selectedTypeId === 'marketing'           ? MARKETER_DOE_PARSED  :
 		selectedTypeId === 'civil_engineer'      ? CIVIL_DOE_PARSED     :
-		selectedTypeId === 'mechanical_engineer' ? MECH_DOE_PARSED      : JOHN_DOE_PARSED
+		selectedTypeId === 'mechanical_engineer' ? MECH_DOE_PARSED      :
+		selectedTypeId === 'finance'             ? FINANCE_DOE_PARSED   : JOHN_DOE_PARSED
 	);
 	const mockContent = $derived(
 		selectedTypeId === 'designer'            ? DESIGNER_DOE_CONTENT  :
 		selectedTypeId === 'marketing'           ? MARKETER_DOE_CONTENT  :
 		selectedTypeId === 'civil_engineer'      ? CIVIL_DOE_CONTENT     :
-		selectedTypeId === 'mechanical_engineer' ? MECH_DOE_CONTENT      : JOHN_DOE_CONTENT
+		selectedTypeId === 'mechanical_engineer' ? MECH_DOE_CONTENT      :
+		selectedTypeId === 'finance'             ? FINANCE_DOE_CONTENT   : JOHN_DOE_CONTENT
 	);
 
 	// Reactive preview — re-renders whenever profession or carousel index changes
@@ -666,11 +783,6 @@
 		if (phase === 'file' && selectedFile) {
 			void beginAnalysis();
 		} else if (phase === 'profession' && selectedTypeId) {
-			if (selectedTypeId === 'finance') {
-				// Finance has no dedicated templates — generate immediately with a default.
-				void generate('neon');
-				return;
-			}
 			carouselIndex = 0; // reset carousel when entering the template screen
 			phase = 'template';
 		}
@@ -775,14 +887,15 @@
 		setTimeout(() => {
 			analyzeAllDone = true;
 			setTimeout(() => {
-				// ≥HIGH and not finance → skip the profession screen.
-				if (isKnown && confidence >= HIGH_CONFIDENCE && predicted !== 'finance') {
+				// ≥HIGH confidence → skip the profession screen (every profession,
+				// finance included, now has dedicated templates).
+				if (isKnown && confidence >= HIGH_CONFIDENCE) {
 					selectedTypeId = predicted as ResumeCategory;
 					autoSkipped = true;
 					carouselIndex = 0;
 					phase = 'template';
 				} else if (isKnown && confidence >= LOW_CONFIDENCE) {
-					// Pre-select on the visible profession screen (finance lands here too).
+					// Pre-select on the visible profession screen.
 					selectedTypeId = predicted as ResumeCategory;
 					autoSkipped = false;
 					phase = 'profession';

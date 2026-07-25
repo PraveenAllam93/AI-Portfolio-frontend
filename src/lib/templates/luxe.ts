@@ -497,7 +497,7 @@ ${item.url ? `<a href="${item.url}" style="font-size:.72rem;letter-spacing:.12em
   <div>
     <p class="hero-label">Portfolio</p>
     <h1 class="hero-name" ${ed('profile.full_name')}>${name}</h1>
-    ${v.headline ? `<p class="hero-title" ${ed('profile.headline')}>${v.headline}</p>` : ''}
+    ${v.headline ? `<p class="hero-title" ${ed('portfolio.headline')}>${v.headline}</p>` : ''}
     ${v.location || v.phone || v.email ? `<p class="hero-title" style="margin-top:-24px;margin-bottom:32px;font-size:.82rem">${[v.location ? `<span ${ed('profile.location')}>${v.location}</span>` : '', v.phone ? `<span ${ed('profile.phone')}>${v.phone}</span>` : '', v.email ? `<span ${ed('profile.email')}>${v.email}</span>` : ''].filter(Boolean).join('&ensp;&mdash;&ensp;')}</p>` : ''}
     ${liHtml ? `<div class="hero-links">${liHtml}</div>` : ''}
   </div>

@@ -570,7 +570,7 @@ ${item.url ? `<a href="${item.url}" style="font-family:var(--font-m);font-size:.
   <div class="hero-inner">
     <p class="hero-id">PORTFOLIO.SYS // IDENTITY MODULE</p>
     <h1 class="hero-name" ${ed('profile.full_name')}>${name}</h1>
-    ${v.headline ? `<p class="hero-title" ${ed('profile.headline')}>${v.headline}</p>` : ''}
+    ${v.headline ? `<p class="hero-title" ${ed('portfolio.headline')}>${v.headline}</p>` : ''}
     ${v.location || v.phone || v.email ? `<p class="hero-meta">${[v.location ? `<span ${ed('profile.location')}>${v.location}</span>` : '', v.phone ? `<span ${ed('profile.phone')}>${v.phone}</span>` : '', v.email ? `<span ${ed('profile.email')}>${v.email}</span>` : ''].filter(Boolean).join(' // ')}</p>` : ''}
     ${liHtml ? `<div class="hero-links">${liHtml}</div>` : ''}
   </div>

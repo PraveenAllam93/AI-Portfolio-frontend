@@ -405,7 +405,7 @@ function _about(v: NormalizedData): string {
   const ed = (p: string, ml = false) => em ? _editable(p, ml) : '';
   const parts: string[] = [];
   if (v.bio)      parts.push(`<p class="about-text" ${ed('portfolio.bio', true)}>${v.bio}</p>`);
-  if (v.headline) parts.push(`<p class="tagline">${v.headline}</p>`);
+  if (v.headline) parts.push(`<p class="tagline" ${ed('portfolio.headline')}>${v.headline}</p>`);
   return parts.join('');
 }
 

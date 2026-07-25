@@ -559,14 +559,14 @@ ${v.experience.map((exp, i) => `<div class="gen-card fade-up" data-item-wrap>
       <div class="hero-card">
         <div class="hero-avatar" ${_imgUpload('profile.profile_image', v.edit_mode)}>${avatar}</div>
         <div>
-          <div class="hero-card-name">${v.name}</div>
-          ${v.headline ? `<div class="hero-card-sub">${v.headline}</div>` : ''}
+          <div class="hero-card-name" ${_editable('profile.full_name')}>${v.name}</div>
+          ${v.headline ? `<div class="hero-card-sub" ${_editable('portfolio.headline')}>${v.headline}</div>` : ''}
         </div>
         <div class="card-divider"></div>
-        ${v.location ? `<div class="card-detail">${IC.pin}<span>${v.location}</span></div>` : ''}
+        ${v.location ? `<div class="card-detail">${IC.pin}<span ${_editable('profile.location')}>${v.location}</span></div>` : ''}
         ${firstCompany ? `<div class="card-detail">${IC.building}<span>${firstCompany}</span></div>` : ''}
-        ${v.email ? `<div class="card-detail">${IC.mail}<span>${v.email}</span></div>` : ''}
-        ${v.phone ? `<div class="card-detail">${IC.phone}<span>${v.phone}</span></div>` : ''}
+        ${v.email ? `<div class="card-detail">${IC.mail}<span ${_editable('profile.email')}>${v.email}</span></div>` : ''}
+        ${v.phone ? `<div class="card-detail">${IC.phone}<span ${_editable('profile.phone')}>${v.phone}</span></div>` : ''}
       </div>
     </div>
   </div>

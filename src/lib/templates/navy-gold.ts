@@ -649,7 +649,7 @@ ${heroStats}
 <div class="hero-right">
 <div class="hero-photo-frame">
 <div class="hero-photo-inner" ${_imgUpload('profile.profile_image', v.edit_mode)}>${avatarHtml}</div>
-${v.headline ? `<div class="hero-badge">${v.headline}</div>` : ''}
+${v.headline ? `<div class="hero-badge" ${_editable('portfolio.headline')}>${v.headline}</div>` : ''}
 </div>
 </div>
 </section>

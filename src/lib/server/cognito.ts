@@ -268,19 +268,57 @@ export function clearAuthCookies(cookies: Cookies) {
 // The claim step reads this to know which guest namespace to migrate.
 const GUEST_UID_COOKIE = 'guest_uid';
 
+// The guest's OWN tokens, kept under distinct names so they survive the real
+// login overwriting id_token/access_token/refresh_token. The claim step forwards
+// the guest ACCESS token to the backend, which validates it (Cognito GetUser) to
+// PROVE the caller owns the guest session — a leaked guest sub alone can no
+// longer be used to claim someone else's draft.
+const GUEST_ACCESS_TOKEN_COOKIE = 'guest_access_token';
+const GUEST_REFRESH_TOKEN_COOKIE = 'guest_refresh_token';
+const GUEST_MAX_AGE = 3 * 24 * 60 * 60; // 3 days — matches the backend guest reaper TTL
+
 export function setGuestUid(cookies: Cookies, guestSub: string) {
-	cookies.set(GUEST_UID_COOKIE, guestSub, {
-		...BASE_OPTS,
-		maxAge: 3 * 24 * 60 * 60 // 3 days — matches the backend guest reaper TTL
-	});
+	cookies.set(GUEST_UID_COOKIE, guestSub, { ...BASE_OPTS, maxAge: GUEST_MAX_AGE });
+}
+
+/** Persist the guest's own access + refresh tokens for the later claim step. */
+export function setGuestTokens(cookies: Cookies, result: AuthenticationResultType) {
+	if (result.AccessToken)
+		cookies.set(GUEST_ACCESS_TOKEN_COOKIE, result.AccessToken, { ...BASE_OPTS, maxAge: GUEST_MAX_AGE });
+	if (result.RefreshToken)
+		cookies.set(GUEST_REFRESH_TOKEN_COOKIE, result.RefreshToken, { ...BASE_OPTS, maxAge: GUEST_MAX_AGE });
 }
 
 export function getGuestUid(cookies: Cookies): string | undefined {
 	return cookies.get(GUEST_UID_COOKIE);
 }
 
+/**
+ * Return a currently-valid guest ACCESS token for the claim call, refreshing it
+ * with the stored guest refresh token if it has expired. Returns null when there
+ * is no usable guest session.
+ */
+export async function getValidGuestAccessToken(cookies: Cookies): Promise<string | null> {
+	const accessToken = cookies.get(GUEST_ACCESS_TOKEN_COOKIE);
+	if (accessToken && !isTokenExpired(accessToken)) return accessToken;
+
+	const refreshToken = cookies.get(GUEST_REFRESH_TOKEN_COOKIE);
+	if (!refreshToken) return null;
+	try {
+		const res = await cognitoRefresh(refreshToken);
+		const fresh = res.AuthenticationResult?.AccessToken;
+		if (!fresh) return null;
+		cookies.set(GUEST_ACCESS_TOKEN_COOKIE, fresh, { ...BASE_OPTS, maxAge: GUEST_MAX_AGE });
+		return fresh;
+	} catch {
+		return null;
+	}
+}
+
 export function clearGuestUid(cookies: Cookies) {
 	cookies.delete(GUEST_UID_COOKIE, { path: '/' });
+	cookies.delete(GUEST_ACCESS_TOKEN_COOKIE, { path: '/' });
+	cookies.delete(GUEST_REFRESH_TOKEN_COOKIE, { path: '/' });
 }
 
 /**

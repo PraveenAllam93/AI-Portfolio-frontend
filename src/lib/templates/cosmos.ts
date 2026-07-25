@@ -773,7 +773,7 @@ ${v.email ? `<a href="mailto:${v.email}" class="nav-cta">Hire Me</a>` : ''}
 <section id="hero">
 <div class="hero-inner">
 <div>
-<div class="hero-badge" ${_editable('profile.headline')}>${v.headline || 'Software Engineer'}</div>
+<div class="hero-badge" ${_editable('portfolio.headline')}>${v.headline || 'Software Engineer'}</div>
 <h1 class="hero-name" ${_editable('profile.full_name')}>
 <span class="line1">${firstName}</span>
 <span class="line2">${lastName || firstName}</span>

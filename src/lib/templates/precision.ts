@@ -680,7 +680,7 @@ ${contactHtml}
 
 <footer>
   <span class="fcopy">&copy; ${new Date().getFullYear()} ${v.name}. All rights reserved.</span>
-  <span class="fright">${v.headline || 'Mechanical Engineer'}${v.location ? ` · <span>${v.location}</span>` : ''}</span>
+  <span class="fright">${v.headline || 'Mechanical Engineer'}${v.location ? ` · <span ${_editable('profile.location')}>${v.location}</span>` : ''}</span>
 </footer>
 ${PRECISION_SCRIPT}
 ${EDITOR_SCRIPT}

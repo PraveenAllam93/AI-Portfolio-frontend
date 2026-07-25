@@ -1,6 +1,6 @@
 import { json, error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import { cognitoCreateGuest, setAuthCookies, setGuestUid, decodeIdToken } from '$lib/server/cognito';
+import { cognitoCreateGuest, setAuthCookies, setGuestUid, setGuestTokens, decodeIdToken } from '$lib/server/cognito';
 import { verifyTurnstile } from '$lib/server/turnstile';
 
 /**
@@ -49,6 +49,9 @@ export const POST: RequestHandler = async ({ request, cookies, getClientAddress 
 	try {
 		const { result } = await cognitoCreateGuest();
 		setAuthCookies(cookies, result);
+		// Preserve the guest's own tokens so the later claim step can PROVE session
+		// ownership to the backend (they survive the real-login cookie overwrite).
+		setGuestTokens(cookies, result);
 
 		const user = result.IdToken ? decodeIdToken(result.IdToken) : null;
 		if (user) {

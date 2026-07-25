@@ -706,16 +706,35 @@
 		// regardless of whether auto-save debounce has flushed to DynamoDB yet.
 		// `suppressed` tells the backend which targets are already handled+unchanged
 		// so it never regenerates them (point 2).
+		//
+		// INDEX SPACES: liveParsedData excludes hidden items, so the backend (and
+		// the LLM) work in VISIBLE index space, while suppressedKeys and everything
+		// else on this page use ACTUAL sections[] indices. Convert suppressed keys
+		// actual→visible on the way out, and suggestion indices visible→actual on
+		// the way back, so hidden items can never shift which item a card targets.
+		const suppressedVisible = [...suppressedKeys]
+			.map((k) => {
+				const parts = k.split(':');
+				if (parts.length !== 3) return k; // 'profile:<key>' or 'skills'
+				const [sec, idxStr, field] = parts;
+				const vis = actualToVisible[sec]?.[parseInt(idxStr)];
+				return vis == null || vis < 0 ? null : `${sec}:${vis}:${field}`;
+			})
+			.filter((k): k is string => k != null);
 		const result = await getAiSuggestions(userId, uploadId, {
 			parsedData: liveParsedData,
 			portfolioContent: livePortfolioContent,
 			category,
-			suppressed: [...suppressedKeys]
+			suppressed: suppressedVisible
 		});
 		llmSuggestionsLoading = false;
 		llmSuggestionsLoaded = true;
 		if (result.ok && result.data) {
-			llmSuggestions = result.data.suggestions;
+			llmSuggestions = result.data.suggestions.map((s) =>
+				s.index != null && s.section !== 'profile' && s.section !== 'skills'
+					? { ...s, index: visibleToActual[s.section]?.[s.index] ?? s.index }
+					: s
+			);
 			// Clear dismissed when refreshed so new suggestions aren't hidden
 			dismissedSuggestions = new Set();
 		} else {
@@ -925,9 +944,20 @@
 	);
 
 	// Templates filtered to only those matching this portfolio's profession.
-	const visibleTemplates = $derived(
-		Object.entries(TEMPLATE_META).filter(([, m]) => m.profession === category)
-	);
+	// Fallbacks keep the dropdown honest:
+	//  - unknown/legacy category (e.g. missing or 'pending') → show ALL templates
+	//    rather than wrongly defaulting to the software-engineer list;
+	//  - the currently-active template is ALWAYS listed, even if its profession
+	//    doesn't match (e.g. category was reclassified after the template was
+	//    chosen), so the selected entry is never invisible.
+	const visibleTemplates = $derived.by(() => {
+		const matching = Object.entries(TEMPLATE_META).filter(([, m]) => m.profession === category);
+		const base = matching.length > 0 ? matching : Object.entries(TEMPLATE_META);
+		if (TEMPLATE_META[templateId] && !base.some(([id]) => id === templateId)) {
+			return [[templateId, TEMPLATE_META[templateId]] as (typeof base)[number], ...base];
+		}
+		return base;
+	});
 
 	// ── Load ────────────────────────────────────────────────────────────────────
 
@@ -2108,6 +2138,16 @@
 		// Re-selecting the already-active template is a no-op — don't save or mark dirty.
 		if (newId === templateId) return;
 		templateId = newId;
+		// Normalize custom-section display types the new template can't render
+		// (previously this only happened on page load, so switching templates left
+		// a stale display_type until the next reload).
+		const allowedDt = customDisplayTypes(newId);
+		if (customSections.some((cs) => !allowedDt.includes(cs.display_type))) {
+			customSections = customSections.map((cs) =>
+				allowedDt.includes(cs.display_type) ? cs : { ...cs, display_type: allowedDt[0] }
+			);
+			autoSaveCustomSections();
+		}
 		await updatePortfolioConfig(userId, uploadId, { templateId: newId });
 		queuePreviewRefresh();
 	}
@@ -2235,7 +2275,12 @@
 				}
 			}
 		} else {
-			const idx = parseInt(idxOrKey);
+			// Template paths use the VISIBLE index (hidden items are filtered out of
+			// the preview) — map it to the actual sections[] index, otherwise an
+			// inline edit lands on (and saves over) the wrong item whenever an
+			// earlier item is hidden.
+			const visIdx = parseInt(idxOrKey);
+			const idx = visibleToActual[ns]?.[visIdx] ?? visIdx;
 			const arr = [...(sections[ns] ?? [])];
 			if (arr[idx]) {
 				const newData = { ...arr[idx].data, [field]: value };
@@ -2267,7 +2312,9 @@
 			const cur = item?.[csField];
 			return typeof cur === 'string' ? cur : (cur == null ? '' : String(cur));
 		}
-		const idx = parseInt(idxOrKey);
+		// Same visible→actual mapping as updateFieldFromIframe.
+		const visIdx = parseInt(idxOrKey);
+		const idx = visibleToActual[ns]?.[visIdx] ?? visIdx;
 		const data = sections[ns]?.[idx]?.data as Record<string, unknown> | undefined;
 		const val = data?.[field];
 		return typeof val === 'string' ? val : (val == null ? '' : String(val));
@@ -2395,7 +2442,9 @@
 			const itemIdx = parseInt(parts[3]);
 			items = [...(customSections[csIdx]?.items?.[itemIdx]?.tags ?? [])];
 		} else {
-			const data = (sections[ns]?.[parseInt(idxStr)]?.data ?? {}) as Record<string, unknown>;
+			// Path index is the visible (preview) index — map to actual sections[] index.
+			const actualIdx = visibleToActual[ns]?.[parseInt(idxStr)] ?? parseInt(idxStr);
+			const data = (sections[ns]?.[actualIdx]?.data ?? {}) as Record<string, unknown>;
 			const val = field ? data[field] : undefined;
 			items = Array.isArray(val) ? val.map((v) => String(v)) : [];
 		}
@@ -2441,8 +2490,10 @@
 			}
 		} else {
 			const field = parts[2];
-			const idx = parseInt(idxStr);
+			// Path index is the visible (preview) index — map to actual sections[] index.
+			const idx = visibleToActual[ns]?.[parseInt(idxStr)] ?? parseInt(idxStr);
 			const arr = [...(sections[ns] ?? [])];
+			if (!arr[idx]) { listEditor = null; return; }
 			arr[idx] = { ...arr[idx], data: { ...arr[idx].data, [field]: cleanItems } };
 			sections = { ...sections, [ns]: arr };
 			await savePortfolioSection(userId, uploadId, ns, arr.map((it) => it.data));
@@ -2542,6 +2593,20 @@
 		return result;
 	});
 
+	/**
+	 * Inverse of visibleToActual: actual sections[] index → visible index,
+	 * or -1 for hidden items. Used when talking TO the backend suggestion
+	 * endpoint, which only ever sees the visible (filtered) arrays.
+	 */
+	const actualToVisible = $derived.by(() => {
+		const result: Record<string, number[]> = {};
+		for (const [sec, items] of Object.entries(sections)) {
+			let vis = 0;
+			result[sec] = (items as ItemState[]).map((item) => (item.hidden ? -1 : vis++));
+		}
+		return result;
+	});
+
 	function focusListItem(index: number) {
 		setTimeout(() => {
 			const inputs = listEditorEl?.querySelectorAll<HTMLInputElement>('[data-list-input]');
@@ -2600,7 +2665,10 @@
 		if (ns === 'portfolio') {
 			result = await getAiEnhancement(userId, uploadId, idxStr as EditableField, instruction, selectedText);
 		} else {
-			result = await getAiItemEnhancement(userId, uploadId, ns, parseInt(idxStr), field, instruction);
+			// Path index is the visible (preview) index — the backend indexes the
+			// full stored array, so map to the actual index first.
+			const actualIdx = visibleToActual[ns]?.[parseInt(idxStr)] ?? parseInt(idxStr);
+			result = await getAiItemEnhancement(userId, uploadId, ns, actualIdx, field, instruction);
 		}
 		if (!result.ok || !result.data) {
 			aiToolbar = { ...aiToolbar, loading: false, error: result.error ?? 'AI enhancement failed.' };
@@ -2914,8 +2982,27 @@
 			}
 		}
 
+		// Safety net for the paused-preview lock: `paused` is normally cleared by
+		// the iframe's field-blur message, but some browsers don't reliably fire
+		// focusout when focus jumps from iframe content to the parent document.
+		// Any pointerdown in the PARENT document (clicks inside the iframe never
+		// bubble here) means the user has left the inline field — finalize the
+		// edit: save if it changed, unpause, and flush the pending repaint.
+		function forceUnpause() {
+			if (!paused) return;
+			paused = false;
+			if (focusBaseline) {
+				const cur = _currentValueForPath(focusBaseline.path);
+				const base = _incomingInlineValue(focusBaseline.path, focusBaseline.value);
+				if (cur !== base) scheduleSaveFromIframe(focusBaseline.path);
+				focusBaseline = null;
+			}
+			if (pendingHtml) { const h = pendingHtml; pendingHtml = null; paint(h); }
+		}
+
 		_forcePaint = paint;
 		window.addEventListener('message', handleMessage);
+		window.addEventListener('pointerdown', forceUnpause);
 		paint(html);
 
 		return {
@@ -2927,6 +3014,7 @@
 			destroy() {
 				if (timer) clearTimeout(timer);
 				window.removeEventListener('message', handleMessage);
+				window.removeEventListener('pointerdown', forceUnpause);
 				iframeEl = null;
 				_forcePaint = null;
 			}
@@ -3148,7 +3236,7 @@
 						<div class="absolute right-0 top-full z-40 mt-1 w-44 overflow-hidden rounded-xl border border-surface-muted bg-white p-1.5 shadow-lg ring-1 ring-black/[0.04]">
 							<p class="px-2.5 pb-1 pt-1 text-[10px] font-bold uppercase tracking-widest text-ink-muted">Templates</p>
 							{#if visibleTemplates.length === 0}
-								<p class="px-2.5 py-3 text-[11px] text-ink-muted leading-snug">Finance-specific templates coming soon.</p>
+								<p class="px-2.5 py-3 text-[11px] text-ink-muted leading-snug">No templates available.</p>
 							{:else}
 								{#each visibleTemplates as [id, meta]}
 									<button
