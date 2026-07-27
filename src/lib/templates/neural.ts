@@ -310,7 +310,7 @@ ${addBtn('education', 'Education')}
 <div class="rows">
 ${v.certifications.map((c, i) => {
 			const nameHtml = c.url ? `<a href="${c.url}" target="_blank" rel="noopener noreferrer">${c.name}</a>` : c.name;
-			return `<div class="rrow"${iw}>${delBtn('certifications', i)}<div><div class="cat">${c.year ? `<span ${ed(`certifications.${i}.year`)}>${c.year}</span>` : ''}</div></div><div class="body"><h3${!c.url ? ` ${ed(`certifications.${i}.name`)}` : ''}>${nameHtml}</h3>${c.issuer ? `<div class="org" ${ed(`certifications.${i}.issuer`)}>${c.issuer}</div>` : ''}</div></div>`;
+			return `<div class="rrow"${iw}>${delBtn('certifications', i)}<div><div class="cat">${c.year ? `<span ${ed(`certifications.${i}.year`)}>${c.year}</span>` : ''}</div></div><div class="body"><h3 ${ed(`certifications.${i}.name`)}>${nameHtml}</h3>${c.issuer ? `<div class="org" ${ed(`certifications.${i}.issuer`)}>${c.issuer}</div>` : ''}</div></div>`;
 		}).join('\n')}
 </div>
 ${addBtn('certifications', 'Certification')}
@@ -334,7 +334,7 @@ ${addBtn('achievements', 'Achievement')}
 			const csIw = ` data-item-wrap data-cs-idx="${csIdx}"`;
 			const items = (cs.items ?? []).map((item, i) => `<div class="rrow"${csIw}>${csDel(i)}<div><div class="cat">${item.subtitle ? `<span ${_editable(`custom_sections.${csIdx}.items.${i}.subtitle`)}>${item.subtitle}</span>` : ''}</div></div><div class="body">${item.label ? `<h3 ${_editable(`custom_sections.${csIdx}.items.${i}.label`)}>${item.label}</h3>` : ''}${item.value ? `<p ${_editable(`custom_sections.${csIdx}.items.${i}.value`, true)}>${item.value}</p>` : ''}${item.tags?.length ? `<div class="list" style="margin-top:12px" ${_listEditable(`custom_sections.${csIdx}.items.${i}.tags`)}>${item.tags.map((t) => `<span>${t}</span>`).join('')}</div>` : ''}${item.url ? `<div style="margin-top:12px"><a href="${item.url}" target="_blank" rel="noopener noreferrer" style="font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--accent-2)">View &#8599;</a></div>` : ''}</div></div>`).join('\n');
 			return `<section id="${cs.section_id}" class="section"><div class="wrap">
-<div class="sec-head"><h2>${cs.title}</h2></div>
+<div class="sec-head"><h2 ${v.edit_mode ? _editable(`custom_sections.${csIdx}.title`) : ''}>${cs.title}</h2></div>
 <div class="rows">${items}</div>
 ${em ? `<button class="ce-add-btn" data-add-section="custom_sections.${csIdx}.items">+ Add Item</button>` : ''}
 </div></section>`;

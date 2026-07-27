@@ -560,7 +560,7 @@ ${edu.grade_or_score ? `<div class="edu-grade" ${_editable(`education.${i}.grade
 ${v.certifications.map((c, i) => `<div class="cert-item reveal" data-item-wrap>
 <button class="del-btn ce-del-btn" data-del-section="certifications" data-del-index="${i}">&#x2715;</button>
 <div>
-  <div class="cert-name"${!c.url ? ` ${_editable(`certifications.${i}.name`)}` : ''}>${c.url ? `<a href="${c.url}" target="_blank" rel="noopener noreferrer">${c.name}</a>` : c.name}</div>
+  <div class="cert-name" ${_editable(`certifications.${i}.name`)}>${c.url ? `<a href="${c.url}" target="_blank" rel="noopener noreferrer">${c.name}</a>` : c.name}</div>
   ${c.issuer ? `<div class="cert-issuer" ${_editable(`certifications.${i}.issuer`)}>${c.issuer}</div>` : ''}
 </div>
 ${c.year ? `<div class="cert-year" ${_editable(`certifications.${i}.year`)}>${c.year}</div>` : ''}
@@ -685,7 +685,7 @@ ${item.url ? `<a href="${item.url}" class="social-link" style="margin-top:10px;d
 </div>`).join('\n');
 			return `<section id="${cs.section_id}"><div class="wrap">
 <div class="section-label reveal">${num()} / Custom</div>
-<h2 class="section-title reveal">${cs.title}</h2>
+<h2 class="section-title reveal" ${v.edit_mode ? _editable(`custom_sections.${csIdx}.title`) : ''}>${cs.title}</h2>
 <div class="${cs.display_type === 'list' ? 'edu-list' : 'gcard-grid'}">${items}</div>
 <button class="add-btn ce-add-btn" data-add-section="custom_sections.${csIdx}.items">+ Add Item</button>
 </div></section>`;
@@ -759,7 +759,7 @@ ${cursorHtml}
   <div class="hero-glow"></div>
   <div class="hero-inner">
     ${avatarHtml}
-    <div class="hero-tag" ${_editable('profile.headline')}>${v.profile_headline || 'Software Engineer'}</div>
+    ${v.profile_headline ? `<div class="hero-tag" ${_editable('profile.headline')}>${v.profile_headline}</div>` : ''}
     <h1 class="hero-name" ${_editable('profile.full_name')}>${v.name}</h1>
     ${v.headline ? `<p class="hero-sub" ${_editable('portfolio.headline')}>${v.headline}</p>` : ''}
     ${heroMeta ? `<div class="hero-meta">${heroMeta}</div>` : ''}

@@ -255,22 +255,22 @@ export function html(v: NormalizedData): string {
 	// Dates are bound to start_date/end_date separately so inline edits round-trip
 	// with the right-side form (which stores those, not the computed `duration`).
 	const datePeriod = (i: number, exp: NormalizedData['experience'][number]) => {
-		const showStart = exp.start_date || em;
-		const showEnd = exp.end_date || em;
+		const showStart = exp.start_date;
+		const showEnd = exp.end_date;
 		if (!showStart && !showEnd) return '';
-		const s = showStart ? `<span ${_editable(`experience.${i}.start_date`)}>${exp.start_date || 'Start'}</span>` : '';
-		const e = showEnd ? `<span ${_editable(`experience.${i}.end_date`)}>${exp.end_date || 'End'}</span>` : '';
+		const s = showStart ? `<span ${_editable(`experience.${i}.start_date`)}>${exp.start_date}</span>` : '';
+		const e = showEnd ? `<span ${_editable(`experience.${i}.end_date`)}>${exp.end_date}</span>` : '';
 		return `<span class="exp-period">${s}${showStart && showEnd ? ' – ' : ''}${e}</span>`;
 	};
 
 	// Education years bind to start_year/end_year (the form fields), NOT the
 	// computed year_range — same round-trip rule as experience dates.
 	const eduYears = (i: number, edu: NormalizedData['education'][number]) => {
-		const showS = edu.start_year || em;
-		const showE = edu.end_year || em;
+		const showS = edu.start_year;
+		const showE = edu.end_year;
 		if (!showS && !showE) return '';
-		const s = showS ? `<span ${_editable(`education.${i}.start_year`)}>${edu.start_year || 'Start'}</span>` : '';
-		const e = showE ? `<span ${_editable(`education.${i}.end_year`)}>${edu.end_year || 'End'}</span>` : '';
+		const s = showS ? `<span ${_editable(`education.${i}.start_year`)}>${edu.start_year}</span>` : '';
+		const e = showE ? `<span ${_editable(`education.${i}.end_year`)}>${edu.end_year}</span>` : '';
 		return `${s}${showS && showE ? '–' : ''}${e}`;
 	};
 
@@ -394,7 +394,7 @@ ${v.projects.map((p, i) => {
       <h3>Technical Skills</h3>
 ${(v.skill_groups ?? []).map((g, i) => `<div class="skill-cat" data-item-wrap>
         <button class="del-btn ce-del-btn" data-del-section="skills" data-del-index="${i}">&#x2715;</button>
-        <div class="skill-cat-name" ${_editable(`skills.${i}.category`)}>${g.category || 'Skills'}</div>
+        <div class="skill-cat-name" ${_editable(`skills.${i}.category`)}>${g.category}</div>
         <ul class="skill-list" ${_listEditable(`skills.${i}.skills`)}>${g.skills.map(s => `<li><span class="ic">${IC.skill}</span>${s}</li>`).join('')}</ul>
       </div>`).join('\n')}
       <button class="add-btn ce-add-btn" data-add-section="skills">+ Add Skill Group</button>
@@ -419,7 +419,7 @@ ${(v.skill_groups ?? []).map((g, i) => `<div class="skill-cat" data-item-wrap>
   <div class="ach-grid">
 ${v.education.map((edu, i) => `<div class="ach-card" data-item-wrap>
     <button class="del-btn ce-del-btn" data-del-section="education" data-del-index="${i}">&#x2715;</button>
-    ${(edu.start_year || edu.end_year || em) ? `<span class="ach-year">${eduYears(i, edu)}</span>` : ''}
+    ${(edu.start_year || edu.end_year) ? `<span class="ach-year">${eduYears(i, edu)}</span>` : ''}
     <div class="ach-title">${_pairEditable(`education.${i}.degree`, edu.degree, `education.${i}.field_of_study`, edu.field_of_study, em, ' — ')}</div>
     ${(edu.institution || edu.location) ? `<div class="ach-desc"><span ${_editable(`education.${i}.institution`)}>${edu.institution || ''}</span>${(edu.location) ? `, <span ${_editable(`education.${i}.location`)}>${edu.location || ''}</span>` : ''}</div>` : ''}
     ${edu.grade_or_score ? `<div class="ach-desc" style="margin-top:.3rem" ${_editable(`education.${i}.grade_or_score`)}>${edu.grade_or_score}</div>` : ''}
@@ -486,7 +486,7 @@ ${v.awards.map((a, i) => `<div class="gen-card" data-item-wrap><button class="de
   ${item.tags?.length ? `<div class="project-tags" ${_listEditable(`custom_sections.${csIdx}.items.${i}.tags`)}>${item.tags.map(t => `<span class="ptag">${t}</span>`).join('')}</div>` : ''}
   ${item.url ? `<div class="project-links"><a href="${item.url}" target="_blank" rel="noopener noreferrer">View &#8599;</a></div>` : ''}
 </div>`).join('\n');
-			return `<section id="${cs.section_id}" class="section-light"><div class="container fade-up"><h2>${cs.title}</h2><div class="gen-grid"${cs.display_type === 'list' ? ' style="grid-template-columns:1fr"' : ''}>${items}</div>
+			return `<section id="${cs.section_id}" class="section-light"><div class="container fade-up"><h2 ${v.edit_mode ? _editable(`custom_sections.${csIdx}.title`) : ''}>${cs.title}</h2><div class="gen-grid"${cs.display_type === 'list' ? ' style="grid-template-columns:1fr"' : ''}>${items}</div>
 <button class="add-btn ce-add-btn" data-add-section="custom_sections.${csIdx}.items">+ Add Item</button></div></section>`;
 		}).filter(Boolean).join('\n')
 		: '';

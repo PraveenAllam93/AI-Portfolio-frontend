@@ -221,17 +221,17 @@ export function html(v: NormalizedData): string {
 		: `<em>${v.name}</em>`;
 
 	const eduYears = (i: number, edu: NormalizedData['education'][number]) => {
-		const s = edu.start_year || em, e = edu.end_year || em;
+		const s = edu.start_year, e = edu.end_year;
 		if (!s && !e) return '';
-		const a = s ? `<span ${ed(`education.${i}.start_year`)}>${edu.start_year || 'Start'}</span>` : '';
-		const b = e ? `<span ${ed(`education.${i}.end_year`)}>${edu.end_year || 'End'}</span>` : '';
+		const a = s ? `<span ${ed(`education.${i}.start_year`)}>${edu.start_year}</span>` : '';
+		const b = e ? `<span ${ed(`education.${i}.end_year`)}>${edu.end_year}</span>` : '';
 		return `${a}${s && e ? ' — ' : ''}${b}`;
 	};
 	const expPeriod = (i: number, exp: NormalizedData['experience'][number]) => {
-		const s = exp.start_date || em, e = exp.end_date || em;
+		const s = exp.start_date, e = exp.end_date;
 		if (!s && !e) return '';
-		const a = s ? `<span ${ed(`experience.${i}.start_date`)}>${exp.start_date || 'Start'}</span>` : '';
-		const b = e ? `<span ${ed(`experience.${i}.end_date`)}>${exp.end_date || 'End'}</span>` : '';
+		const a = s ? `<span ${ed(`experience.${i}.start_date`)}>${exp.start_date}</span>` : '';
+		const b = e ? `<span ${ed(`experience.${i}.end_date`)}>${exp.end_date}</span>` : '';
 		return `${a}${s && e ? ' — ' : ''}${b}`;
 	};
 
@@ -247,7 +247,7 @@ ${v.projects.map((p, i) => {
 			].filter(Boolean).join('');
 			return `<div class="fp-card reveal"${iw}>
 ${delBtn('projects', i)}
-<div class="fp-top"><div class="fp-title"><h3 ${ed(`projects.${i}.title`)}>${p.title || 'Project'}</h3>${p.project_category ? `<div class="fp-client" ${ed(`projects.${i}.project_category`)}>${p.project_category}</div>` : ''}</div></div>
+<div class="fp-top"><div class="fp-title"><h3 ${ed(`projects.${i}.title`)}>${p.title || (em ? 'Project' : '')}</h3>${p.project_category ? `<div class="fp-client" ${ed(`projects.${i}.project_category`)}>${p.project_category}</div>` : ''}</div></div>
 <div class="fp-cover" ${_imgUpload(`projects.${i}.images`, em, 'Upload image')}>${p.images?.[0] ? `<img src="${p.images[0]}" alt="${p.title}">` : `<div class="fp-cover-ph">${initials}</div>`}</div>
 <div class="fp-body">
 ${p.description ? `<div class="fp-block"><h4>Overview</h4><p ${ed(`projects.${i}.description`, true)}>${p.description}</p></div>` : ''}
@@ -270,7 +270,7 @@ ${addBtn('projects', 'Project')}
 <div class="skills-cats">
 ${v.skill_groups.map((g, gi) => `<div class="skills-cat reveal"${iw}>
 ${delBtn('skills', gi)}
-<h3 ${ed(`skills.${gi}.category`)}>${g.category || 'Skills'}</h3>
+<h3 ${ed(`skills.${gi}.category`)}>${g.category}</h3>
 <div class="tag-cloud" ${le(`skills.${gi}.skills`)}>${g.skills.map(s => `<span class="tag-chip">${s}</span>`).join('')}</div>
 </div>`).join('\n')}
 </div>
@@ -291,7 +291,7 @@ ${addBtn('skills', 'Skill Group')}
 <div class="exp-list">
 ${v.experience.map((exp, i) => `<div class="exp-card reveal"${iw}>
 ${delBtn('experience', i)}
-<div class="exp-top"><div><h3 ${ed(`experience.${i}.role`)}>${exp.role || 'Role'}</h3>${(exp.company || exp.location) ? `<div class="exp-company">${exp.company ? `<span ${ed(`experience.${i}.company`)}>${exp.company}</span>` : ''}${exp.company && exp.location ? ' · ' : ''}${exp.location ? `<span ${ed(`experience.${i}.location`)}>${exp.location}</span>` : ''}</div>` : ''}</div><div class="exp-year">${expPeriod(i, exp)}</div></div>
+<div class="exp-top"><div><h3 ${ed(`experience.${i}.role`)}>${exp.role || (em ? 'Role' : '')}</h3>${(exp.company || exp.location) ? `<div class="exp-company">${exp.company ? `<span ${ed(`experience.${i}.company`)}>${exp.company}</span>` : ''}${exp.company && exp.location ? ' · ' : ''}${exp.location ? `<span ${ed(`experience.${i}.location`)}>${exp.location}</span>` : ''}</div>` : ''}</div><div class="exp-year">${expPeriod(i, exp)}</div></div>
 ${exp.description ? `<p class="exp-summary" ${ed(`experience.${i}.description`, true)}>${exp.description}</p>` : ''}
 ${exp.key_points?.length ? `<ul class="exp-kps" ${le(`experience.${i}.key_points`)}>${exp.key_points.map(k => `<li>${k}</li>`).join('')}</ul>` : ''}
 </div>`).join('\n')}
@@ -380,7 +380,7 @@ ${item.tags?.length ? `<div class="tag-cloud cs-tags" ${le(`custom_sections.${ci
 ${item.url ? `<a href="${item.url}" class="ach-link" target="_blank" rel="noopener noreferrer">View &#8599;</a>` : ''}
 </div>`).join('\n');
 			return `<section id="${cs.section_id}" class="wrap">
-<span class="sec-label reveal">${cs.title}</span><h2 class="sec-title reveal">${cs.title}</h2>
+<span class="sec-label reveal" ${v.edit_mode ? _editable(`custom_sections.${ci}.title`) : ''}>${cs.title}</span><h2 class="sec-title reveal" ${v.edit_mode ? _editable(`custom_sections.${ci}.title`) : ''}>${cs.title}</h2>
 <div class="ach-grid">${cards}</div>
 ${addBtn(`custom_sections.${ci}.items`, 'Item')}
 </section>`;
@@ -444,7 +444,7 @@ ${addBtn(`custom_sections.${ci}.items`, 'Item')}
 
 <section id="home" class="wrap hero">
 <div class="hero-left">
-<span class="kicker">${v.profile_headline ? `<span ${ed('profile.headline')}>${v.profile_headline}</span>` : 'Designer'}</span>
+<span class="kicker">${v.profile_headline ? `<span ${ed('profile.headline')}>${v.profile_headline}</span>` : ''}</span>
 <h1 class="serif" ${ed('profile.full_name')}>${heroName}</h1>
 ${v.headline ? `<p class="tag" ${ed('portfolio.headline')}>${v.headline}</p>` : ''}
 ${v.bio && !v.headline ? `<p class="tag" ${ed('portfolio.bio', true)}>${v.bio}</p>` : ''}

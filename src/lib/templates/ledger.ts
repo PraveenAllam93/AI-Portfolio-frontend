@@ -261,19 +261,19 @@ export function html(v: NormalizedData): string {
 
 	// Experience dates bound to real start/end fields.
 	const datePeriod = (i: number, exp: NormalizedData['experience'][number]) => {
-		const showStart = exp.start_date || em;
-		const showEnd = exp.end_date || em;
+		const showStart = exp.start_date;
+		const showEnd = exp.end_date;
 		if (!showStart && !showEnd) return '';
-		const s = showStart ? `<span ${_editable(`experience.${i}.start_date`)}>${exp.start_date || 'Start'}</span>` : '';
-		const e = showEnd ? `<span ${_editable(`experience.${i}.end_date`)}>${exp.end_date || 'End'}</span>` : '';
+		const s = showStart ? `<span ${_editable(`experience.${i}.start_date`)}>${exp.start_date}</span>` : '';
+		const e = showEnd ? `<span ${_editable(`experience.${i}.end_date`)}>${exp.end_date}</span>` : '';
 		return `<span>${s}${showStart && showEnd ? ' — ' : ''}${e}</span>`;
 	};
 	const eduYears = (i: number, edu: NormalizedData['education'][number]) => {
-		const showS = edu.start_year || em;
-		const showE = edu.end_year || em;
+		const showS = edu.start_year;
+		const showE = edu.end_year;
 		if (!showS && !showE) return '';
-		const s = showS ? `<span ${_editable(`education.${i}.start_year`)}>${edu.start_year || 'Start'}</span>` : '';
-		const e = showE ? `<span ${_editable(`education.${i}.end_year`)}>${edu.end_year || 'End'}</span>` : '';
+		const s = showS ? `<span ${_editable(`education.${i}.start_year`)}>${edu.start_year}</span>` : '';
+		const e = showE ? `<span ${_editable(`education.${i}.end_year`)}>${edu.end_year}</span>` : '';
 		return `${s}${showS && showE ? '–' : ''}${e}`;
 	};
 
@@ -355,7 +355,7 @@ export function html(v: NormalizedData): string {
     <div class="skills-cats reveal">
 ${v.skill_groups.map((g, gi) => `<div class="skill-cat" data-item-wrap>
       <button class="del-btn ce-del-btn" data-del-section="skills" data-del-index="${gi}">&#x2715;</button>
-      <h5 ${_editable(`skills.${gi}.category`)}>${g.category || 'Skills'}</h5>
+      <h5 ${_editable(`skills.${gi}.category`)}>${g.category}</h5>
       <ul ${_listEditable(`skills.${gi}.skills`)}>${(g.skills ?? []).map(s => `<li>${s}</li>`).join('')}</ul>
     </div>`).join('\n')}
     </div>
@@ -474,7 +474,7 @@ ${v.achievements.map((a, i) => `<div class="ach-card" data-item-wrap>
     </div>`).join('\n');
 			return `<section class="section" id="${cs.section_id}">
   <div class="wrap">
-    <div class="section-head reveal"><h2>${cs.title}</h2></div>
+    <div class="section-head reveal"><h2 ${v.edit_mode ? _editable(`custom_sections.${ci}.title`) : ''}>${cs.title}</h2></div>
     <div class="ach-grid reveal">${cards}</div>
     <button class="add-btn ce-add-btn" data-add-section="custom_sections.${ci}.items">+ Add Item</button>
   </div>

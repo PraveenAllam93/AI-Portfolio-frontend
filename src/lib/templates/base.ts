@@ -183,8 +183,22 @@ export const EDITOR_JS = `(function(){
   document.head.appendChild(s);
 
   var _LF=String.fromCharCode(10),_CR=String.fromCharCode(13),_ZW=String.fromCharCode(8203),_BOM=String.fromCharCode(65279),_SHY=String.fromCharCode(173);
+  /* innerText returns the RENDERED text, so CSS text-transform is baked in — and
+     text-transform inherits, so an editable nested in an uppercased label is hit
+     too. Reading it straight would save "ACME CORP" over "Acme Corp" the moment
+     the user types. Neutralise the transform for the read only (same task, before
+     paint, so nothing flickers), then restore the author's inline value. We still
+     need innerText rather than textContent: it is what turns <br> and block
+     boundaries into the whitespace the single-line collapse below relies on. */
+  function rendered(el){
+    var prev=el.style.textTransform;
+    el.style.textTransform='none';
+    var t=el.innerText;
+    if(prev) el.style.textTransform=prev; else el.style.removeProperty('text-transform');
+    return t;
+  }
   function getValue(el){
-    var raw=el.innerText.split(_ZW).join('').split(_BOM).join('').split(_SHY).join('');
+    var raw=rendered(el).split(_ZW).join('').split(_BOM).join('').split(_SHY).join('');
     if(el.dataset.multiline) return raw.trimEnd();
     raw=raw.split(_LF).join(' ').split(_CR).join(' ');
     while(raw.indexOf('  ')>=0) raw=raw.split('  ').join(' ');

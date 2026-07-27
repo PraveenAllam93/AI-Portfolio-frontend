@@ -282,7 +282,7 @@ ${v.projects.map((p, i) => {
 			].filter(Boolean).join('');
 			return `<article class="project${i === 0 ? ' featured' : ''}"${iw}>${delBtn('projects', i)}${thumb}
 <div class="body">
-<div class="meta-row"><span class="cat" ${ed(`projects.${i}.project_category`)}>${p.project_category || 'Project'}</span></div>
+<div class="meta-row"><span class="cat" ${ed(`projects.${i}.project_category`)}>${p.project_category}</span></div>
 <h3 ${ed(`projects.${i}.title`)}>${p.title}</h3>
 ${p.description ? `<p class="desc" ${ed(`projects.${i}.description`, true)}>${p.description}</p>` : ''}
 ${resp.length ? `<div class="proj-block"><div class="lbl">Responsibilities</div><ul ${led(`projects.${i}.responsibilities`)}>${resp.map((r) => `<li>${r}</li>`).join('')}</ul></div>` : ''}
@@ -307,7 +307,7 @@ ${v.experience.map((exp, i) => {
 			return `<article class="item"${iw}>${delBtn('experience', i)}
 <div class="when">${range || ''}</div>
 <div>
-<h4><span ${ed(`experience.${i}.role`)}>${exp.role}</span>${exp.company ? ` <span class="at" ${ed(`experience.${i}.company`)}>/ ${exp.company}</span>` : ''}</h4>
+<h4><span ${ed(`experience.${i}.role`)}>${exp.role}</span>${exp.company ? ` <span class="at">/ <span ${ed(`experience.${i}.company`)}>${exp.company}</span></span>` : ''}</h4>
 ${exp.location ? `<div class="role" ${ed(`experience.${i}.location`)}>${exp.location}</div>` : ''}
 ${exp.description ? `<p ${ed(`experience.${i}.description`, true)}>${exp.description}</p>` : ''}
 ${exp.key_points?.length ? `<ul class="pts" ${led(`experience.${i}.key_points`)}>${exp.key_points.map((k) => `<li>${k}</li>`).join('')}</ul>` : ''}
@@ -347,7 +347,7 @@ ${addBtn('education', 'Education')}
 <div class="cards-grid">
 ${v.certifications.map((c, i) => {
 			const nameHtml = c.url ? `<a href="${c.url}" target="_blank" rel="noopener noreferrer">${c.name}</a>` : c.name;
-			return `<div class="mini"${iw}>${delBtn('certifications', i)}<h4${!c.url ? ` ${ed(`certifications.${i}.name`)}` : ''}>${nameHtml}</h4>${c.issuer ? `<p class="sub" ${ed(`certifications.${i}.issuer`)}>${c.issuer}</p>` : ''}${c.year ? `<span class="yr" ${ed(`certifications.${i}.year`)}>${c.year}</span>` : ''}</div>`;
+			return `<div class="mini"${iw}>${delBtn('certifications', i)}<h4 ${ed(`certifications.${i}.name`)}>${nameHtml}</h4>${c.issuer ? `<p class="sub" ${ed(`certifications.${i}.issuer`)}>${c.issuer}</p>` : ''}${c.year ? `<span class="yr" ${ed(`certifications.${i}.year`)}>${c.year}</span>` : ''}</div>`;
 		}).join('\n')}
 </div>
 ${addBtn('certifications', 'Certification')}
@@ -373,7 +373,7 @@ ${addBtn('achievements', 'Achievement')}
 			const csIw = ` data-item-wrap data-cs-idx="${csIdx}"`;
 			const items = (cs.items ?? []).map((item, i) => `<div class="mini"${csIw}>${csDel(i)}${item.label ? `<h4 ${_editable(`custom_sections.${csIdx}.items.${i}.label`)}>${item.label}</h4>` : ''}${item.subtitle ? `<p class="sub" ${_editable(`custom_sections.${csIdx}.items.${i}.subtitle`)}>${item.subtitle}</p>` : ''}${item.value ? `<p ${_editable(`custom_sections.${csIdx}.items.${i}.value`, true)}>${item.value}</p>` : ''}${item.tags?.length ? `<div class="tags" ${_listEditable(`custom_sections.${csIdx}.items.${i}.tags`)}>${item.tags.map((t) => `<span class="tag">${t}</span>`).join('')}</div>` : ''}${item.url ? `<p style="margin-top:10px"><a href="${item.url}" target="_blank" rel="noopener noreferrer" style="color:var(--accent);font-family:var(--mono);font-size:12px">View &#8599;</a></p>` : ''}</div>`).join('\n');
 			return `<section id="${cs.section_id}" class="${rev.trim()}">
-<div class="section-head"><div><div class="section-num">${num()} &mdash; ${cs.title}</div><h2 class="section-title">${cs.title}</h2></div></div>
+<div class="section-head"><div><div class="section-num">${num()} &mdash; ${cs.title}</div><h2 class="section-title" ${v.edit_mode ? _editable(`custom_sections.${csIdx}.title`) : ''}>${cs.title}</h2></div></div>
 <div class="cards-grid">${items}</div>
 ${em ? `<button class="ce-add-btn" data-add-section="custom_sections.${csIdx}.items">+ Add Item</button>` : ''}
 </section>`;

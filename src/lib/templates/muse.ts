@@ -205,17 +205,17 @@ export function html(v: NormalizedData): string {
 	const initials = v.name.split(' ').map(p => p[0] ?? '').join('').slice(0, 2).toUpperCase() || 'D';
 
 	const eduYears = (i: number, edu: NormalizedData['education'][number]) => {
-		const s = edu.start_year || em, e = edu.end_year || em;
+		const s = edu.start_year, e = edu.end_year;
 		if (!s && !e) return '';
-		const a = s ? `<span ${ed(`education.${i}.start_year`)}>${edu.start_year || 'Start'}</span>` : '';
-		const b = e ? `<span ${ed(`education.${i}.end_year`)}>${edu.end_year || 'End'}</span>` : '';
+		const a = s ? `<span ${ed(`education.${i}.start_year`)}>${edu.start_year}</span>` : '';
+		const b = e ? `<span ${ed(`education.${i}.end_year`)}>${edu.end_year}</span>` : '';
 		return `${a}${s && e ? '–' : ''}${b}`;
 	};
 	const expPeriod = (i: number, exp: NormalizedData['experience'][number]) => {
-		const s = exp.start_date || em, e = exp.end_date || em;
+		const s = exp.start_date, e = exp.end_date;
 		if (!s && !e) return '';
-		const a = s ? `<span ${ed(`experience.${i}.start_date`)}>${exp.start_date || 'Start'}</span>` : '';
-		const b = e ? `<span ${ed(`experience.${i}.end_date`)}>${exp.end_date || 'End'}</span>` : '';
+		const a = s ? `<span ${ed(`experience.${i}.start_date`)}>${exp.start_date}</span>` : '';
+		const b = e ? `<span ${ed(`experience.${i}.end_date`)}>${exp.end_date}</span>` : '';
 		return `${a}${s && e ? '–' : ''}${b}`;
 	};
 
@@ -232,7 +232,7 @@ ${v.projects.map((p, i) => {
 ${delBtn('projects', i)}
 <div class="project-media" ${_imgUpload(`projects.${i}.images`, em, 'Upload image')}>${p.images?.[0] ? `<img src="${p.images[0]}" alt="${p.title}">` : `<div class="project-media-ph">${initials}</div>`}</div>
 <div class="project-body">
-<div class="project-top"><div><div class="project-title" ${ed(`projects.${i}.title`)}>${p.title || 'Project'}</div>${p.project_category ? `<div class="project-meta" ${ed(`projects.${i}.project_category`)}>${p.project_category}</div>` : ''}</div>${links ? `<div class="project-links">${links}</div>` : ''}</div>
+<div class="project-top"><div><div class="project-title" ${ed(`projects.${i}.title`)}>${p.title || (em ? 'Project' : '')}</div>${p.project_category ? `<div class="project-meta" ${ed(`projects.${i}.project_category`)}>${p.project_category}</div>` : ''}</div>${links ? `<div class="project-links">${links}</div>` : ''}</div>
 ${p.description ? `<div class="pblock"><h4>Overview</h4><p ${ed(`projects.${i}.description`, true)}>${p.description}</p></div>` : ''}
 <div class="project-cols">
 ${p.responsibilities?.length ? `<div class="pblock"><h4>What I did</h4><ul ${le(`projects.${i}.responsibilities`)}>${p.responsibilities.map(r => `<li>${r}</li>`).join('')}</ul></div>` : ''}
@@ -253,7 +253,7 @@ ${addBtn('projects', 'Project')}
 <div class="skills-grid">
 ${v.skill_groups.map((g, gi) => `<div class="skill-panel reveal"${iw}>
 ${delBtn('skills', gi)}
-<div class="head" style="${HEAD_COLORS[gi % HEAD_COLORS.length]}" ${ed(`skills.${gi}.category`)}>${g.category || 'Skills'}</div>
+<div class="head" style="${HEAD_COLORS[gi % HEAD_COLORS.length]}" ${ed(`skills.${gi}.category`)}>${g.category}</div>
 <div class="skill-list" ${le(`skills.${gi}.skills`)}>${g.skills.map(s => `<span class="tag">${s}</span>`).join('')}</div>
 </div>`).join('\n')}
 </div>
@@ -275,7 +275,7 @@ ${addBtn('skills', 'Skill Group')}
 ${v.experience.map((exp, i) => `<div class="t-item reveal"${iw}>
 ${delBtn('experience', i)}
 <div class="t-card">
-<div class="t-top"><div><div class="t-title" ${ed(`experience.${i}.role`)}>${exp.role || 'Role'}</div>${(exp.company || exp.location) ? `<div class="t-company">${exp.company ? `<span ${ed(`experience.${i}.company`)}>${exp.company}</span>` : ''}${exp.company && exp.location ? ' · ' : ''}${exp.location ? `<span ${ed(`experience.${i}.location`)}>${exp.location}</span>` : ''}</div>` : ''}</div><div class="t-dur">${expPeriod(i, exp)}</div></div>
+<div class="t-top"><div><div class="t-title" ${ed(`experience.${i}.role`)}>${exp.role || (em ? 'Role' : '')}</div>${(exp.company || exp.location) ? `<div class="t-company">${exp.company ? `<span ${ed(`experience.${i}.company`)}>${exp.company}</span>` : ''}${exp.company && exp.location ? ' · ' : ''}${exp.location ? `<span ${ed(`experience.${i}.location`)}>${exp.location}</span>` : ''}</div>` : ''}</div><div class="t-dur">${expPeriod(i, exp)}</div></div>
 ${exp.description ? `<div class="t-desc" ${ed(`experience.${i}.description`, true)}>${exp.description}</div>` : ''}
 ${exp.key_points?.length ? `<ul class="t-kps" ${le(`experience.${i}.key_points`)}>${exp.key_points.map(k => `<li>${k}</li>`).join('')}</ul>` : ''}
 </div>
@@ -366,7 +366,7 @@ ${item.tags?.length ? `<div class="mini-tags" ${le(`custom_sections.${ci}.items.
 ${item.url ? `<a href="${item.url}" class="ml" target="_blank" rel="noopener noreferrer">View ↗</a>` : ''}
 </div>`).join('\n');
 			return `<section id="${cs.section_id}"><div class="wrap">
-<div class="section-head reveal"><div class="eyebrow"><span class="dot"></span>Frame / ${cs.title}</div><br><h2 class="section-title"><span class="hi">${cs.title}</span></h2></div>
+<div class="section-head reveal"><div class="eyebrow"><span class="dot"></span>Frame / ${cs.title}</div><br><h2 class="section-title"><span class="hi" ${v.edit_mode ? _editable(`custom_sections.${ci}.title`) : ''}>${cs.title}</span></h2></div>
 <div class="mini-grid">${cards}</div>
 ${addBtn(`custom_sections.${ci}.items`, 'Item')}
 </div></section>`;
@@ -392,8 +392,11 @@ ${addBtn(`custom_sections.${ci}.items`, 'Item')}
 
 	// HERO chips + CONTACT
 	const heroChips = [
-		v.location ? `<span class="chip" ${ed('profile.location')}>📍 ${v.location}</span>` : '',
-		v.email ? `<span class="chip" ${ed('profile.email')}>✉ ${v.email}</span>` : '',
+		// Icons live OUTSIDE the editable span — inside it they become part of the
+		// value the editor reads back, so the chip saved "📍 Hyderabad" into
+		// profile.location and permanently disagreed with the contact-card copy.
+		v.location ? `<span class="chip">📍 <span ${ed('profile.location')}>${v.location}</span></span>` : '',
+		v.email ? `<span class="chip">✉ <span ${ed('profile.email')}>${v.email}</span></span>` : '',
 	].filter(Boolean).join('');
 	const details = [
 		v.email ? `<div class="detail-card"><div class="lbl">Email</div><div class="val" ${ed('profile.email')}>${v.email}</div></div>` : '',

@@ -1878,6 +1878,15 @@
 		// otherwise the Publish button flips on without a real edit.
 		const snapshot = JSON.stringify(customSections);
 		if (snapshot === customSectionsOriginal) return;
+		// The backend rejects a section with a blank title (400). Titles are now
+		// inline-editable in the preview, so a user can empty one — catch it here
+		// and say why, instead of surfacing a bare "Save failed".
+		const blank = customSections.findIndex((cs) => !(cs.title ?? '').trim());
+		if (blank >= 0) {
+			csSaveStatus = 'error';
+			csSaveError = `Section ${blank + 1} needs a title before it can be saved.`;
+			return;
+		}
 		csSaveStatus = 'saving';
 		csSaveError = '';
 		const result = await savePortfolioSection(userId, uploadId, 'custom_sections', customSections);
@@ -2261,11 +2270,19 @@
 			const num = digitsOnly ? parseInt(digitsOnly) : null;
 			templateOverrides = { ...templateOverrides, [idxOrKey]: num };
 		} else if (ns === 'custom_sections') {
-			// path: custom_sections.{csIdx}.items.{itemIdx}.{csField}
 			const csIdx = parseInt(idxOrKey);
+			if (isNaN(csIdx) || !customSections[csIdx]) return;
+			if (field === 'title') {
+				// path: custom_sections.{csIdx}.title — the section heading itself
+				const u = [...customSections];
+				u[csIdx] = { ...u[csIdx], title: value };
+				customSections = u;
+				return;
+			}
+			// path: custom_sections.{csIdx}.items.{itemIdx}.{csField}
 			const itemIdx = parseInt(parts[3]);
 			const csField = parts[4];
-			if (!isNaN(csIdx) && !isNaN(itemIdx) && csField) {
+			if (!isNaN(itemIdx) && csField) {
 				const u = [...customSections];
 				if (u[csIdx]?.items?.[itemIdx]) {
 					const updatedItems = [...u[csIdx].items];
@@ -2306,6 +2323,7 @@
 		}
 		if (ns === 'custom_sections') {
 			const csIdx = parseInt(idxOrKey);
+			if (field === 'title') return customSections[csIdx]?.title ?? '';
 			const itemIdx = parseInt(parts[3]);
 			const csField = parts[4];
 			const item = customSections[csIdx]?.items?.[itemIdx] as Record<string, unknown> | undefined;
@@ -3077,7 +3095,7 @@
 
 	<div class="flex min-h-0 flex-1 overflow-hidden">
 
-		<aside class="{mobileTab === 'sections' ? 'flex' : 'hidden'} sm:flex w-full sm:w-80 flex-col flex-shrink-0 overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden border-r border-surface-muted bg-surface-subtle sm:bg-surface-subtle sm:p-0 sm:pt-3">
+		<aside class="{mobileTab === 'sections' ? 'flex' : 'hidden'} sm:flex w-full sm:w-64 flex-col flex-shrink-0 overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden border-r border-surface-muted bg-surface-subtle sm:bg-surface-subtle sm:p-0 sm:pt-3">
 			<div class="flex-shrink-0 p-3 space-y-0.5 sm:mx-3 sm:rounded-2xl sm:border sm:border-surface-muted sm:bg-white sm:shadow-md sm:p-3 sm:mb-2">
 				<button onclick={() => { activeTab = 'profile'; mobileTab = 'edit'; }} class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm font-medium transition-colors {activeTab === 'profile' ? 'bg-brand text-white' : 'text-ink-soft hover:bg-surface-muted'}">
 					Profile
@@ -3262,13 +3280,13 @@
 
 				<span class="hidden text-xs text-ink-muted sm:block">Click any text to edit · select text for AI ✦</span>
 			</div>
-			<div class="relative flex-1 overflow-hidden p-4 sm:p-5">
+			<div class="relative flex-1 overflow-hidden p-4 sm:p-3">
 				{#if pageLoading}
 					<div class="flex h-full items-center justify-center">
 						<p class="text-sm text-ink-muted">Loading preview…</p>
 					</div>
 				{:else}
-					<div bind:clientWidth={previewContainerW} bind:clientHeight={previewContainerH} class="absolute inset-4 sm:inset-5 overflow-hidden rounded-2xl shadow-2xl ring-1 ring-black/[0.07]">
+					<div bind:clientWidth={previewContainerW} bind:clientHeight={previewContainerH} class="absolute inset-4 sm:inset-3 overflow-hidden rounded-2xl shadow-2xl ring-1 ring-black/[0.07]">
 						<!-- On desktop, render at a fixed desktop width and scale to fit so the
 						     preview matches the published (non-mobile) layout. On phones
 						     previewScale === 1 → native full-width responsive rendering. -->
@@ -3280,8 +3298,8 @@
 			</div>
 		</div>
 
-		<div bind:this={rightPanelEl} class="{mobileTab === 'edit' ? 'flex' : 'hidden'} sm:flex w-full sm:w-[460px] sm:flex-shrink-0 flex-col overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-			<div class="flex-shrink-0 p-4 sm:p-6 space-y-4">
+		<div bind:this={rightPanelEl} class="{mobileTab === 'edit' ? 'flex' : 'hidden'} sm:flex w-full sm:w-[396px] sm:flex-shrink-0 flex-col overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+			<div class="flex-shrink-0 p-4 sm:p-5 space-y-4">
 
 			{#if pageLoading}
 				<LoadingState size="lg" message="Loading your portfolio content…" />

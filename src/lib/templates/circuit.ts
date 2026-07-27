@@ -226,7 +226,7 @@ section{position:relative;z-index:1;padding:clamp(5rem,10vw,8rem) clamp(1.5rem,8
 .project-banner-img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:0}
 .project-banner-img+.project-banner-bg{background:linear-gradient(to bottom,transparent 40%,rgba(10,13,20,.7));opacity:1}
 .project-banner-icon{font-size:3.5rem;color:var(--accent);opacity:.12;position:relative;z-index:2;font-family:'JetBrains Mono',monospace;font-weight:700;letter-spacing:-.05em}
-.project-banner-label{position:absolute;top:1rem;right:1rem;font-family:'JetBrains Mono',monospace;font-size:.65rem;padding:.2rem .6rem;border-radius:3px;background:rgba(0,212,255,.12);color:var(--accent);border:1px solid rgba(0,212,255,.25);z-index:3}
+.project-banner-label{text-transform:uppercase;position:absolute;top:1rem;right:1rem;font-family:'JetBrains Mono',monospace;font-size:.65rem;padding:.2rem .6rem;border-radius:3px;background:rgba(0,212,255,.12);color:var(--accent);border:1px solid rgba(0,212,255,.25);z-index:3}
 .project-body{padding:1.5rem;flex:1;display:flex;flex-direction:column}
 .project-title{font-family:'Rajdhani',sans-serif;font-size:1.15rem;font-weight:700;color:var(--white);margin-bottom:.5rem}
 [data-theme="light"] .project-title{color:var(--text)}
@@ -601,7 +601,11 @@ ${v.skill_groups.map((g, i) => `<div class="skill-cat-card fade-in${i > 0 ? ' de
 <div class="projects-grid">
 ${v.projects.map((p, i) => {
 	const stack = [...(p.tech_stack ?? []), ...(p.software_used ?? [])];
-	const tags = stack.map(t => `<span class="ptag">${t}</span>`).join('');
+	// tech_stack and software_used are SEPARATE model fields, so each needs its own
+	// click-to-edit region. Rendering both under one le(`…tech_stack`) made the list
+	// editor show only tech_stack while the chips showed both, and saving wrote the
+	// merged list back into tech_stack alone.
+	const chips = (arr: string[]) => arr.map(t => `<span class="ptag">${t}</span>`).join('');
 	const links = [
 		p.github_repo ? `<a href="${p.github_repo}" class="plink" target="_blank" rel="noopener noreferrer">GitHub</a>` : '',
 		p.project_url ? `<a href="${p.project_url}" class="plink" target="_blank" rel="noopener noreferrer">Live</a>` : '',
@@ -610,9 +614,13 @@ ${v.projects.map((p, i) => {
 		? `<div class="exp-points" ${_listEditable(`projects.${i}.responsibilities`)}>${p.responsibilities.map(r => `<div class="exp-point">${r}</div>`).join('')}</div>`
 		: '';
 	const outcomes = p.measurable_outcomes?.length
-		? `<div class="project-outcomes">${p.measurable_outcomes.map(o => `<div class="project-outcome">&#10003; ${o}</div>`).join('')}</div>`
+		? `<div class="project-outcomes" ${_listEditable(`projects.${i}.measurable_outcomes`)}>${p.measurable_outcomes.map(o => `<div class="project-outcome">&#10003; ${o}</div>`).join('')}</div>`
 		: '';
-	const catLabel = p.project_category?.toUpperCase() || 'PROJECT';
+	// Uppercasing is done in CSS (.project-banner-label), NOT here: getValue()
+	// neutralises CSS text-transform when it reads the field, so the label can stay
+	// inline-editable without saving the shouted text. Omitted when empty rather
+	// than falling back to a fake "PROJECT" label.
+	const catLabel = p.project_category;
 	const gradient = bannerGradient(p);
 	const bannerIcon = stack[0] ? stack[0].toUpperCase().slice(0, 3) : '&lt;/&gt;';
 	const bannerImg = p.images?.[0];
@@ -622,7 +630,7 @@ ${v.projects.map((p, i) => {
   ${bannerImg ? `<img class="project-banner-img" src="${bannerImg}" alt="${p.title}">` : ''}
   <div class="project-banner-bg"></div>
   ${bannerImg ? '' : `<div class="project-banner-icon">${bannerIcon}</div>`}
-  <span class="project-banner-label">${catLabel}</span>
+  ${catLabel ? `<span class="project-banner-label" ${_editable(`projects.${i}.project_category`)}>${catLabel}</span>` : ''}
 </div>
 <div class="project-body">
   <div class="project-title" ${_editable(`projects.${i}.title`)}>${p.title}</div>
@@ -630,7 +638,8 @@ ${v.projects.map((p, i) => {
   ${responsibilities}
   ${outcomes}
   <div class="project-footer">
-    ${tags ? `<div class="project-tags" ${_listEditable(`projects.${i}.tech_stack`)}>${tags}</div>` : ''}
+    ${p.tech_stack?.length ? `<div class="project-tags" ${_listEditable(`projects.${i}.tech_stack`)}>${chips(p.tech_stack)}</div>` : ''}
+${p.software_used?.length ? `<div class="project-tags" ${_listEditable(`projects.${i}.software_used`)}>${chips(p.software_used)}</div>` : ''}
     ${links ? `<div class="project-links">${links}</div>` : ''}
   </div>
 </div>
@@ -676,7 +685,7 @@ ${v.certifications.map((c, i) => `<div class="cert-card fade-in" data-item-wrap>
 <button class="del-btn ce-del-btn" data-del-section="certifications" data-del-index="${i}">&#x2715;</button>
 <div class="cert-icon">&#9670;</div>
 <div>
-  <div class="cert-name"${!c.url ? ` ${_editable(`certifications.${i}.name`)}` : ''}>${c.url ? `<a href="${c.url}" target="_blank" rel="noopener noreferrer">${c.name}</a>` : c.name}</div>
+  <div class="cert-name" ${_editable(`certifications.${i}.name`)}>${c.url ? `<a href="${c.url}" target="_blank" rel="noopener noreferrer">${c.name}</a>` : c.name}</div>
   ${c.issuer ? `<div class="cert-org" ${_editable(`certifications.${i}.issuer`)}>${c.issuer}</div>` : ''}
   ${c.year ? `<div class="cert-year" ${_editable(`certifications.${i}.year`)}>${c.year}</div>` : ''}
 </div>
@@ -850,8 +859,8 @@ ${item.url ? `<a href="${item.url}" class="plink" style="margin-top:.5rem;displa
 				: `<div style="display:flex;flex-direction:column;gap:1rem">${items}</div>`;
 			return `<section id="${cs.section_id}">
 <div class="section-header fade-in">
-  <p class="section-tag">${cs.title}</p>
-  <h2 class="section-title">${cs.title}</h2>
+  <p class="section-tag" ${v.edit_mode ? _editable(`custom_sections.${csIdx}.title`) : ''}>${cs.title}</p>
+  <h2 class="section-title" ${v.edit_mode ? _editable(`custom_sections.${csIdx}.title`) : ''}>${cs.title}</h2>
 </div>
 ${grid}
 <button class="add-btn ce-add-btn" data-add-section="custom_sections.${csIdx}.items">+ Add Item</button>

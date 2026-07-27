@@ -278,7 +278,7 @@ ${v.skill_groups.map((g, gi) => `<div class="service-card reveal"${iw}>
 ${delBtn('skills', gi)}
 <div class="service-card__num">${String(gi + 1).padStart(2, '0')}</div>
 <span class="service-card__icon">${SVC_ICONS[gi % SVC_ICONS.length]}</span>
-<div class="service-card__title" ${ed(`skills.${gi}.category`)}>${g.category || 'Skills'}</div>
+<div class="service-card__title" ${ed(`skills.${gi}.category`)}>${g.category}</div>
 <div class="service-card__tags" ${le(`skills.${gi}.skills`)}>${g.skills.map(s => `<span class="service-tag">${s}</span>`).join('')}</div>
 </div>`).join('\n')}
 </div>
@@ -293,7 +293,7 @@ ${addBtn('skills', 'Skill Group')}
 ${(v.campaigns ?? []).map((c, i) => `<div class="work-card reveal"${iw}>
 ${delBtn('campaigns', i)}
 ${c.campaign_type ? `<div class="work-card__type" ${ed(`campaigns.${i}.campaign_type`)}>${c.campaign_type}</div>` : ''}
-<div class="work-card__name" ${ed(`campaigns.${i}.campaign_name`)}>${c.campaign_name || 'Campaign'}</div>
+<div class="work-card__name" ${ed(`campaigns.${i}.campaign_name`)}>${c.campaign_name || (em ? 'Campaign' : '')}</div>
 ${c.budget ? `<div class="work-card__budget">Budget: <span ${ed(`campaigns.${i}.budget`)}>${c.budget}</span></div>` : ''}
 ${c.performance_metrics?.length ? `<div class="work-card__metrics" ${le(`campaigns.${i}.performance_metrics`)}>${c.performance_metrics.map(m => `<div class="work-card__metric">${m}</div>`).join('')}</div>` : ''}
 ${c.channels_used?.length ? `<div class="work-card__channels" ${le(`campaigns.${i}.channels_used`)}>${c.channels_used.map(ch => `<span class="service-tag">${ch}</span>`).join('')}</div>` : ''}
@@ -309,8 +309,8 @@ ${addBtn('campaigns', 'Campaign')}
 <div class="tl">
 ${v.experience.map((exp, i) => `<div class="tl-item reveal"${iw}>
 ${delBtn('experience', i)}
-<div class="tl-year">${exp.start_date ? `<span ${ed(`experience.${i}.start_date`)}>${exp.start_date}</span>` : (em ? `<span ${ed(`experience.${i}.start_date`)}>Start</span>` : '')}${(exp.start_date && exp.end_date) ? ' — ' : ''}${exp.end_date ? `<span ${ed(`experience.${i}.end_date`)}>${exp.end_date}</span>` : (em ? `<span ${ed(`experience.${i}.end_date`)}>End</span>` : '')}</div>
-<div class="tl-title" ${ed(`experience.${i}.role`)}>${exp.role || 'Role'}</div>
+<div class="tl-year">${exp.start_date ? `<span ${ed(`experience.${i}.start_date`)}>${exp.start_date}</span>` : ''}${(exp.start_date && exp.end_date) ? ' — ' : ''}${exp.end_date ? `<span ${ed(`experience.${i}.end_date`)}>${exp.end_date}</span>` : ''}</div>
+<div class="tl-title" ${ed(`experience.${i}.role`)}>${exp.role || (em ? 'Role' : '')}</div>
 ${exp.company ? `<div class="tl-company"><span ${ed(`experience.${i}.company`)}>${exp.company}</span>${exp.location ? ` · <span ${ed(`experience.${i}.location`)}>${exp.location}</span>` : ''}</div>` : ''}
 ${exp.description ? `<div class="tl-desc" ${ed(`experience.${i}.description`, true)}>${exp.description}</div>` : ''}
 ${exp.key_points?.length ? `<div class="tl-metrics" ${le(`experience.${i}.key_points`)}>${exp.key_points.map(k => `<div class="tl-metric">${k}</div>`).join('')}</div>` : ''}
@@ -327,7 +327,7 @@ ${addBtn('experience', 'Experience')}
 <div class="mini-grid">
 ${v.education.map((edu, i) => `<div class="mini-card"${iw}>
 ${delBtn('education', i)}
-<div class="mini-year">${edu.start_year ? `<span ${ed(`education.${i}.start_year`)}>${edu.start_year}</span>` : (em ? `<span ${ed(`education.${i}.start_year`)}>Start</span>` : '')}${(edu.start_year && edu.end_year) ? ' – ' : ''}${edu.end_year ? `<span ${ed(`education.${i}.end_year`)}>${edu.end_year}</span>` : (em ? `<span ${ed(`education.${i}.end_year`)}>End</span>` : '')}</div>
+<div class="mini-year">${edu.start_year ? `<span ${ed(`education.${i}.start_year`)}>${edu.start_year}</span>` : ''}${(edu.start_year && edu.end_year) ? ' – ' : ''}${edu.end_year ? `<span ${ed(`education.${i}.end_year`)}>${edu.end_year}</span>` : ''}</div>
 <div class="mini-title">${_pairEditable(`education.${i}.degree`, edu.degree, `education.${i}.field_of_study`, edu.field_of_study, em, ' — ')}</div>
 ${edu.institution ? `<div class="mini-meta"><span ${ed(`education.${i}.institution`)}>${edu.institution}</span>${edu.location ? ` · <span ${ed(`education.${i}.location`)}>${edu.location}</span>` : ''}</div>` : ''}
 ${edu.grade_or_score ? `<span class="mini-badge" ${ed(`education.${i}.grade_or_score`)}>${edu.grade_or_score}</span>` : ''}
@@ -380,7 +380,7 @@ ${item.tags?.length ? `<div class="mini-chips" ${le(`custom_sections.${ci}.items
 ${item.url ? `<a href="${item.url}" class="mini-link" target="_blank" rel="noopener noreferrer">View &#8599;</a>` : ''}
 </div>`).join('\n');
 			return `<section class="section section--sage" id="${cs.section_id}"><div class="container">
-<div class="section-header reveal"><div><div class="tag" style="margin-bottom:1.5rem">${cs.title}</div><h2 class="section-title">${cs.title}</h2></div></div>
+<div class="section-header reveal"><div><div class="tag" style="margin-bottom:1.5rem" ${v.edit_mode ? _editable(`custom_sections.${ci}.title`) : ''}>${cs.title}</div><h2 class="section-title" ${v.edit_mode ? _editable(`custom_sections.${ci}.title`) : ''}>${cs.title}</h2></div></div>
 <div class="mini-grid">${cards}</div>
 ${addBtn(`custom_sections.${ci}.items`, 'Item')}
 </div></section>`;
@@ -462,7 +462,7 @@ ${v.email ? `<a href="mailto:${v.email}" class="nav__cta">Contact</a>` : ''}
 <div class="hero__left">
 <div class="hero__eyebrow">${v.profile_headline ? `<span ${ed('profile.headline')}>${v.profile_headline}</span>` : 'Marketing Portfolio'}</div>
 <h1 class="hero__name" ${ed('profile.full_name')}>${heroName}</h1>
-${v.bio ? `<p class="hero__title" ${ed('portfolio.bio', true)}>${v.bio.slice(0, 120)}${v.bio.length > 120 ? '…' : ''}</p>` : ''}
+${v.bio ? `<p class="hero__title" ${ed('portfolio.bio', true)}>${v.bio}</p>` : ''}
 <div class="hero__avatar" ${_imgUpload('profile.profile_image', em)}>${v.profile_image ? `<img src="${v.profile_image}" alt="${v.name}">` : initials}</div>
 </div>
 <div class="hero__right">

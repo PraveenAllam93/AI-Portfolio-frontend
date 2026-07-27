@@ -240,13 +240,17 @@ section{margin-bottom:60px}
 }
 `;
 
-function _section(title: string, content: string, counter: { n: number }): string {
+/** `titleAttr` carries the inline-edit binding for custom sections, whose title is
+ *  user data. Built-in headings ("Experience", …) pass '' and stay static.
+ *  Note the label is `[NN] title`, so the binding goes on an inner span — binding
+ *  the whole label would save "[01] My Section" back as the title. */
+function _section(title: string, content: string, counter: { n: number }, titleAttr = ''): string {
   if (!content.trim()) return '';
   counter.n += 1;
   const num = String(counter.n).padStart(2, '0');
   return `<section id="${title.toLowerCase().replace(/\s+/g, '-')}">
 <div class="sec-head">
-  <span class="sec-label">[${num}] ${title}</span>
+  <span class="sec-label">[${num}] <span ${titleAttr}>${title}</span></span>
   <div class="sec-line" aria-hidden="true"></div>
 </div>
 ${content}
@@ -542,7 +546,7 @@ ${item.url ? `<a href="${item.url}" style="font-family:var(--font-m);font-size:.
         const inner = cs.display_type === 'cards'
           ? `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px">${itemsHtml}</div>${addBtn}`
           : `<div style="display:flex;flex-direction:column;gap:12px">${itemsHtml}</div>${addBtn}`;
-        return _section(cs.title, inner, counter);
+        return _section(cs.title, inner, counter, em ? _editable(`custom_sections.${csIdx}.title`) : '');
       });
     }
     if (key in _RENDERERS) {

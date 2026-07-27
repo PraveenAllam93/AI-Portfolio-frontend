@@ -276,7 +276,7 @@ ${addBtn(`custom_sections.${csIdx}.items`, 'Item')}`;
 			return `<section id="${cs.section_id}" class="d-sec">
 <div class="sec-eyebrow-row" style="padding-bottom:30px;border-bottom:1px solid var(--line);margin-bottom:0">
 <div class="d-eyebrow"><span class="dot"></span><span>Custom section</span></div>
-<h2 class="d-sec-title" style="margin-top:16px">${cs.title}</h2>
+<h2 class="d-sec-title" style="margin-top:16px" ${v.edit_mode ? _editable(`custom_sections.${csIdx}.title`) : ''}>${cs.title}</h2>
 </div>
 ${inner}
 </section>`;
@@ -327,7 +327,7 @@ ${p.images?.[0] ? `<img src="${p.images[0]}" alt="${p.title}" loading="lazy">` :
 <div class="d-hover">view case →</div>
 </div>
 <div class="d-work-meta">
-<div class="d-work-title" ${ed(`projects.${i}.title`)}>${p.title || 'Project'}</div>
+<div class="d-work-title" ${ed(`projects.${i}.title`)}>${p.title || (em ? 'Project' : '')}</div>
 ${p.tech_stack?.length ? `<div class="d-work-tags" ${le(`projects.${i}.tech_stack`)}>${p.tech_stack.join('<br>')}</div>` : ''}
 ${p.software_used?.length ? `<div class="d-work-tags" ${le(`projects.${i}.software_used`)}>${p.software_used.join('<br>')}</div>` : ''}
 </div>
@@ -357,13 +357,15 @@ ${v.experience.map((exp, i) => {
 ${delBtn('experience', i)}
 <div class="d-t-year">${year}</div>
 <div class="d-t-body">
-<h4 ${ed(`experience.${i}.role`)}>${exp.role || 'Role'}${exp.company ? ` — ${exp.company}` : ''}</h4>
+<h4>${exp.role || exp.company
+			? _pairEditable(`experience.${i}.role`, exp.role, `experience.${i}.company`, exp.company, em, ' — ')
+			: (em ? `<span ${ed(`experience.${i}.role`)}>Role</span>` : '')}</h4>
 ${exp.description ? `<p ${ed(`experience.${i}.description`, true)}>${exp.description}</p>` : ''}
 ${exp.key_points?.length ? `<ul ${le(`experience.${i}.key_points`)}>${exp.key_points.map(kp => `<li>${kp}</li>`).join('')}</ul>` : ''}
 </div>
 <div class="d-t-role">
 ${exp.company ? `<span ${ed(`experience.${i}.company`)}>${exp.company}</span><br>` : ''}
-${exp.start_date ? `<span ${ed(`experience.${i}.start_date`)}>${exp.start_date}</span>` : (em ? `<span ${ed(`experience.${i}.start_date`)}>Start</span>` : '')}${(exp.start_date && exp.end_date) ? ' – ' : ''}${exp.end_date ? `<span class="${exp.is_current ? 'now' : ''}" ${ed(`experience.${i}.end_date`)}>${exp.end_date}</span>` : (em ? `<span ${ed(`experience.${i}.end_date`)}>End</span>` : '')}
+${exp.start_date ? `<span ${ed(`experience.${i}.start_date`)}>${exp.start_date}</span>` : ''}${(exp.start_date && exp.end_date) ? ' – ' : ''}${exp.end_date ? `<span class="${exp.is_current ? 'now' : ''}" ${ed(`experience.${i}.end_date`)}>${exp.end_date}</span>` : ''}
 </div>
 </div>`;
 }).join('\n')}
@@ -384,7 +386,7 @@ ${addBtn('experience', 'Experience')}
 </div>
 <div class="d-skill-grid">
 ${v.skill_groups.map((g, gi) => `<div class="d-skill-col reveal">
-<h5>(${String.fromCharCode(97 + gi)}) ${g.category}</h5>
+<h5>(${String.fromCharCode(97 + gi)}) <span ${ed(`skills.${gi}.category`)}>${g.category}</span></h5>
 <ul class="d-skill-list" ${le(`skills.${gi}.skills`)}>
 ${g.skills.map(s => `<li>${s}</li>`).join('')}
 </ul>
@@ -467,7 +469,7 @@ ${delBtn('education', i)}
 <div class="d-edu-inst" ${ed(`education.${i}.institution`)}>${edu.institution}</div>
 ${edu.grade_or_score ? `<div class="d-edu-grade" ${ed(`education.${i}.grade_or_score`)}>${edu.grade_or_score}</div>` : ''}
 </div>
-<div class="d-edu-year">${edu.start_year ? `<span ${ed(`education.${i}.start_year`)}>${edu.start_year}</span>` : (em ? `<span ${ed(`education.${i}.start_year`)}>Start</span>` : '')}${(edu.start_year && edu.end_year) ? ' – ' : ''}${edu.end_year ? `<span ${ed(`education.${i}.end_year`)}>${edu.end_year}</span>` : (em ? `<span ${ed(`education.${i}.end_year`)}>End</span>` : '')}</div>
+<div class="d-edu-year">${edu.start_year ? `<span ${ed(`education.${i}.start_year`)}>${edu.start_year}</span>` : ''}${(edu.start_year && edu.end_year) ? ' – ' : ''}${edu.end_year ? `<span ${ed(`education.${i}.end_year`)}>${edu.end_year}</span>` : ''}</div>
 </div>`).join('\n')}
 </div>
 ${addBtn('education', 'Education')}
@@ -611,20 +613,20 @@ ${cursorHtml}
 <!-- HERO -->
 <header class="d-hero" id="top">
 <div class="meta">
-<span ${ed('profile.location')}>${v.location || 'Designer'}</span>
+${v.location ? `<span ${ed('profile.location')}>${v.location}</span>` : ''}
 <span>Portfolio</span>
 <span>&copy; ${new Date().getFullYear()} ${v.name}</span>
 </div>
 
 <h1>
 <span ${ed('profile.full_name')}>${v.name}</span><br>
-<span class="it" ${ed('portfolio.headline')}>${v.headline || v.profile_headline || 'Designer &amp; creator'}</span>
+${(v.headline || v.profile_headline) ? `<span class="it" ${ed(v.headline ? 'portfolio.headline' : 'profile.headline')}>${v.headline || v.profile_headline}</span>` : (em ? `<span class="it" ${ed('portfolio.headline')}>Add a professional headline.</span>` : '')}
 </h1>
 
 <div class="d-hero-row">
 <div class="d-lede">
 <em>— Manifesto</em>
-<span ${ed('portfolio.bio', true)}>${v.bio || 'Creative professional building thoughtful digital experiences.'}</span>
+${v.bio ? `<span ${ed('portfolio.bio', true)}>${v.bio}</span>` : (em ? `<span ${ed('portfolio.bio', true)}>Add a short introduction.</span>` : '')}
 </div>
 ${statShown(v, 'years_experience', yearsExp) ? `<div class="d-stat">
 <span class="n" ${ed('template_overrides.years_experience')}>${yearsExp}</span>
@@ -655,7 +657,7 @@ ${allSkills.length ? `<div class="d-marquee" aria-hidden="true">
 </div>
 <div class="d-about-grid reveal">
 <div>
-<p ${ed('portfolio.uniqueValue', true)}>${v.uniqueValue || 'I create brand systems, products, and software that feel deliberate — never noisy, never disposable.'}</p>
+${v.uniqueValue ? `<p ${ed('portfolio.uniqueValue', true)}>${v.uniqueValue}</p>` : (em ? `<p ${ed('portfolio.uniqueValue', true)}>Add your unique value proposition.</p>` : '')}
 </div>
 <div class="d-about-side">
 ${v.location ? `<div class="d-about-row"><span class="d-about-k">Based in</span><span class="d-about-v" ${ed('profile.location')}>${v.location}</span></div>` : ''}

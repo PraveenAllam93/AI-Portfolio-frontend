@@ -228,14 +228,16 @@ section{margin-bottom:56px}
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
-function _section(title: string, content: string, counter: { n: number }): string {
+/** `titleAttr` carries the inline-edit binding for custom sections (whose title is
+ *  user data); built-in headings pass '' and stay static. */
+function _section(title: string, content: string, counter: { n: number }, titleAttr = ''): string {
   if (!content.trim()) return '';
   counter.n += 1;
   const num = String(counter.n).padStart(2, '0');
   return `<section>
 <div class="sec-head">
   <span class="sec-num">${num}</span>
-  <h2 class="sec-title">${title}</h2>
+  <h2 class="sec-title" ${titleAttr}>${title}</h2>
   <div class="sec-rule-wrap"><div class="sec-rule-line"></div><div class="sec-rule-dot"></div></div>
 </div>
 ${content}
@@ -535,7 +537,7 @@ ${item.url ? `<a href="${item.url}" style="font-size:.82rem;margin-top:8px;displ
         const inner = cs.display_type === 'cards'
           ? `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:1rem">${itemsHtml}</div>${addBtn}`
           : `<div style="display:flex;flex-direction:column;gap:.75rem">${itemsHtml}</div>${addBtn}`;
-        return _section(cs.title, inner, counter);
+        return _section(cs.title, inner, counter, em ? _editable(`custom_sections.${csIdx}.title`) : '');
       });
     }
     if (key in _RENDERERS) {

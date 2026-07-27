@@ -388,11 +388,14 @@ section h2 {
 // Section helper — auto-numbered
 // ---------------------------------------------------------------------------
 
-function _section(title: string, content: string, counter: { n: number }): string {
+/** `titleAttr` carries the inline-edit binding for custom sections (whose title is
+ *  user data); built-in headings pass '' and stay static. It goes on an inner span
+ *  because the <h2> also holds the section number. */
+function _section(title: string, content: string, counter: { n: number }, titleAttr = ''): string {
   if (!content) return '';
   counter.n += 1;
   const num = String(counter.n).padStart(2, '0');
-  return `<section><h2><span class="snum">${num}</span> ${title}</h2>${content}</section>`;
+  return `<section><h2><span class="snum">${num}</span> <span ${titleAttr}>${title}</span></h2>${content}</section>`;
 }
 
 // ---------------------------------------------------------------------------
@@ -793,7 +796,7 @@ ${item.url ? `<a href="${item.url}" style="font-size:.82rem;margin-top:8px;displ
             const inner = cs.display_type === 'cards'
               ? `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px">${itemsHtml}</div>${add}`
               : `<div class="exp-list">${itemsHtml}</div>${add}`;
-            return _section(cs.title, inner, counter);
+            return _section(cs.title, inner, counter, em ? _editable(`custom_sections.${csIdx}.title`) : '');
           });
       }
       if (key in _SECTION_RENDERERS) {
@@ -828,7 +831,7 @@ ${item.url ? `<a href="${item.url}" style="font-size:.82rem;margin-top:8px;displ
     <div class="hero-inner">
       <p class="eyebrow"><span class="eyebrow-dot"></span>Portfolio</p>
       <h1 class="hero-name" ${ed('profile.full_name')}>${name}</h1>
-      ${title ? `<p class="hero-title" ${ed('profile.headline')}>${title}</p>` : ''}
+      ${title ? `<p class="hero-title" ${ed('portfolio.headline')}>${title}</p>` : ''}
       ${v.location || v.phone || v.email ? `<p class="hero-title" style="font-size:.9rem;margin-top:-16px;margin-bottom:24px">${[v.location ? `<span ${ed('profile.location')}>${v.location}</span>` : '', v.phone ? `<span ${ed('profile.phone')}>${v.phone}</span>` : '', v.email ? `<span ${ed('profile.email')}>${v.email}</span>` : ''].filter(Boolean).join(' &bull; ')}</p>` : ''}
       ${liHtml ? `<div class="hero-links">${liHtml}</div>` : ''}
     </div>

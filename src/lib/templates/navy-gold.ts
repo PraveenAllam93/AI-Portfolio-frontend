@@ -388,7 +388,7 @@ ${v.skill_groups.map((g, i) => {
 	return `<div class="skill-group-card reveal" data-item-wrap>
 <button class="del-btn ce-del-btn" data-del-section="skills" data-del-index="${i}">&#x2715;</button>
 <div class="skill-cat" ${_editable(`skills.${i}.category`)}>${g.category}</div>
-<div class="skill-tags">${tags}</div>
+<div class="skill-tags" ${_listEditable(`skills.${i}.skills`)}>${tags}</div>
 </div>`;
 }).join('\n')}
 </div>
@@ -462,7 +462,7 @@ ${v.certifications.map((c, i) => `<div class="cert-card reveal-up" data-item-wra
 <button class="del-btn ce-del-btn" data-del-section="certifications" data-del-index="${i}">&#x2715;</button>
 <div class="cert-ico">&#10003;</div>
 <div>
-<div class="cert-name"${!c.url ? ` ${_editable(`certifications.${i}.name`)}` : ''}>${c.url ? `<a href="${c.url}" target="_blank" rel="noopener noreferrer">${c.name}</a>` : c.name}</div>
+<div class="cert-name" ${_editable(`certifications.${i}.name`)}>${c.url ? `<a href="${c.url}" target="_blank" rel="noopener noreferrer">${c.name}</a>` : c.name}</div>
 ${c.issuer ? `<div class="cert-issuer" ${_editable(`certifications.${i}.issuer`)}>${c.issuer}</div>` : ''}
 ${c.year ? `<div class="cert-year" ${_editable(`certifications.${i}.year`)}>${c.year}</div>` : ''}
 </div>
@@ -592,7 +592,7 @@ ${item.url ? `<a href="${item.url}" class="proj-link" target="_blank" rel="noope
 				: `<div style="display:flex;flex-direction:column;gap:18px">${items}</div>`;
 			return `<section id="${cs.section_id}">
 <div class="container">
-<div class="section-header reveal"><div class="section-label">${cs.title}</div><h2 class="section-title">${cs.title}</h2></div>
+<div class="section-header reveal"><div class="section-label" ${v.edit_mode ? _editable(`custom_sections.${csIdx}.title`) : ''}>${cs.title}</div><h2 class="section-title" ${v.edit_mode ? _editable(`custom_sections.${csIdx}.title`) : ''}>${cs.title}</h2></div>
 ${grid}
 <button class="add-btn ce-add-btn" data-add-section="custom_sections.${csIdx}.items">+ Add Item</button>
 </div>

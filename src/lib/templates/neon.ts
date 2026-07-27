@@ -480,7 +480,7 @@ ${v.certifications
 			return `<div class="cert-card"${iw}>
 ${delBtn('certifications', i)}
 <span class="cert-icon">${icon}</span>
-<h3${!c.url ? ` ${ed(`certifications.${i}.name`)}` : ''}>${nameHtml}</h3>
+<h3 ${ed(`certifications.${i}.name`)}>${nameHtml}</h3>
 ${c.issuer ? `<p class="cert-issuer" ${ed(`certifications.${i}.issuer`)}>${c.issuer}</p>` : ''}
 ${c.year ? `<p class="cert-year" ${ed(`certifications.${i}.year`)}>${c.year}</p>` : ''}
 </div>`;
@@ -586,7 +586,7 @@ ${item.url ? `<a href="${item.url}" class="project-link" target="_blank" rel="no
 </div>`;
 			}
 			return `<section id="${cs.section_id}">
-<h2 class="section-title">${cs.title}</h2>
+<h2 class="section-title" ${v.edit_mode ? _editable(`custom_sections.${csIdx}.title`) : ''}>${cs.title}</h2>
 ${inner}
 ${em ? `<button class="ce-add-btn" data-add-section="custom_sections.${csIdx}.items">+ Add Item</button>` : ''}
 </section>`;

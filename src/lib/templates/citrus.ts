@@ -322,7 +322,7 @@ ${v.projects.map((p, i) => {
 			].filter(Boolean).join('');
 			return `<article class="project${i === 0 ? ' featured' : ''}"${iw}>${delBtn('projects', i)}${thumb}
 <div class="body">
-<div class="meta-top"><span ${ed(`projects.${i}.project_category`)}>${p.project_category || 'Project'}</span><span>${String(i + 1).padStart(2, '0')}</span></div>
+<div class="meta-top"><span ${ed(`projects.${i}.project_category`)}>${p.project_category}</span><span>${String(i + 1).padStart(2, '0')}</span></div>
 <h3 ${ed(`projects.${i}.title`)}>${p.title}</h3>
 ${p.description ? `<p class="desc" ${ed(`projects.${i}.description`, true)}>${p.description}</p>` : ''}
 ${resp.length ? `<div class="proj-block"><div class="lbl">Responsibilities</div><ul ${led(`projects.${i}.responsibilities`)}>${resp.map((r) => `<li>${r}</li>`).join('')}</ul></div>` : ''}
@@ -343,7 +343,7 @@ ${addBtn('projects', 'Project')}
 <div class="timeline">
 ${v.certifications.map((c, i) => {
 			const nameHtml = c.url ? `<a href="${c.url}" target="_blank" rel="noopener noreferrer">${c.name}</a>` : c.name;
-			return `<div class="row"${iw}>${delBtn('certifications', i)}<div class="year">${c.year ? `<span ${ed(`certifications.${i}.year`)}>${c.year}</span>` : ''}</div><div><h3${!c.url ? ` ${ed(`certifications.${i}.name`)}` : ''}>${nameHtml}</h3>${c.issuer ? `<div class="org" ${ed(`certifications.${i}.issuer`)}>${c.issuer}</div>` : ''}</div><span class="tag-sm">Cert</span></div>`;
+			return `<div class="row"${iw}>${delBtn('certifications', i)}<div class="year">${c.year ? `<span ${ed(`certifications.${i}.year`)}>${c.year}</span>` : ''}</div><div><h3 ${ed(`certifications.${i}.name`)}>${nameHtml}</h3>${c.issuer ? `<div class="org" ${ed(`certifications.${i}.issuer`)}>${c.issuer}</div>` : ''}</div><span class="tag-sm">Cert</span></div>`;
 		}).join('\n')}
 </div>
 ${addBtn('certifications', 'Certification')}
@@ -367,7 +367,7 @@ ${addBtn('achievements', 'Achievement')}
 			const csIw = ` data-item-wrap data-cs-idx="${csIdx}"`;
 			const items = (cs.items ?? []).map((item, i) => `<div class="row"${csIw}>${csDel(i)}<div class="year">${item.subtitle ? `<span ${_editable(`custom_sections.${csIdx}.items.${i}.subtitle`)}>${item.subtitle}</span>` : ''}</div><div>${item.label ? `<h3 ${_editable(`custom_sections.${csIdx}.items.${i}.label`)}>${item.label}</h3>` : ''}${item.value ? `<p ${_editable(`custom_sections.${csIdx}.items.${i}.value`, true)}>${item.value}</p>` : ''}${item.tags?.length ? `<ul ${_listEditable(`custom_sections.${csIdx}.items.${i}.tags`)}>${item.tags.map((t) => `<li>${t}</li>`).join('')}</ul>` : ''}${item.url ? `<div class="links" style="margin-top:10px"><a href="${item.url}" target="_blank" rel="noopener noreferrer">View &#8599;</a></div>` : ''}</div><span class="tag-sm">Item</span></div>`).join('\n');
 			return `<section id="${cs.section_id}"><div class="wrap">
-<div class="section-head"><div><span class="eyebrow">More</span><h2>${cs.title}</h2></div></div>
+<div class="section-head"><div><span class="eyebrow">More</span><h2 ${v.edit_mode ? _editable(`custom_sections.${csIdx}.title`) : ''}>${cs.title}</h2></div></div>
 <div class="timeline">${items}</div>
 ${em ? `<button class="ce-add-btn" data-add-section="custom_sections.${csIdx}.items">+ Add Item</button>` : ''}
 </div></section>`;

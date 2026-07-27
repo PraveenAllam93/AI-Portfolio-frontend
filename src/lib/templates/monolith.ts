@@ -178,7 +178,9 @@ export function html(v: NormalizedData): string {
 
 	const photo = v.profile_image
 		? `<div class="hero-photo-wrap"><img src="${v.profile_image}" alt="${v.name}">${em ? '' : `<div class="ghost ghost-r"><img src="${v.profile_image}" alt=""></div><div class="ghost ghost-b"><img src="${v.profile_image}" alt=""></div>`}</div>`
-		: `<div class="photo-placeholder"><span class="ph-mono">${initials(v.name)}</span><span class="mono">Add a photo</span></div>`;
+		// "Add a photo" is an EDITOR prompt — gated on em so it never ships to the
+		// published site, which would otherwise tell visitors to add a photo.
+		: `<div class="photo-placeholder"><span class="ph-mono">${initials(v.name)}</span>${em ? '<span class="mono">Add a photo</span>' : ''}</div>`;
 
 	const heroHtml = `<section id="hero">
 <div class="hero-image-col" ${_imgUpload('profile.profile_image', em)}>${photo}</div>
@@ -284,7 +286,7 @@ ${addBtn('education', 'Education')}
 <div class="rows">
 ${v.certifications.map((c, i) => {
 			const nameHtml = c.url ? `<a href="${c.url}" target="_blank" rel="noopener noreferrer">${c.name}</a>` : c.name;
-			return `<div class="rrow"${iw}>${delBtn('certifications', i)}<div><div class="cat">${c.year ? `<span ${ed(`certifications.${i}.year`)}>${c.year}</span>` : ''}</div></div><div class="body"><h3${!c.url ? ` ${ed(`certifications.${i}.name`)}` : ''}>${nameHtml}</h3>${c.issuer ? `<div class="org" ${ed(`certifications.${i}.issuer`)}>${c.issuer}</div>` : ''}</div></div>`;
+			return `<div class="rrow"${iw}>${delBtn('certifications', i)}<div><div class="cat">${c.year ? `<span ${ed(`certifications.${i}.year`)}>${c.year}</span>` : ''}</div></div><div class="body"><h3 ${ed(`certifications.${i}.name`)}>${nameHtml}</h3>${c.issuer ? `<div class="org" ${ed(`certifications.${i}.issuer`)}>${c.issuer}</div>` : ''}</div></div>`;
 		}).join('\n')}
 </div>
 ${addBtn('certifications', 'Certification')}
@@ -308,7 +310,7 @@ ${addBtn('achievements', 'Achievement')}
 			const csIw = ` data-item-wrap data-cs-idx="${csIdx}"`;
 			const items = (cs.items ?? []).map((item, i) => `<div class="rrow"${csIw}>${csDel(i)}<div><div class="cat">${item.subtitle ? `<span ${_editable(`custom_sections.${csIdx}.items.${i}.subtitle`)}>${item.subtitle}</span>` : ''}</div></div><div class="body">${item.label ? `<h3 ${_editable(`custom_sections.${csIdx}.items.${i}.label`)}>${item.label}</h3>` : ''}${item.value ? `<p ${_editable(`custom_sections.${csIdx}.items.${i}.value`, true)}>${item.value}</p>` : ''}${item.tags?.length ? `<div class="list" style="margin-top:.9rem" ${_listEditable(`custom_sections.${csIdx}.items.${i}.tags`)}>${item.tags.map((t) => `<span>${t}</span>`).join('')}</div>` : ''}${item.url ? `<div style="margin-top:.9rem"><a href="${item.url}" target="_blank" rel="noopener noreferrer" class="mono" style="color:var(--accent)">View &#8599;</a></div>` : ''}</div></div>`).join('\n');
 			return `<section id="${cs.section_id}" class="section">
-<div class="sec-head"><span class="idx">${idx()}</span><h2>${cs.title}</h2></div>
+<div class="sec-head"><span class="idx">${idx()}</span><h2 ${v.edit_mode ? _editable(`custom_sections.${csIdx}.title`) : ''}>${cs.title}</h2></div>
 <div class="rows">${items}</div>
 ${em ? `<button class="ce-add-btn" data-add-section="custom_sections.${csIdx}.items">+ Add Item</button>` : ''}
 </section>`;

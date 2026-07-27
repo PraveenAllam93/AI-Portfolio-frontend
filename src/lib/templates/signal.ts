@@ -284,7 +284,7 @@ ${aboutStats ? `<div class="about-stats">${aboutStats}</div>` : ''}
 <div class="skills-grid">
 ${v.skill_groups.map((g, gi) => `<div class="skill-cat"${iw}>
 ${delBtn('skills', gi)}
-<div class="skill-cat-title" ${ed(`skills.${gi}.category`)}>${g.category || 'Skills'}</div>
+<div class="skill-cat-title" ${ed(`skills.${gi}.category`)}>${g.category}</div>
 <div class="chip-row" ${le(`skills.${gi}.skills`)}>${g.skills.map(s => `<span class="chip">${s}</span>`).join('')}</div>
 </div>`).join('\n')}
 </div>
@@ -298,11 +298,11 @@ ${addBtn('skills', 'Skill Group')}
 ${v.experience.map((exp, i) => `<div class="exp-card reveal"${iw}>
 ${delBtn('experience', i)}
 <div>
-<div class="exp-duration">${exp.start_date ? `<span ${ed(`experience.${i}.start_date`)}>${exp.start_date}</span>` : (em ? `<span ${ed(`experience.${i}.start_date`)}>Start</span>` : '')}${(exp.start_date && exp.end_date) ? ' — ' : ''}${exp.end_date ? `<span ${ed(`experience.${i}.end_date`)}>${exp.end_date}</span>` : (em ? `<span ${ed(`experience.${i}.end_date`)}>End</span>` : '')}</div>
+<div class="exp-duration">${exp.start_date ? `<span ${ed(`experience.${i}.start_date`)}>${exp.start_date}</span>` : ''}${(exp.start_date && exp.end_date) ? ' — ' : ''}${exp.end_date ? `<span ${ed(`experience.${i}.end_date`)}>${exp.end_date}</span>` : ''}</div>
 ${exp.is_current ? `<span class="exp-current">Current</span>` : ''}
 </div>
 <div>
-<div class="exp-title" ${ed(`experience.${i}.role`)}>${exp.role || 'Role'}</div>
+<div class="exp-title" ${ed(`experience.${i}.role`)}>${exp.role || (em ? 'Role' : '')}</div>
 ${exp.company ? `<div class="exp-company" ${ed(`experience.${i}.company`)}>${exp.company}</div>` : ''}
 ${exp.location ? `<div class="exp-location" ${ed(`experience.${i}.location`)}>${exp.location}</div>` : ''}
 ${exp.description ? `<div class="exp-summary" ${ed(`experience.${i}.description`, true)}>${exp.description}</div>` : ''}
@@ -323,7 +323,7 @@ ${delBtn('campaigns', i)}
 <div class="camp-strip"></div>
 <div class="camp-body">
 ${c.campaign_type ? `<div class="camp-type" ${ed(`campaigns.${i}.campaign_type`)}>${c.campaign_type}</div>` : ''}
-<div class="camp-name" ${ed(`campaigns.${i}.campaign_name`)}>${c.campaign_name || 'Campaign'}</div>
+<div class="camp-name" ${ed(`campaigns.${i}.campaign_name`)}>${c.campaign_name || (em ? 'Campaign' : '')}</div>
 ${c.budget ? `<div class="camp-budget">Budget: <b ${ed(`campaigns.${i}.budget`)}>${c.budget}</b></div>` : ''}
 ${c.performance_metrics?.length ? `<div class="camp-metrics" ${le(`campaigns.${i}.performance_metrics`)}>${c.performance_metrics.map(m => `<div class="camp-metric">${m}</div>`).join('')}</div>` : ''}
 ${c.channels_used?.length ? `<div class="camp-channels" ${le(`campaigns.${i}.channels_used`)}>${c.channels_used.map(ch => `<span class="chip">${ch}</span>`).join('')}</div>` : ''}
@@ -340,7 +340,7 @@ ${addBtn('campaigns', 'Campaign')}
 <div class="ach-list">
 ${v.achievements.map((a, i) => `<div class="ach-row"${iw}>
 ${delBtn('achievements', i)}
-<div class="ach-year">${a.year ? `<span ${ed(`achievements.${i}.year`)}>${a.year}</span>` : (em ? `<span ${ed(`achievements.${i}.year`)}>Year</span>` : '')}</div>
+<div class="ach-year">${a.year ? `<span ${ed(`achievements.${i}.year`)}>${a.year}</span>` : ''}</div>
 <div><div class="ach-title" ${ed(`achievements.${i}.title`)}>${a.title}</div>${a.description ? `<div class="ach-desc" ${ed(`achievements.${i}.description`, true)}>${a.description}</div>` : ''}</div>
 ${a.url ? `<a href="${a.url}" class="ach-link" target="_blank" rel="noopener noreferrer">View &#8599;</a>` : '<span></span>'}
 </div>`).join('\n')}
@@ -393,7 +393,7 @@ ${item.tags?.length ? `<div class="ci-tags" ${le(`custom_sections.${ci}.items.${
 ${item.url ? `<a href="${item.url}" class="ver-link" target="_blank" rel="noopener noreferrer">View &#8599;</a>` : ''}
 </div>`).join('\n');
 			return `<section class="section" id="${cs.section_id}"><div class="wrap">
-<div class="section-head reveal"><div><div class="section-kicker"><span class="section-num">${nn()}</span><span class="eyebrow-tag">${cs.title}</span></div><h2 class="section-title">${cs.title}</h2></div></div>
+<div class="section-head reveal"><div><div class="section-kicker"><span class="section-num">${nn()}</span><span class="eyebrow-tag" ${v.edit_mode ? _editable(`custom_sections.${ci}.title`) : ''}>${cs.title}</span></div><h2 class="section-title" ${v.edit_mode ? _editable(`custom_sections.${ci}.title`) : ''}>${cs.title}</h2></div></div>
 <div class="mini-grid">${cards}</div>
 ${addBtn(`custom_sections.${ci}.items`, 'Item')}
 </div></section>`;

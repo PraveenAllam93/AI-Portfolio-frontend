@@ -260,11 +260,11 @@ export function html(v: NormalizedData): string {
 
 	// Education years bind to start_year/end_year (form fields), not computed year_range.
 	const eduYears = (i: number, edu: NormalizedData['education'][number]) => {
-		const showS = edu.start_year || em;
-		const showE = edu.end_year || em;
+		const showS = edu.start_year;
+		const showE = edu.end_year;
 		if (!showS && !showE) return '';
-		const s = showS ? `<span ${_editable(`education.${i}.start_year`)}>${edu.start_year || 'Start'}</span>` : '';
-		const e = showE ? `<span ${_editable(`education.${i}.end_year`)}>${edu.end_year || 'End'}</span>` : '';
+		const s = showS ? `<span ${_editable(`education.${i}.start_year`)}>${edu.start_year}</span>` : '';
+		const e = showE ? `<span ${_editable(`education.${i}.end_year`)}>${edu.end_year}</span>` : '';
 		return `${s}${showS && showE ? '–' : ''}${e}`;
 	};
 
@@ -364,7 +364,7 @@ ${v.projects.map((p, i) => {
     <div class="skill-group fade-up delay-1">
 ${(v.skill_groups ?? []).map((g, gi) => `<div class="skill-group-block" data-item-wrap>
       <button class="del-btn ce-del-btn" data-del-section="skills" data-del-index="${gi}">&#x2715;</button>
-      <div class="skill-cat-title" ${_editable(`skills.${gi}.category`)}>${g.category || 'Skills'}</div>
+      <div class="skill-cat-title" ${_editable(`skills.${gi}.category`)}>${g.category}</div>
       <div class="skill-chips" ${_listEditable(`skills.${gi}.skills`)}>${g.skills.map(s => `<span class="skill-chip">${IC.gem}${s}</span>`).join('')}</div>
     </div>`).join('\n')}
       <button class="add-btn ce-add-btn" data-add-section="skills">+ Add Skill Group</button>
@@ -414,7 +414,7 @@ ${v.certifications.map((c, i) => `<div class="cert-card fade-up" data-item-wrap>
   <div class="gen-grid">
 ${v.education.map((edu, i) => `<div class="gen-card fade-up" data-item-wrap>
     <button class="del-btn ce-del-btn" data-del-section="education" data-del-index="${i}">&#x2715;</button>
-    ${(edu.start_year || edu.end_year || em) ? `<div class="gen-year">${eduYears(i, edu)}</div>` : ''}
+    ${(edu.start_year || edu.end_year) ? `<div class="gen-year">${eduYears(i, edu)}</div>` : ''}
     <div class="gen-title">${_pairEditable(`education.${i}.degree`, edu.degree, `education.${i}.field_of_study`, edu.field_of_study, em, ' — ')}</div>
     ${(edu.institution || edu.location) ? `<div class="gen-meta"><span ${_editable(`education.${i}.institution`)}>${edu.institution || ''}</span>${(edu.location) ? `, <span ${_editable(`education.${i}.location`)}>${edu.location || ''}</span>` : ''}</div>` : ''}
     ${edu.grade_or_score ? `<div class="gen-meta" style="margin-top:.3rem" ${_editable(`education.${i}.grade_or_score`)}>${edu.grade_or_score}</div>` : ''}
@@ -464,7 +464,7 @@ ${v.awards.map((a, i) => `<div class="gen-card fade-up" data-item-wrap><button c
   ${item.tags?.length ? `<div class="project-tags" ${_listEditable(`custom_sections.${csIdx}.items.${i}.tags`)}>${item.tags.map(t => `<span class="ptag">${t}</span>`).join('')}</div>` : ''}
   ${item.url ? `<a href="${item.url}" class="plink" target="_blank" rel="noopener noreferrer">View &#8599;</a>` : ''}
 </div>`).join('\n');
-			return `<section class="section section--alt" id="${cs.section_id}"><div class="container"><div class="section-label fade-up">${cs.title}</div><h2 class="section-title fade-up delay-1">${cs.title}</h2><div class="gen-grid"${cs.display_type === 'list' ? ' style="grid-template-columns:1fr"' : ''}>${items}</div>
+			return `<section class="section section--alt" id="${cs.section_id}"><div class="container"><div class="section-label fade-up" ${v.edit_mode ? _editable(`custom_sections.${csIdx}.title`) : ''}>${cs.title}</div><h2 class="section-title fade-up delay-1" ${v.edit_mode ? _editable(`custom_sections.${csIdx}.title`) : ''}>${cs.title}</h2><div class="gen-grid"${cs.display_type === 'list' ? ' style="grid-template-columns:1fr"' : ''}>${items}</div>
 <button class="add-btn ce-add-btn" data-add-section="custom_sections.${csIdx}.items">+ Add Item</button></div></section>`;
 		}).filter(Boolean).join('\n')
 		: '';
@@ -478,7 +478,7 @@ ${v.awards.map((a, i) => `<div class="gen-card fade-up" data-item-wrap><button c
   <div class="gen-grid">
 ${v.experience.map((exp, i) => `<div class="gen-card fade-up" data-item-wrap>
     <button class="del-btn ce-del-btn" data-del-section="experience" data-del-index="${i}">&#x2715;</button>
-    ${(exp.start_date || exp.end_date || em) ? `<div class="gen-year">${_rangeEditable(`experience.${i}.start_date`, exp.start_date, `experience.${i}.end_date`, exp.end_date, em)}</div>` : ''}
+    ${(exp.start_date || exp.end_date) ? `<div class="gen-year">${_rangeEditable(`experience.${i}.start_date`, exp.start_date, `experience.${i}.end_date`, exp.end_date, em)}</div>` : ''}
     <div class="gen-title" ${_editable(`experience.${i}.role`)}>${exp.role || ''}</div>
     ${(exp.company || exp.location) ? `<div class="gen-meta"><span ${_editable(`experience.${i}.company`)}>${exp.company || ''}</span>${(exp.location) ? `, <span ${_editable(`experience.${i}.location`)}>${exp.location || ''}</span>` : ''}</div>` : ''}
     ${exp.description ? `<div class="gen-meta" style="margin-top:.5rem" ${_editable(`experience.${i}.description`, true)}>${exp.description}</div>` : ''}

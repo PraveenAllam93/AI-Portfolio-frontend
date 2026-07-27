@@ -295,8 +295,8 @@ ${v.experience.map((exp, i) => `<div class="timeline-item reveal"${iw}>
 ${delBtn('experience', i)}
 <div class="timeline-marker"><div class="timeline-dot"></div>${i < v.experience.length - 1 ? '<div class="timeline-line"></div>' : ''}</div>
 <div class="timeline-content">
-<div class="timeline-year">${exp.start_date ? `<span ${ed(`experience.${i}.start_date`)}>${exp.start_date}</span>` : (em ? `<span ${ed(`experience.${i}.start_date`)}>Start</span>` : '')}${(exp.start_date && exp.end_date) ? ' – ' : ''}${exp.end_date ? `<span ${ed(`experience.${i}.end_date`)}>${exp.end_date}</span>` : (em ? `<span ${ed(`experience.${i}.end_date`)}>End</span>` : '')}</div>
-<div class="timeline-title" ${ed(`experience.${i}.role`)}>${exp.role || 'Role'}</div>
+<div class="timeline-year">${exp.start_date ? `<span ${ed(`experience.${i}.start_date`)}>${exp.start_date}</span>` : ''}${(exp.start_date && exp.end_date) ? ' – ' : ''}${exp.end_date ? `<span ${ed(`experience.${i}.end_date`)}>${exp.end_date}</span>` : ''}</div>
+<div class="timeline-title" ${ed(`experience.${i}.role`)}>${exp.role || (em ? 'Role' : '')}</div>
 ${exp.company ? `<div class="timeline-company"><span ${ed(`experience.${i}.company`)}>${exp.company}</span>${exp.location ? ` · <span ${ed(`experience.${i}.location`)}>${exp.location}</span>` : ''}</div>` : ''}
 ${exp.description ? `<div class="timeline-desc" ${ed(`experience.${i}.description`, true)}>${exp.description}</div>` : ''}
 ${exp.channels_managed?.length ? `<div class="timeline-chips" ${le(`experience.${i}.channels_managed`)}>${exp.channels_managed.map(c => `<span class="tchip">${c}</span>`).join('')}</div>` : ''}
@@ -316,7 +316,7 @@ ${addBtn('experience', 'Experience')}
 ${v.skill_groups.map((g, gi) => `<div class="exp-card reveal"${iw}>
 ${delBtn('skills', gi)}
 <div class="exp-icon">${EXP_ICONS[gi % EXP_ICONS.length]}</div>
-<div class="exp-title" ${ed(`skills.${gi}.category`)}>${g.category || 'Skills'}</div>
+<div class="exp-title" ${ed(`skills.${gi}.category`)}>${g.category}</div>
 <div class="exp-chips" ${le(`skills.${gi}.skills`)}>${g.skills.map(s => `<span class="echip">${s}</span>`).join('')}</div>
 </div>`).join('\n')}
 </div>
@@ -332,8 +332,8 @@ ${addBtn('skills', 'Skill Group')}
 ${(v.campaigns ?? []).map((c, i) => `<div class="case-card reveal"${iw}>
 ${delBtn('campaigns', i)}
 <div>
-${c.campaign_type ? `<div class="case-tag" ${ed(`campaigns.${i}.campaign_type`)}>${c.campaign_type}</div>` : '<div class="case-tag">Campaign</div>'}
-<div class="case-title" ${ed(`campaigns.${i}.campaign_name`)}>${c.campaign_name || 'Campaign'}</div>
+${c.campaign_type ? `<div class="case-tag" ${ed(`campaigns.${i}.campaign_type`)}>${c.campaign_type}</div>` : ''}
+<div class="case-title" ${ed(`campaigns.${i}.campaign_name`)}>${c.campaign_name || (em ? 'Campaign' : '')}</div>
 ${c.budget ? `<div class="case-budget">Budget: <span ${ed(`campaigns.${i}.budget`)}>${c.budget}</span></div>` : ''}
 ${c.channels_used?.length ? `<div class="case-chips" ${le(`campaigns.${i}.channels_used`)}>${c.channels_used.map(ch => `<span class="tchip">${ch}</span>`).join('')}</div>` : ''}
 </div>
@@ -369,7 +369,7 @@ ${addBtn('achievements', 'Achievement')}
 <div class="card-grid">
 ${v.education.map((edu, i) => `<div class="mkcard reveal"${iw}>
 ${delBtn('education', i)}
-<div class="mkcard-year">${edu.start_year ? `<span ${ed(`education.${i}.start_year`)}>${edu.start_year}</span>` : (em ? `<span ${ed(`education.${i}.start_year`)}>Start</span>` : '')}${(edu.start_year && edu.end_year) ? ' – ' : ''}${edu.end_year ? `<span ${ed(`education.${i}.end_year`)}>${edu.end_year}</span>` : (em ? `<span ${ed(`education.${i}.end_year`)}>End</span>` : '')}</div>
+<div class="mkcard-year">${edu.start_year ? `<span ${ed(`education.${i}.start_year`)}>${edu.start_year}</span>` : ''}${(edu.start_year && edu.end_year) ? ' – ' : ''}${edu.end_year ? `<span ${ed(`education.${i}.end_year`)}>${edu.end_year}</span>` : ''}</div>
 <div class="mkcard-title">${_pairEditable(`education.${i}.degree`, edu.degree, `education.${i}.field_of_study`, edu.field_of_study, em, ' — ')}</div>
 ${edu.institution ? `<div class="mkcard-meta"><span ${ed(`education.${i}.institution`)}>${edu.institution}</span>${edu.location ? ` · <span ${ed(`education.${i}.location`)}>${edu.location}</span>` : ''}</div>` : ''}
 ${edu.grade_or_score ? `<span class="mkcard-badge" ${ed(`education.${i}.grade_or_score`)}>${edu.grade_or_score}</span>` : ''}
@@ -408,8 +408,8 @@ ${item.tags?.length ? `<div class="mkcard-chips" ${le(`custom_sections.${ci}.ite
 ${item.url ? `<a href="${item.url}" class="mkcard-link" target="_blank" rel="noopener noreferrer">View &#8599;</a>` : ''}
 </div>`).join('\n');
 			return `<section id="${cs.section_id}">
-<div class="section-eyebrow reveal">${cs.title}</div>
-<h2 class="section-heading reveal">${cs.title}</h2>
+<div class="section-eyebrow reveal" ${v.edit_mode ? _editable(`custom_sections.${ci}.title`) : ''}>${cs.title}</div>
+<h2 class="section-heading reveal" ${v.edit_mode ? _editable(`custom_sections.${ci}.title`) : ''}>${cs.title}</h2>
 <div class="card-grid">${cards}</div>
 ${addBtn(`custom_sections.${ci}.items`, 'Item')}
 </section>`;
@@ -455,10 +455,10 @@ ${v.email ? `<li><a href="mailto:${v.email}" class="nav-cta">Let's Talk</a></li>
 
 <section class="hero" id="hero">
 <div class="hero-left reveal">
-<div class="hero-eyebrow"><span class="dot"></span> ${v.profile_headline ? `<span ${ed('profile.headline')}>${v.profile_headline}</span>` : 'Growth Marketing'}</div>
+<div class="hero-eyebrow"><span class="dot"></span> ${v.profile_headline ? `<span ${ed('profile.headline')}>${v.profile_headline}</span>` : ''}</div>
 <h1 ${ed('profile.full_name')}>${heroName}</h1>
 ${v.headline ? `<p class="hero-sub" ${ed('portfolio.headline')}>${v.headline}</p>` : ''}
-${v.bio ? `<p class="hero-sub" ${ed('portfolio.bio', true)}>${v.bio.slice(0, 220)}${v.bio.length > 220 ? '…' : ''}</p>` : ''}
+${v.bio ? `<p class="hero-sub" ${ed('portfolio.bio', true)}>${v.bio}</p>` : ''}
 <div class="hero-actions">
 <a href="#campaigns" class="btn-primary">View Case Studies &#8595;</a>
 <a href="#contact" class="btn-secondary">Start a Conversation</a>
@@ -506,7 +506,7 @@ function allExpertise(v: NormalizedData, em: boolean, ed: (p: string, m?: boolea
 	if (!v.skill_groups?.length) return '';
 	return `<div style="display:flex;flex-direction:column;gap:14px">
 ${v.skill_groups.slice(0, 4).map((g, gi) => `<div class="exp-card">
-<div class="exp-title">${g.category || 'Skills'}</div>
+<div class="exp-title">${g.category}</div>
 <div class="exp-chips">${g.skills.slice(0, 8).map(s => `<span class="echip">${s}</span>`).join('')}</div>
 </div>`).join('\n')}
 </div>`;

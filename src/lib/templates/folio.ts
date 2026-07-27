@@ -237,17 +237,17 @@ export function html(v: NormalizedData): string {
 		: `<em>${v.name}</em>`;
 
 	const eduYears = (i: number, edu: NormalizedData['education'][number]) => {
-		const s = edu.start_year || em, e = edu.end_year || em;
+		const s = edu.start_year, e = edu.end_year;
 		if (!s && !e) return '';
-		const a = s ? `<span ${ed(`education.${i}.start_year`)}>${edu.start_year || 'Start'}</span>` : '';
-		const b = e ? `<span ${ed(`education.${i}.end_year`)}>${edu.end_year || 'End'}</span>` : '';
+		const a = s ? `<span ${ed(`education.${i}.start_year`)}>${edu.start_year}</span>` : '';
+		const b = e ? `<span ${ed(`education.${i}.end_year`)}>${edu.end_year}</span>` : '';
 		return `${a}${s && e ? ' — ' : ''}${b}`;
 	};
 	const expPeriod = (i: number, exp: NormalizedData['experience'][number]) => {
-		const s = exp.start_date || em, e = exp.end_date || em;
+		const s = exp.start_date, e = exp.end_date;
 		if (!s && !e) return '';
-		const a = s ? `<span ${ed(`experience.${i}.start_date`)}>${exp.start_date || 'Start'}</span>` : '';
-		const b = e ? `<span ${ed(`experience.${i}.end_date`)}>${exp.end_date || 'End'}</span>` : '';
+		const a = s ? `<span ${ed(`experience.${i}.start_date`)}>${exp.start_date}</span>` : '';
+		const b = e ? `<span ${ed(`experience.${i}.end_date`)}>${exp.end_date}</span>` : '';
 		return `${a}${s && e ? ' — ' : ''}${b}`;
 	};
 
@@ -258,7 +258,7 @@ export function html(v: NormalizedData): string {
 ${v.projects.map((p, i) => `<div class="work-card reveal"${iw}>
 ${delBtn('projects', i)}
 <div class="work-thumb" ${_imgUpload(`projects.${i}.images`, em, 'Upload image')}>${p.images?.[0] ? `<img src="${p.images[0]}" alt="${p.title}">` : `<div class="work-thumb-ph">${initials}</div>`}</div>
-<div class="work-meta"><div class="work-name" ${ed(`projects.${i}.title`)}>${p.title || 'Project'}</div>${p.project_category ? `<div class="work-cat" ${ed(`projects.${i}.project_category`)}>${p.project_category}</div>` : ''}</div>
+<div class="work-meta"><div class="work-name" ${ed(`projects.${i}.title`)}>${p.title || (em ? 'Project' : '')}</div>${p.project_category ? `<div class="work-cat" ${ed(`projects.${i}.project_category`)}>${p.project_category}</div>` : ''}</div>
 ${p.description ? `<p class="work-desc" ${ed(`projects.${i}.description`, true)}>${p.description}</p>` : ''}
 ${p.responsibilities?.length ? `<ul class="proj-pts" ${le(`projects.${i}.responsibilities`)}>${p.responsibilities.map(r => `<li>${r}</li>`).join('')}</ul>` : ''}
 ${p.measurable_outcomes?.length ? `<ul class="proj-pts" ${le(`projects.${i}.measurable_outcomes`)}>${p.measurable_outcomes.map(o => `<li>${o}</li>`).join('')}</ul>` : ''}
@@ -278,7 +278,7 @@ ${v.skill_groups.map((g, gi) => `<div class="service-card reveal"${iw}>
 ${delBtn('skills', gi)}
 <span class="service-num">${String(gi + 1).padStart(2, '0')}</span>
 <div class="service-icon">${SVC_ICONS[gi % SVC_ICONS.length]}</div>
-<div class="service-title" ${ed(`skills.${gi}.category`)}>${g.category || 'Skills'}</div>
+<div class="service-title" ${ed(`skills.${gi}.category`)}>${g.category}</div>
 <div class="service-tags" ${le(`skills.${gi}.skills`)}>${g.skills.map(s => `<span class="svc-tag">${s}</span>`).join('')}</div>
 </div>`).join('\n')}
 </div>
@@ -298,7 +298,7 @@ ${addBtn('skills', 'Skill Group')}
 ${v.experience.map((exp, i) => `<div class="t-item reveal"${iw}>
 ${delBtn('experience', i)}
 <span class="t-year">${expPeriod(i, exp)}</span>
-<div class="t-title" ${ed(`experience.${i}.role`)}>${exp.role || 'Role'}</div>
+<div class="t-title" ${ed(`experience.${i}.role`)}>${exp.role || (em ? 'Role' : '')}</div>
 ${(exp.company || exp.location) ? `<div class="t-sub">${exp.company ? `<span ${ed(`experience.${i}.company`)}>${exp.company}</span>` : ''}${exp.company && exp.location ? ' · ' : ''}${exp.location ? `<span ${ed(`experience.${i}.location`)}>${exp.location}</span>` : ''}</div>` : ''}
 ${exp.description ? `<div class="t-desc" ${ed(`experience.${i}.description`, true)}>${exp.description}</div>` : ''}
 ${exp.key_points?.length ? `<ul class="t-kps" ${le(`experience.${i}.key_points`)}>${exp.key_points.map(k => `<li class="t-kp">${k}</li>`).join('')}</ul>` : ''}
@@ -383,7 +383,7 @@ ${item.value ? `<div class="d-card-desc" ${ed(`custom_sections.${ci}.items.${i}.
 ${item.tags?.length ? `<div class="cs-tags" ${le(`custom_sections.${ci}.items.${i}.tags`)}>${item.tags.map(t => `<span class="svc-tag">${t}</span>`).join('')}</div>` : ''}
 ${item.url ? `<a href="${item.url}" class="d-card-link" target="_blank" rel="noopener noreferrer">View &#8599;</a>` : ''}
 </div>`).join('\n');
-			return `<section id="${cs.section_id}"><div class="section-head reveal"><span class="eyebrow">${cs.title}</span><h2 class="section-title">${cs.title}</h2></div>
+			return `<section id="${cs.section_id}"><div class="section-head reveal"><span class="eyebrow" ${v.edit_mode ? _editable(`custom_sections.${ci}.title`) : ''}>${cs.title}</span><h2 class="section-title" ${v.edit_mode ? _editable(`custom_sections.${ci}.title`) : ''}>${cs.title}</h2></div>
 <div class="card-grid">${cards}</div>
 ${addBtn(`custom_sections.${ci}.items`, 'Item')}
 </section>`;
@@ -441,7 +441,7 @@ ${addBtn(`custom_sections.${ci}.items`, 'Item')}
 <div class="brand-mark"><span>Portfolio ${new Date().getFullYear()}</span><span class="status-dot"></span></div>
 <div class="avatar-wrap" ${_imgUpload('profile.profile_image', em)}>${v.profile_image ? `<img src="${v.profile_image}" alt="${v.name}">` : `<div class="avatar-ph">${initials}</div>`}</div>
 <div class="id-name" ${ed('profile.full_name')}>${v.name}</div>
-<div class="id-role">${v.profile_headline ? `<span ${ed('profile.headline')}>${v.profile_headline}</span>` : (v.headline ? `<span ${ed('portfolio.headline')}>${v.headline}</span>` : 'Designer')}</div>
+<div class="id-role">${v.profile_headline ? `<span ${ed('profile.headline')}>${v.profile_headline}</span>` : (v.headline ? `<span ${ed('portfolio.headline')}>${v.headline}</span>` : '')}</div>
 <nav class="side-nav">
 <a href="#home"><span class="num">00</span> Home</a>
 <a href="#about"><span class="num">01</span> About</a>
@@ -459,7 +459,7 @@ ${v.location ? `<div class="side-loc" ${ed('profile.location')}>${v.location}</d
 <section id="home">
 <div class="hero-grid">
 <div class="hero-text">
-<div class="eyebrow">${v.profile_headline ? `<span ${ed('profile.headline')}>${v.profile_headline}</span>` : 'Design & Craft'}</div>
+<div class="eyebrow">${v.profile_headline ? `<span ${ed('profile.headline')}>${v.profile_headline}</span>` : ''}</div>
 <h1 class="hero-title" ${ed('profile.full_name')}>${heroTitle}</h1>
 ${v.bio ? `<p class="hero-desc" ${ed('portfolio.bio', true)}>${v.bio}</p>` : ''}
 <div class="hero-cta">

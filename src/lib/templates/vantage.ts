@@ -294,7 +294,7 @@ export function html(v: NormalizedData): string {
 	const kpiRow = kpis.join('<div class="kpi-divider"></div>');
 
 	// ABOUT
-	const highlights = (v.skill_groups ?? []).slice(0, 4).map(g => `<div class="highlight-item"><div class="highlight-dot"></div><div class="highlight-text"><strong>${g.category || 'Expertise'}</strong><small>${g.skills.slice(0, 2).join(' · ')}</small></div></div>`).join('');
+	const highlights = (v.skill_groups ?? []).slice(0, 4).map(g => `<div class="highlight-item"><div class="highlight-dot"></div><div class="highlight-text"><strong>${g.category}</strong><small>${g.skills.slice(0, 2).join(' · ')}</small></div></div>`).join('');
 	const aboutHtml = (v.bio || v.uniqueValue)
 		? `<section id="about" class="bg-surface"><div class="about-grid">
 <div class="about-visual reveal">
@@ -317,7 +317,7 @@ ${highlights ? `<div class="about-highlights">${highlights}</div>` : ''}
 ${v.skill_groups.map((g, gi) => `<div class="expertise-card reveal"${iw}>
 ${delBtn('skills', gi)}
 <div class="card-icon">${CARD_ICONS[gi % CARD_ICONS.length]}</div>
-<div class="card-title" ${ed(`skills.${gi}.category`)}>${g.category || 'Skills'}</div>
+<div class="card-title" ${ed(`skills.${gi}.category`)}>${g.category}</div>
 <div class="card-chips" ${le(`skills.${gi}.skills`)}>${g.skills.map(s => `<span class="gchip">${s}</span>`).join('')}</div>
 </div>`).join('\n')}
 </div>
@@ -332,8 +332,8 @@ ${v.experience.map((exp, i) => `<div class="timeline-item reveal"${iw}>
 ${delBtn('experience', i)}
 <div class="t-dot">${CARD_ICONS[i % CARD_ICONS.length]}</div>
 <div class="t-content">
-<div class="t-step">${exp.start_date ? `<span ${ed(`experience.${i}.start_date`)}>${exp.start_date}</span>` : (em ? `<span ${ed(`experience.${i}.start_date`)}>Start</span>` : '')}${(exp.start_date && exp.end_date) ? ' — ' : ''}${exp.end_date ? `<span ${ed(`experience.${i}.end_date`)}>${exp.end_date}</span>` : (em ? `<span ${ed(`experience.${i}.end_date`)}>End</span>` : '')}</div>
-<div class="t-title" ${ed(`experience.${i}.role`)}>${exp.role || 'Role'}</div>
+<div class="t-step">${exp.start_date ? `<span ${ed(`experience.${i}.start_date`)}>${exp.start_date}</span>` : ''}${(exp.start_date && exp.end_date) ? ' — ' : ''}${exp.end_date ? `<span ${ed(`experience.${i}.end_date`)}>${exp.end_date}</span>` : ''}</div>
+<div class="t-title" ${ed(`experience.${i}.role`)}>${exp.role || (em ? 'Role' : '')}</div>
 ${exp.company ? `<div class="t-company"><span ${ed(`experience.${i}.company`)}>${exp.company}</span>${exp.location ? ` · <span ${ed(`experience.${i}.location`)}>${exp.location}</span>` : ''}</div>` : ''}
 ${exp.description ? `<div class="t-desc" ${ed(`experience.${i}.description`, true)}>${exp.description}</div>` : ''}
 ${exp.key_points?.length ? `<div class="t-metrics" ${le(`experience.${i}.key_points`)}>${exp.key_points.map(k => `<div class="t-metric">${k}</div>`).join('')}</div>` : ''}
@@ -352,8 +352,8 @@ ${(v.campaigns ?? []).map((c, i) => `<div class="campaign-card reveal"${iw}>
 ${delBtn('campaigns', i)}
 <div class="campaign-visual cp${i % 4}">${(c.campaign_name || '?').slice(0, 2).toUpperCase()}${c.campaign_type ? `<div class="campaign-badge" ${ed(`campaigns.${i}.campaign_type`)}>${c.campaign_type}</div>` : ''}</div>
 <div class="campaign-content">
-<div class="campaign-meta"><span class="campaign-client">${c.budget ? `Budget <span ${ed(`campaigns.${i}.budget`)}>${c.budget}</span>` : 'Campaign'}</span></div>
-<div class="campaign-name" ${ed(`campaigns.${i}.campaign_name`)}>${c.campaign_name || 'Campaign'}</div>
+<div class="campaign-meta"><span class="campaign-client">${c.budget ? `Budget <span ${ed(`campaigns.${i}.budget`)}>${c.budget}</span>` : ''}</span></div>
+<div class="campaign-name" ${ed(`campaigns.${i}.campaign_name`)}>${c.campaign_name || (em ? 'Campaign' : '')}</div>
 ${c.performance_metrics?.length ? `<div class="campaign-metrics" ${le(`campaigns.${i}.performance_metrics`)}>${c.performance_metrics.map(m => `<div class="campaign-metric">${m}</div>`).join('')}</div>` : ''}
 ${c.channels_used?.length ? `<div class="campaign-channels" ${le(`campaigns.${i}.channels_used`)}>${c.channels_used.map(ch => `<span class="gchip">${ch}</span>`).join('')}</div>` : ''}
 </div>
@@ -384,7 +384,7 @@ ${addBtn('achievements', 'Achievement')}
 <div class="mini-grid">
 ${v.education.map((edu, i) => `<div class="mini-card reveal"${iw}>
 ${delBtn('education', i)}
-<div class="mini-year">${edu.start_year ? `<span ${ed(`education.${i}.start_year`)}>${edu.start_year}</span>` : (em ? `<span ${ed(`education.${i}.start_year`)}>Start</span>` : '')}${(edu.start_year && edu.end_year) ? ' – ' : ''}${edu.end_year ? `<span ${ed(`education.${i}.end_year`)}>${edu.end_year}</span>` : (em ? `<span ${ed(`education.${i}.end_year`)}>End</span>` : '')}</div>
+<div class="mini-year">${edu.start_year ? `<span ${ed(`education.${i}.start_year`)}>${edu.start_year}</span>` : ''}${(edu.start_year && edu.end_year) ? ' – ' : ''}${edu.end_year ? `<span ${ed(`education.${i}.end_year`)}>${edu.end_year}</span>` : ''}</div>
 <div class="mini-title">${_pairEditable(`education.${i}.degree`, edu.degree, `education.${i}.field_of_study`, edu.field_of_study, em, ' — ')}</div>
 ${edu.institution ? `<div class="mini-meta"><span ${ed(`education.${i}.institution`)}>${edu.institution}</span>${edu.location ? ` · <span ${ed(`education.${i}.location`)}>${edu.location}</span>` : ''}</div>` : ''}
 ${edu.grade_or_score ? `<span class="mini-badge" ${ed(`education.${i}.grade_or_score`)}>${edu.grade_or_score}</span>` : ''}
@@ -420,7 +420,7 @@ ${item.value ? `<div class="mini-meta" ${ed(`custom_sections.${ci}.items.${i}.va
 ${item.tags?.length ? `<div class="mini-chips" ${le(`custom_sections.${ci}.items.${i}.tags`)}>${item.tags.map(t => `<span class="gchip">${t}</span>`).join('')}</div>` : ''}
 ${item.url ? `<a href="${item.url}" class="mini-link" target="_blank" rel="noopener noreferrer">View &#8599;</a>` : ''}
 </div>`).join('\n');
-			return `<section id="${cs.section_id}"><div class="section-eyebrow reveal">${cs.title}</div><h2 class="section-title reveal">${cs.title}</h2>
+			return `<section id="${cs.section_id}"><div class="section-eyebrow reveal" ${v.edit_mode ? _editable(`custom_sections.${ci}.title`) : ''}>${cs.title}</div><h2 class="section-title reveal" ${v.edit_mode ? _editable(`custom_sections.${ci}.title`) : ''}>${cs.title}</h2>
 <div class="mini-grid">${cards}</div>
 ${addBtn(`custom_sections.${ci}.items`, 'Item')}
 </section>`;
@@ -464,7 +464,9 @@ ${addBtn(`custom_sections.${ci}.items`, 'Item')}
 <body>
 ${cursorMarkup}
 <nav>
-<div class="nav-logo" ${ed('profile.full_name')}>${v.name.split(' ')[0]}<span>.</span></div>
+<!-- Derived first-name mark — see bloom.ts: binding it to profile.full_name
+     would save the truncated "Kunal." back over the real name. -->
+<div class="nav-logo">${v.name.split(' ')[0]}<span>.</span></div>
 <div class="nav-links">
 <a href="#about">About</a>
 <a href="#skills">Expertise</a>
@@ -482,10 +484,10 @@ ${v.email ? `<a href="mailto:${v.email}" class="btn-hire">Hire Me</a>` : ''}
 <div class="hero-gridlines"></div>
 <div class="hero-inner">
 <div class="hero-copy">
-<div class="hero-eyebrow"><span class="eyebrow-dot"></span><span class="eyebrow-pill">${v.profile_headline ? `<span ${ed('profile.headline')}>${v.profile_headline}</span>` : 'Brand Marketing'}</span></div>
+<div class="hero-eyebrow"><span class="eyebrow-dot"></span><span class="eyebrow-pill">${v.profile_headline ? `<span ${ed('profile.headline')}>${v.profile_headline}</span>` : ''}</span></div>
 <h1 class="hero-title" ${ed('profile.full_name')}>${heroName}</h1>
 ${v.headline ? `<p class="hero-subtitle" ${ed('portfolio.headline')}>${v.headline}</p>` : ''}
-${v.bio && !v.headline ? `<p class="hero-subtitle" ${ed('portfolio.bio', true)}>${v.bio.slice(0, 200)}</p>` : ''}
+${v.bio && !v.headline ? `<p class="hero-subtitle" ${ed('portfolio.bio', true)}>${v.bio}</p>` : ''}
 <div class="hero-actions">
 <a href="#campaigns" class="btn-primary">View Work</a>
 <a href="#contact" class="btn-secondary">Get in Touch</a>
@@ -503,7 +505,7 @@ ${orderedSections}
 ${contactHtml}
 
 <footer>
-<div class="footer-logo" ${ed('profile.full_name')}>${v.name}<span>.</span></div>
+<div class="footer-logo"><span ${ed('profile.full_name')}>${v.name}</span><span>.</span></div>
 <div class="footer-copy">&copy; ${new Date().getFullYear()} · ${v.profile_headline || v.headline || 'Marketing Portfolio'}${v.location ? ` · ${v.location}` : ''}</div>
 </footer>
 

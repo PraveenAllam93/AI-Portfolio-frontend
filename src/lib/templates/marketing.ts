@@ -485,8 +485,8 @@ ${item.subtitle ? `<div style="font-size:.8rem;color:var(--rose);flex-shrink:0" 
 		}
 		return `<section id="${cs.section_id}" style="${bg};padding:100px 60px;position:relative;overflow:hidden">
 <div style="max-width:1100px;margin:0 auto">
-<div class="sec-tag-dark reveal">${cs.title}</div>
-<h2 class="sec-heading-dark reveal d1">${cs.title}</h2>
+<div class="sec-tag-dark reveal" ${v.edit_mode ? _editable(`custom_sections.${csIdx}.title`) : ''}>${cs.title}</div>
+<h2 class="sec-heading-dark reveal d1" ${v.edit_mode ? _editable(`custom_sections.${csIdx}.title`) : ''}>${cs.title}</h2>
 ${inner}
 </div>
 </section>`;
@@ -529,10 +529,10 @@ ${v.experience.map((exp, i) => {
 	return `<div class="tl-item reveal"${iw}>
 ${delBtn('experience', i)}
 <div class="tl-dot"></div>
-<div class="tl-period">${exp.start_date ? `<span ${ed(`experience.${i}.start_date`)}>${exp.start_date}</span>` : (em ? `<span ${ed(`experience.${i}.start_date`)}>Start</span>` : '')}${(exp.start_date && exp.end_date) ? ' — ' : ''}${exp.end_date ? `<span ${ed(`experience.${i}.end_date`)}>${exp.end_date}</span>` : (em ? `<span ${ed(`experience.${i}.end_date`)}>End</span>` : '')}</div>
+<div class="tl-period">${exp.start_date ? `<span ${ed(`experience.${i}.start_date`)}>${exp.start_date}</span>` : ''}${(exp.start_date && exp.end_date) ? ' — ' : ''}${exp.end_date ? `<span ${ed(`experience.${i}.end_date`)}>${exp.end_date}</span>` : ''}</div>
 <div>
 ${exp.company ? `<div class="tl-company" ${ed(`experience.${i}.company`)}>${exp.company}</div>` : ''}
-<div class="tl-title" ${ed(`experience.${i}.role`)}>${exp.role || 'Role'}</div>
+<div class="tl-title" ${ed(`experience.${i}.role`)}>${exp.role || (em ? 'Role' : '')}</div>
 ${exp.description ? `<div class="tl-desc" ${ed(`experience.${i}.description`, true)}>${exp.description}</div>` : ''}
 ${exp.channels_managed?.length ? `<div class="tl-chips" ${le(`experience.${i}.channels_managed`)}>${exp.channels_managed.map(c => `<span class="chip">${c}</span>`).join('')}</div>` : ''}
 ${exp.key_points?.length ? `<div class="camp-metrics" ${le(`experience.${i}.key_points`)}>${exp.key_points.map(kp => `<div class="camp-metric">${kp}</div>`).join('')}</div>` : ''}
@@ -555,7 +555,7 @@ ${addBtn('experience', 'Experience')}
 ${v.education.map((edu, i) => `<div class="edu-card reveal"${iw}>
 ${delBtn('education', i)}
 <div class="edu-card-accent"></div>
-<div class="edu-year">${edu.start_year ? `<span ${ed(`education.${i}.start_year`)}>${edu.start_year}</span>` : (em ? `<span ${ed(`education.${i}.start_year`)}>Start</span>` : '')}${(edu.start_year && edu.end_year) ? ' – ' : ''}${edu.end_year ? `<span ${ed(`education.${i}.end_year`)}>${edu.end_year}</span>` : (em ? `<span ${ed(`education.${i}.end_year`)}>End</span>` : '')}</div>
+<div class="edu-year">${edu.start_year ? `<span ${ed(`education.${i}.start_year`)}>${edu.start_year}</span>` : ''}${(edu.start_year && edu.end_year) ? ' – ' : ''}${edu.end_year ? `<span ${ed(`education.${i}.end_year`)}>${edu.end_year}</span>` : ''}</div>
 <div class="edu-degree">${_pairEditable(`education.${i}.degree`, edu.degree, `education.${i}.field_of_study`, edu.field_of_study, em, ' — ')}</div>
 <div class="edu-school" ${ed(`education.${i}.institution`)}>${edu.institution}</div>
 ${edu.grade_or_score ? `<span class="edu-badge-pill" ${ed(`education.${i}.grade_or_score`)}>${edu.grade_or_score}</span>` : ''}
@@ -612,7 +612,7 @@ ${(v.campaigns ?? []).map((c, i) => `<div class="camp-card reveal${i > 1 ? ` d${
 ${delBtn('campaigns', i)}
 <div class="camp-stripe"></div>
 ${c.campaign_type ? `<div class="camp-type" ${ed(`campaigns.${i}.campaign_type`)}>${c.campaign_type}</div>` : ''}
-<div class="camp-title" ${ed(`campaigns.${i}.campaign_name`)}>${c.campaign_name || 'Campaign'}</div>
+<div class="camp-title" ${ed(`campaigns.${i}.campaign_name`)}>${c.campaign_name || (em ? 'Campaign' : '')}</div>
 ${c.budget ? `<div class="camp-budget">Budget: <span ${ed(`campaigns.${i}.budget`)}>${c.budget}</span></div>` : ''}
 ${c.channels_used?.length ? `<div class="tl-chips" style="margin-bottom:8px" ${le(`campaigns.${i}.channels_used`)}>${c.channels_used.map(ch => `<span class="chip">${ch}</span>`).join('')}</div>` : ''}
 ${c.performance_metrics?.length ? `<div class="camp-metrics" ${le(`campaigns.${i}.performance_metrics`)}>${c.performance_metrics.map(m => `<div class="camp-metric">${m}</div>`).join('')}</div>` : ''}
@@ -635,7 +635,7 @@ ${delBtn('certifications', i)}
 <div class="cert-year-badge">${c.year ? c.year.toString().slice(-2) : ''}</div>
 <div class="cert-issuer" ${ed(`certifications.${i}.issuer`)}>${c.issuer}</div>
 <div class="cert-name" ${ed(`certifications.${i}.name`)}>${c.name}</div>
-${(c.year || em) ? `<div class="cert-year-text">Certified <span ${ed(`certifications.${i}.year`)}>${c.year || 'Year'}</span></div>` : ''}
+${(c.year || em) ? `<div class="cert-year-text">Certified <span ${ed(`certifications.${i}.year`)}>${c.year}</span></div>` : ''}
 </div>`).join('\n')}
 </div>
 ${addBtn('certifications', 'Certification')}
@@ -812,12 +812,13 @@ ${sideNavHtml}
 <div class="orb hero-orb2"></div>
 <div class="orb hero-orb3"></div>
 <div class="hero-left">
-<div class="hero-eyebrow" ${ed('profile.location')}>${v.location || 'Marketing Strategist'}</div>
-<h1 class="hero-name">
-${v.name.split(' ').map((w, wi) => wi === 0 ? `<span ${ed('profile.full_name')}>${w}</span>` : `<span class="italic">${w}</span>`).join('<br>')}
-</h1>
+${v.location ? `<div class="hero-eyebrow" ${ed('profile.location')}>${v.location}</div>` : ''}
+<!-- The editable must wrap the WHOLE name. Binding only the first word made the
+     rest uneditable AND saved "Kunal" over "Kunal Rao Yadla" on the first edit.
+     <br> reads back as a space in getValue(), so the full name round-trips. -->
+<h1 class="hero-name" ${ed('profile.full_name')}>${v.name.split(' ').map((w, wi) => wi === 0 ? w : `<span class="italic">${w}</span>`).join('<br>')}</h1>
 <div class="hero-divider"></div>
-<p class="hero-tagline" ${ed('portfolio.headline')}>${v.headline || 'Crafting brand narratives that convert audiences into loyal advocates.'}</p>
+${v.headline ? `<p class="hero-tagline" ${ed('portfolio.headline')}>${v.headline}</p>` : (em ? `<p class="hero-tagline" ${ed('portfolio.headline')}>Add a professional headline.</p>` : '')}
 <div class="hero-ctas">
 <a href="#s-contact" class="btn-rose">Let&#8217;s Collaborate</a>
 <a href="#s-exp" class="btn-outline">View Work</a>
@@ -861,13 +862,13 @@ ${showCampaigns ? `<div class="stat-pill p3">
 <div class="orb about-orb2"></div>
 <div class="about-decor reveal">
 <div class="about-monogram">${initials}</div>
-<p class="about-quote-txt" ${ed('portfolio.uniqueValue', true)}>${v.uniqueValue || 'Marketing is no longer about what you make, but the stories you tell.'}</p>
+${v.uniqueValue ? `<p class="about-quote-txt" ${ed('portfolio.uniqueValue', true)}>${v.uniqueValue}</p>` : (em ? `<p class="about-quote-txt" ${ed('portfolio.uniqueValue', true)}>Add your unique value proposition.</p>` : '')}
 </div>
 <div class="about-content">
 <div class="sec-tag reveal">About Me</div>
 <h2 class="sec-heading reveal d1">The Strategy <em>Behind the Story</em></h2>
 <div class="about-text reveal d2">
-<p ${ed('portfolio.bio', true)}>${v.bio || 'Marketing professional with a passion for building brands and driving measurable results.'}</p>
+${v.bio ? `<p ${ed('portfolio.bio', true)}>${v.bio}</p>` : (em ? `<p ${ed('portfolio.bio', true)}>Add a short introduction.</p>` : '')}
 </div>
 ${aboutGridItems.length ? `<div class="about-grid reveal d3">${aboutGridItems.join('')}</div>` : ''}
 </div>
@@ -883,7 +884,10 @@ ${orderedSections}
 <div class="orb ct-orb3"></div>
 <div class="sec-tag ct-tag reveal" style="position:relative;z-index:2;justify-content:center">Get in Touch</div>
 <h2 class="ct-headline reveal d1">Let&#8217;s Build<em>Something Great</em></h2>
-<p class="ct-sub reveal d2" ${ed('portfolio.bio', true)}>${v.bio ? v.bio.slice(0, 120) + '…' : 'Open to strategy consultations, full-time roles, and creative collaborations.'}</p>
+<!-- Must render the FULL bio: this element is bound to portfolio.bio, and the
+     editor saves whatever text it contains. A .slice() here silently truncated
+     the stored bio to 120 chars the moment the user touched it. -->
+${v.bio ? `<p class="ct-sub reveal d2" ${ed('portfolio.bio', true)}>${v.bio}</p>` : ''}
 <div class="ct-links reveal d3">
 ${socialItems.join('\n')}
 </div>

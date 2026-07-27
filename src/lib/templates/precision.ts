@@ -345,21 +345,21 @@ export function html(v: NormalizedData): string {
 
 	// Bind start_date/end_date separately so inline preview edits round-trip with the form.
 	const datePeriod = (i: number, exp: NormalizedData['experience'][number]) => {
-		const showStart = exp.start_date || em;
-		const showEnd = exp.end_date || em;
+		const showStart = exp.start_date;
+		const showEnd = exp.end_date;
 		if (!showStart && !showEnd) return '';
-		const s = showStart ? `<span ${_editable(`experience.${i}.start_date`)}>${exp.start_date || 'Start'}</span>` : '';
-		const e = showEnd ? `<span ${_editable(`experience.${i}.end_date`)}>${exp.end_date || 'End'}</span>` : '';
+		const s = showStart ? `<span ${_editable(`experience.${i}.start_date`)}>${exp.start_date}</span>` : '';
+		const e = showEnd ? `<span ${_editable(`experience.${i}.end_date`)}>${exp.end_date}</span>` : '';
 		return `<span class="eperiod">${s}${showStart && showEnd ? ' — ' : ''}${e}</span>`;
 	};
 
 	// Education years bind to start_year/end_year (form fields), not computed year_range.
 	const eduYears = (i: number, edu: NormalizedData['education'][number]) => {
-		const showS = edu.start_year || em;
-		const showE = edu.end_year || em;
+		const showS = edu.start_year;
+		const showE = edu.end_year;
 		if (!showS && !showE) return '';
-		const s = showS ? `<span ${_editable(`education.${i}.start_year`)}>${edu.start_year || 'Start'}</span>` : '';
-		const e = showE ? `<span ${_editable(`education.${i}.end_year`)}>${edu.end_year || 'End'}</span>` : '';
+		const s = showS ? `<span ${_editable(`education.${i}.start_year`)}>${edu.start_year}</span>` : '';
+		const e = showE ? `<span ${_editable(`education.${i}.end_year`)}>${edu.end_year}</span>` : '';
 		return `${s}${showS && showE ? '–' : ''}${e}`;
 	};
 
@@ -429,7 +429,7 @@ export function html(v: NormalizedData): string {
 	const skillBlocks = (v.skill_groups ?? []).map((g, gi) => `<div class="sblock" data-item-wrap>
   <button class="del-btn ce-del-btn" data-del-section="skills" data-del-index="${gi}">&#x2715;</button>
   <div class="sicon">${SKILL_ICONS[gi % SKILL_ICONS.length]}</div>
-  <div class="scat" ${_editable(`skills.${gi}.category`)}>${g.category || 'Skills'}</div>
+  <div class="scat" ${_editable(`skills.${gi}.category`)}>${g.category}</div>
   <div class="stags" ${_listEditable(`skills.${gi}.skills`)}>${g.skills.map((s) => `<span class="stag">${s}</span>`).join('')}</div>
 </div>`).join('\n');
 	const toolsBlock = (v.software_proficiency?.length || em)
@@ -597,7 +597,7 @@ ${v.awards.map((a, i) => `<div class="gen-card" data-item-wrap><button class="de
 				: cs.display_type === 'list'
 				? `<div class="edu-list reveal">${listItems}</div>`
 				: `<div class="gen-grid reveal">${cardItems}</div>`;
-			return `<section id="${cs.section_id}"><span class="lbl">${cs.title}</span><h2 class="stitle">${cs.title}</h2>${grid}
+			return `<section id="${cs.section_id}"><span class="lbl" ${v.edit_mode ? _editable(`custom_sections.${csIdx}.title`) : ''}>${cs.title}</span><h2 class="stitle" ${v.edit_mode ? _editable(`custom_sections.${csIdx}.title`) : ''}>${cs.title}</h2>${grid}
 <button class="add-btn ce-add-btn" data-add-section="custom_sections.${csIdx}.items">+ Add Item</button></section>
 <div class="divider"></div>`;
 		}).filter(Boolean).join('\n')

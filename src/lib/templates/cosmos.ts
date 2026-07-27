@@ -388,7 +388,10 @@ export function html(v: NormalizedData): string {
 
 	const inits = initials(v.name);
 	const nameParts = v.name.split(' ');
-	const lastName = nameParts.slice(1).join(' ') || nameParts[0];
+	// Empty (not a copy of firstName) for single-word names — the hero binds the
+	// whole <h1> to profile.full_name, so echoing firstName as the last name would
+	// make the editor read back "Solo Solo" and save the duplicate.
+	const lastName = nameParts.slice(1).join(' ');
 	const firstName = nameParts[0];
 
 	// Hero stats — use manual overrides if set, fall back to auto-computed values
@@ -501,7 +504,7 @@ ${thumbImg ? `<img class="proj-thumb-img" src="${thumbImg}" alt="${p.title}">` :
 ${thumbImg ? '' : `<div class="proj-thumb-icon">${iconInitial}</div>`}
 </div>
 <div class="proj-body">
-${p.project_category ? `<div class="proj-category">${p.project_category}</div>` : ''}
+${p.project_category ? `<div class="proj-category" ${_editable(`projects.${i}.project_category`)}>${p.project_category}</div>` : ''}
 <div class="proj-name" ${_editable(`projects.${i}.title`)}>${p.title}</div>
 ${p.description ? `<div class="proj-desc" ${_editable(`projects.${i}.description`, true)}>${p.description}</div>` : ''}
 ${respHtml}
@@ -602,7 +605,7 @@ ${v.certifications.map((c, i) => `<div class="cert-card" data-item-wrap>
 <button class="del-btn ce-del-btn" data-del-section="certifications" data-del-index="${i}">&#x2715;</button>
 <div class="cert-ico">&#10003;</div>
 <div>
-<div class="cert-name"${!c.url ? ` ${_editable(`certifications.${i}.name`)}` : ''}>${c.url ? `<a href="${c.url}" target="_blank" rel="noopener noreferrer">${c.name}</a>` : c.name}</div>
+<div class="cert-name" ${_editable(`certifications.${i}.name`)}>${c.url ? `<a href="${c.url}" target="_blank" rel="noopener noreferrer">${c.name}</a>` : c.name}</div>
 ${c.issuer ? `<div class="cert-issuer" ${_editable(`certifications.${i}.issuer`)}>${c.issuer}</div>` : ''}
 ${c.year ? `<div class="cert-year" ${_editable(`certifications.${i}.year`)}>${c.year}</div>` : ''}
 </div>
@@ -723,8 +726,8 @@ ${item.url ? `<a href="${item.url}" class="proj-link" target="_blank" rel="noope
 				: `<div style="display:flex;flex-direction:column;gap:1.5rem">${items}</div>`;
 			return `<section id="${cs.section_id}">
 <div class="section-wrap"><div class="sw-inner">
-<div class="section-label">${cs.title}</div>
-<h2 class="section-title">${cs.title}</h2>
+<div class="section-label" ${v.edit_mode ? _editable(`custom_sections.${csIdx}.title`) : ''}>${cs.title}</div>
+<h2 class="section-title" ${v.edit_mode ? _editable(`custom_sections.${csIdx}.title`) : ''}>${cs.title}</h2>
 ${grid}
 <button class="ce-add-btn" data-add-section="custom_sections.${csIdx}.items">+ Add Item</button>
 </div></div>
@@ -773,10 +776,10 @@ ${v.email ? `<a href="mailto:${v.email}" class="nav-cta">Hire Me</a>` : ''}
 <section id="hero">
 <div class="hero-inner">
 <div>
-<div class="hero-badge" ${_editable('portfolio.headline')}>${v.headline || 'Software Engineer'}</div>
+${v.headline ? `<div class="hero-badge" ${_editable('portfolio.headline')}>${v.headline}</div>` : ''}
 <h1 class="hero-name" ${_editable('profile.full_name')}>
-<span class="line1">${firstName}</span>
-<span class="line2">${lastName || firstName}</span>
+<span class="line1">${firstName}</span>${lastName ? `
+<span class="line2">${lastName}</span>` : ''}
 </h1>
 ${v.bio ? `<p class="hero-sub" ${_editable('portfolio.bio', true)}>${v.bio}</p>` : ''}
 <div class="hero-btns">

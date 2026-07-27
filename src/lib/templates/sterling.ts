@@ -300,19 +300,19 @@ export function html(v: NormalizedData): string {
 	};
 
 	const datePeriod = (i: number, exp: NormalizedData['experience'][number]) => {
-		const showStart = exp.start_date || em;
-		const showEnd = exp.end_date || em;
+		const showStart = exp.start_date;
+		const showEnd = exp.end_date;
 		if (!showStart && !showEnd) return '';
-		const s = showStart ? `<span ${_editable(`experience.${i}.start_date`)}>${exp.start_date || 'Start'}</span>` : '';
-		const e = showEnd ? `<span ${_editable(`experience.${i}.end_date`)}>${exp.end_date || 'End'}</span>` : '';
+		const s = showStart ? `<span ${_editable(`experience.${i}.start_date`)}>${exp.start_date}</span>` : '';
+		const e = showEnd ? `<span ${_editable(`experience.${i}.end_date`)}>${exp.end_date}</span>` : '';
 		return `<span class="timeline-period">${s}${showStart && showEnd ? ' – ' : ''}${e}</span>`;
 	};
 	const eduYears = (i: number, edu: NormalizedData['education'][number]) => {
-		const showS = edu.start_year || em;
-		const showE = edu.end_year || em;
+		const showS = edu.start_year;
+		const showE = edu.end_year;
 		if (!showS && !showE) return '';
-		const s = showS ? `<span ${_editable(`education.${i}.start_year`)}>${edu.start_year || 'Start'}</span>` : '';
-		const e = showE ? `<span ${_editable(`education.${i}.end_year`)}>${edu.end_year || 'End'}</span>` : '';
+		const s = showS ? `<span ${_editable(`education.${i}.start_year`)}>${edu.start_year}</span>` : '';
+		const e = showE ? `<span ${_editable(`education.${i}.end_year`)}>${edu.end_year}</span>` : '';
 		return `${s}${showS && showE ? ' – ' : ''}${e}`;
 	};
 
@@ -378,7 +378,7 @@ export function html(v: NormalizedData): string {
 ${v.skill_groups.map((g, gi) => `<div class="expertise-card glass fade-in" data-item-wrap>
     <button class="del-btn ce-del-btn" data-del-section="skills" data-del-index="${gi}">&#x2715;</button>
     <div class="expertise-icon">${EXPERTISE_ICONS[gi % EXPERTISE_ICONS.length]}</div>
-    <div class="expertise-name" ${_editable(`skills.${gi}.category`)}>${g.category || 'Expertise'}</div>
+    <div class="expertise-name" ${_editable(`skills.${gi}.category`)}>${g.category}</div>
     <div class="expertise-tags" ${_listEditable(`skills.${gi}.skills`)}>${(g.skills ?? []).map(s => `<span class="expertise-tag">${s}</span>`).join('')}</div>
   </div>`).join('\n')}
   </div>
@@ -526,8 +526,8 @@ ${v.achievements.map((a, i) => `<div class="stat-card glass fade-in" data-item-w
   </div>`).join('\n');
 			return `<section id="${cs.section_id}">
   <div class="section-header center">
-    <div class="section-tag">${cs.title}</div>
-    <h2 class="section-title">${cs.title}</h2>
+    <div class="section-tag" ${v.edit_mode ? _editable(`custom_sections.${ci}.title`) : ''}>${cs.title}</div>
+    <h2 class="section-title" ${v.edit_mode ? _editable(`custom_sections.${ci}.title`) : ''}>${cs.title}</h2>
   </div>
   <div class="stats-grid">${cards}</div>
   <button class="add-btn ce-add-btn" data-add-section="custom_sections.${ci}.items">+ Add Item</button>

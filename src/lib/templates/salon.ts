@@ -179,20 +179,20 @@ export function html(v: NormalizedData): string {
 		: `<em>${v.name}</em>`;
 
 	const eduYears = (i: number, edu: NormalizedData['education'][number]) => {
-		const s = edu.start_year || em, e = edu.end_year || em;
+		const s = edu.start_year, e = edu.end_year;
 		if (!s && !e) return '';
-		const a = s ? `<span ${ed(`education.${i}.start_year`)}>${edu.start_year || 'Start'}</span>` : '';
-		const b = e ? `<span ${ed(`education.${i}.end_year`)}>${edu.end_year || 'End'}</span>` : '';
+		const a = s ? `<span ${ed(`education.${i}.start_year`)}>${edu.start_year}</span>` : '';
+		const b = e ? `<span ${ed(`education.${i}.end_year`)}>${edu.end_year}</span>` : '';
 		return `${a}${s && e ? ' — ' : ''}${b}`;
 	};
 	const expPeriod = (i: number, exp: NormalizedData['experience'][number]) => {
-		const s = exp.start_date || em, e = exp.end_date || em;
+		const s = exp.start_date, e = exp.end_date;
 		if (!s && !e) return '';
-		const a = s ? `<span ${ed(`experience.${i}.start_date`)}>${exp.start_date || 'Start'}</span>` : '';
-		const b = e ? `<span ${ed(`experience.${i}.end_date`)}>${exp.end_date || 'End'}</span>` : '';
+		const a = s ? `<span ${ed(`experience.${i}.start_date`)}>${exp.start_date}</span>` : '';
+		const b = e ? `<span ${ed(`experience.${i}.end_date`)}>${exp.end_date}</span>` : '';
 		return `${a}${s && e ? ' — ' : ''}${b}`;
 	};
-	const shead = (eyebrow: string, title: string) => `<div class="section-header reveal"><span class="eyebrow">${eyebrow}</span><h2>${title}</h2></div>`;
+	const shead = (eyebrow: string, title: string, titleAttr = '') => `<div class="section-header reveal"><span class="eyebrow">${eyebrow}</span><h2 ${titleAttr}>${title}</h2></div>`;
 
 	// PROJECTS
 	const projectsHtml = !hidden.has('projects') && (v.projects?.length || em)
@@ -204,7 +204,7 @@ ${delBtn('projects', i)}
 <div class="lcard-media" ${_imgUpload(`projects.${i}.images`, em, 'Upload image')}>${p.images?.[0] ? `<img src="${p.images[0]}" alt="${p.title}">` : `<div class="lcard-media-ph">${initials}</div>`}</div>
 <div class="lcard-body">
 ${p.project_category ? `<span class="lcard-cat" ${ed(`projects.${i}.project_category`)}>${p.project_category}</span>` : ''}
-<div class="lcard-title" ${ed(`projects.${i}.title`)}>${p.title || 'Project'}</div>
+<div class="lcard-title" ${ed(`projects.${i}.title`)}>${p.title || (em ? 'Project' : '')}</div>
 ${p.description ? `<p class="lcard-desc" ${ed(`projects.${i}.description`, true)}>${p.description}</p>` : ''}
 ${p.responsibilities?.length ? `<ul class="lcard-pts" ${le(`projects.${i}.responsibilities`)}>${p.responsibilities.map(r => `<li>${r}</li>`).join('')}</ul>` : ''}
 ${p.measurable_outcomes?.length ? `<ul class="lcard-pts" ${le(`projects.${i}.measurable_outcomes`)}>${p.measurable_outcomes.map(o => `<li>${o}</li>`).join('')}</ul>` : ''}
@@ -225,7 +225,7 @@ ${shead('Expertise', 'Craft & Services')}
 ${v.skill_groups.map((g, gi) => `<div class="skill-card reveal"${iw}>
 ${delBtn('skills', gi)}
 <div class="skill-icon">${ICONS[gi % ICONS.length]}</div>
-<h3 ${ed(`skills.${gi}.category`)}>${g.category || 'Skills'}</h3>
+<h3 ${ed(`skills.${gi}.category`)}>${g.category}</h3>
 <div class="skill-tags" ${le(`skills.${gi}.skills`)}>${g.skills.map(s => `<span class="ltag">${s}</span>`).join('')}</div>
 </div>`).join('\n')}
 </div>
@@ -247,7 +247,7 @@ ${shead('Journey', 'Career Experience')}
 ${v.experience.map((exp, i) => `<div class="t-item reveal"${iw}>
 ${delBtn('experience', i)}
 <div class="t-year">${expPeriod(i, exp)}</div>
-<div class="t-title" ${ed(`experience.${i}.role`)}>${exp.role || 'Role'}</div>
+<div class="t-title" ${ed(`experience.${i}.role`)}>${exp.role || (em ? 'Role' : '')}</div>
 ${(exp.company || exp.location) ? `<div class="t-sub">${exp.company ? `<span ${ed(`experience.${i}.company`)}>${exp.company}</span>` : ''}${exp.company && exp.location ? ' · ' : ''}${exp.location ? `<span ${ed(`experience.${i}.location`)}>${exp.location}</span>` : ''}</div>` : ''}
 ${exp.description ? `<div class="t-desc" ${ed(`experience.${i}.description`, true)}>${exp.description}</div>` : ''}
 ${exp.key_points?.length ? `<ul class="t-kps" ${le(`experience.${i}.key_points`)}>${exp.key_points.map(k => `<li class="t-kp">${k}</li>`).join('')}</ul>` : ''}
@@ -338,7 +338,7 @@ ${item.tags?.length ? `<div class="skill-tags" style="justify-content:flex-start
 ${item.url ? `<a href="${item.url}" class="lcard-link" target="_blank" rel="noopener noreferrer">View &#8599;</a>` : ''}
 </div>`).join('\n');
 			return `<section id="${cs.section_id}"><div class="container">
-${shead(cs.title, cs.title)}
+${shead(cs.title, cs.title, ed(`custom_sections.${ci}.title`))}
 <div class="card-grid">${cards}</div>
 ${addBtn(`custom_sections.${ci}.items`, 'Item')}
 </div></section>`;
@@ -377,7 +377,8 @@ ${addBtn(`custom_sections.${ci}.items`, 'Item')}
 <body>
 <header>
 <div class="container header-container">
-<a href="#home" class="logo" ${ed('profile.full_name')}>${nameParts[0] || v.name}</a>
+<!-- Derived first-name mark — not bound to profile.full_name (would save only the first word). -->
+<a href="#home" class="logo">${nameParts[0] || v.name}</a>
 <nav><ul class="nav-links">
 <li><a href="#projects">Work</a></li>
 <li><a href="#skills">Expertise</a></li>
@@ -390,7 +391,7 @@ ${addBtn(`custom_sections.${ci}.items`, 'Item')}
 <section class="hero" id="home">
 <div class="container">
 <div class="hero-content">
-<span class="eyebrow">${v.profile_headline ? `<span ${ed('profile.headline')}>${v.profile_headline}</span>` : 'Design & Craft'}</span>
+<span class="eyebrow">${v.profile_headline ? `<span ${ed('profile.headline')}>${v.profile_headline}</span>` : ''}</span>
 <h1 ${ed('profile.full_name')}>${heroName}</h1>
 ${v.headline ? `<p class="subtitle" ${ed('portfolio.headline')}>${v.headline}</p>` : (v.bio ? `<p class="subtitle" ${ed('portfolio.bio', true)}>${v.bio}</p>` : '')}
 <div class="hero-actions">

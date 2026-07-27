@@ -260,7 +260,7 @@ ${item.subtitle ? `<div class="ach-year" ${em ? _editable(`custom_sections.${csI
 		return `<section id="${cs.section_id}" style="background:var(--bg)">
 <div class="section-wrap">
 <div class="section-label">Custom</div>
-<h2 class="section-title">${cs.title}</h2>
+<h2 class="section-title" ${v.edit_mode ? _editable(`custom_sections.${csIdx}.title`) : ''}>${cs.title}</h2>
 ${inner}
 </div>
 </section>`;
@@ -293,7 +293,7 @@ export function html(v: NormalizedData): string {
 ${v.education.map((edu, i) => `<div class="edu-card"${iw}>
 ${delBtn('education', i)}
 ${edu.grade_or_score ? `<div class="edu-gpa" ${ed(`education.${i}.grade_or_score`)}>${edu.grade_or_score}</div>` : ''}
-<div class="edu-year">${edu.start_year ? `<span ${ed(`education.${i}.start_year`)}>${edu.start_year}</span>` : (em ? `<span ${ed(`education.${i}.start_year`)}>Start</span>` : '')}${(edu.start_year && edu.end_year) ? ' – ' : ''}${edu.end_year ? `<span ${ed(`education.${i}.end_year`)}>${edu.end_year}</span>` : (em ? `<span ${ed(`education.${i}.end_year`)}>End</span>` : '')}</div>
+<div class="edu-year">${edu.start_year ? `<span ${ed(`education.${i}.start_year`)}>${edu.start_year}</span>` : ''}${(edu.start_year && edu.end_year) ? ' – ' : ''}${edu.end_year ? `<span ${ed(`education.${i}.end_year`)}>${edu.end_year}</span>` : ''}</div>
 <div class="edu-degree">${_pairEditable(`education.${i}.degree`, edu.degree, `education.${i}.field_of_study`, edu.field_of_study, em, ' — ')}</div>
 <div class="edu-school" ${ed(`education.${i}.institution`)}>${edu.institution}</div>
 </div>`).join('\n')}
@@ -313,13 +313,13 @@ ${addBtn('education', 'Education')}
 ${v.experience.map((exp, i) => `<div class="work-item"${iw}>
 ${delBtn('experience', i)}
 <div class="work-left">
-<div class="work-period">${exp.start_date ? `<span ${ed(`experience.${i}.start_date`)}>${exp.start_date}</span>` : (em ? `<span ${ed(`experience.${i}.start_date`)}>Start</span>` : '')}${(exp.start_date && exp.end_date) ? ' — ' : ''}${exp.end_date ? `<span ${ed(`experience.${i}.end_date`)}>${exp.end_date}</span>` : (em ? `<span ${ed(`experience.${i}.end_date`)}>End</span>` : '')}</div>
+<div class="work-period">${exp.start_date ? `<span ${ed(`experience.${i}.start_date`)}>${exp.start_date}</span>` : ''}${(exp.start_date && exp.end_date) ? ' — ' : ''}${exp.end_date ? `<span ${ed(`experience.${i}.end_date`)}>${exp.end_date}</span>` : ''}</div>
 ${exp.company ? `<div class="work-type" ${ed(`experience.${i}.company`)}>${exp.company}</div>` : ''}
 </div>
 <div class="work-right">
 <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:12px">
 <div>
-<div class="work-role" ${ed(`experience.${i}.role`)}>${exp.role || 'Role'}</div>
+<div class="work-role" ${ed(`experience.${i}.role`)}>${exp.role || (em ? 'Role' : '')}</div>
 ${exp.company ? `<div class="work-company" ${ed(`experience.${i}.company`)}>${exp.company}</div>` : ''}
 </div>
 <div style="width:40px;height:40px;border:1px solid var(--border);border-radius:50%;display:flex;align-items:center;justify-content:center;color:var(--muted);flex-shrink:0">→</div>
@@ -355,8 +355,8 @@ ${p.images?.[0]
 ${p.project_category ? `<span class="case-chip">${p.project_category}</span>` : (p.tech_stack?.[0] ? `<span class="case-chip">${p.tech_stack[0]}</span>` : '')}
 </div>
 <div class="case-body">
-${p.project_category ? `<div class="case-category">${p.project_category}</div>` : ''}
-<div class="case-title" ${ed(`projects.${i}.title`)}>${p.title || 'Project'}</div>
+${p.project_category ? `<div class="case-category" ${ed(`projects.${i}.project_category`)}>${p.project_category}</div>` : ''}
+<div class="case-title" ${ed(`projects.${i}.title`)}>${p.title || (em ? 'Project' : '')}</div>
 ${p.description ? `<p class="case-excerpt" ${ed(`projects.${i}.description`, true)}>${p.description}</p>` : ''}
 <div style="display:flex;align-items:center;justify-content:space-between">
 ${p.tech_stack?.length ? `<div class="work-tags" ${le(`projects.${i}.tech_stack`)}>${p.tech_stack.map(t => `<span class="work-tag">${t}</span>`).join('')}</div>` : '<div></div>'}
@@ -379,7 +379,7 @@ ${addBtn('projects', 'Project')}
 <h2 class="section-title">Skills &amp; <span style="color:var(--accent)">Expertise</span></h2>
 <div class="skills-groups">
 ${v.skill_groups.map((g, gi) => `<div class="skill-group-card">
-<div class="skill-group-name">${g.category}</div>
+<div class="skill-group-name" ${ed(`skills.${gi}.category`)}>${g.category}</div>
 <div class="skill-tags" ${le(`skills.${gi}.skills`)}>${g.skills.map(s => `<span class="skill-tag">${s}</span>`).join('')}</div>
 </div>`).join('\n')}
 </div>
@@ -563,14 +563,14 @@ ${v.email ? `<a href="mailto:${v.email}" class="nav-cta">Hire me</a>` : ''}
 <div class="hero-bg"></div>
 <div class="hero-grid"></div>
 <div class="hero-badge">
-<span ${ed('profile.location')}>${v.location || 'Creative Designer'}</span>
+${v.location ? `<span ${ed('profile.location')}>${v.location}</span>` : ''}
 </div>
 <h1 class="hero-title">
 <span class="line" ${ed('profile.full_name')}>${v.name}</span>
-<span class="line"><em ${ed('portfolio.headline')}>${v.headline || v.profile_headline || 'Designer'}</em> &amp; <span class="acc">Creator</span></span>
+<span class="line">${(v.headline || v.profile_headline) ? `<em ${ed(v.headline ? 'portfolio.headline' : 'profile.headline')}>${v.headline || v.profile_headline}</em> &amp; ` : ''}<span class="acc">Creator</span></span>
 </h1>
 <div class="hero-bottom">
-<p class="hero-desc" ${ed('portfolio.bio', true)}>${v.bio || 'Creative professional building thoughtful digital experiences.'}</p>
+${v.bio ? `<p class="hero-desc" ${ed('portfolio.bio', true)}>${v.bio}</p>` : (em ? `<p class="hero-desc" ${ed('portfolio.bio', true)}>Add a short introduction.</p>` : '')}
 <div class="hero-stats">
 ${statShown(v, 'years_experience', yearsExp) ? `<div class="stat-item">
 <div class="stat-num" ${ed('template_overrides.years_experience')}>${yearsExp}+</div>
@@ -602,7 +602,7 @@ ${orderedSections}
 <h2 class="section-title">Let's <span style="color:var(--accent)">Collaborate</span></h2>
 <div class="contact-wrap">
 <div class="contact-left">
-<p class="contact-intro" ${ed('portfolio.uniqueValue', true)}>${v.uniqueValue || "Let's work together to bring your vision to life."}</p>
+${v.uniqueValue ? `<p class="contact-intro" ${ed('portfolio.uniqueValue', true)}>${v.uniqueValue}</p>` : (em ? `<p class="contact-intro" ${ed('portfolio.uniqueValue', true)}>Add your unique value proposition.</p>` : '')}
 <div class="contact-links">
 ${v.email ? `<a href="mailto:${v.email}" class="contact-link-item">
 <div class="contact-icon">✉</div>

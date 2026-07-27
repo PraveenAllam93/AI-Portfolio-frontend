@@ -293,19 +293,19 @@ export function html(v: NormalizedData): string {
 
 	// Experience date range bound to real start/end fields (never computed duration).
 	const datePeriod = (i: number, exp: NormalizedData['experience'][number]) => {
-		const showStart = exp.start_date || em;
-		const showEnd = exp.end_date || em;
+		const showStart = exp.start_date;
+		const showEnd = exp.end_date;
 		if (!showStart && !showEnd) return '';
-		const s = showStart ? `<span ${_editable(`experience.${i}.start_date`)}>${exp.start_date || 'Start'}</span>` : '';
-		const e = showEnd ? `<span ${_editable(`experience.${i}.end_date`)}>${exp.end_date || 'End'}</span>` : '';
+		const s = showStart ? `<span ${_editable(`experience.${i}.start_date`)}>${exp.start_date}</span>` : '';
+		const e = showEnd ? `<span ${_editable(`experience.${i}.end_date`)}>${exp.end_date}</span>` : '';
 		return `<span class="timeline-date">${s}${showStart && showEnd ? ' – ' : ''}${e}</span>`;
 	};
 	const eduYears = (i: number, edu: NormalizedData['education'][number]) => {
-		const showS = edu.start_year || em;
-		const showE = edu.end_year || em;
+		const showS = edu.start_year;
+		const showE = edu.end_year;
 		if (!showS && !showE) return '';
-		const s = showS ? `<span ${_editable(`education.${i}.start_year`)}>${edu.start_year || 'Start'}</span>` : '';
-		const e = showE ? `<span ${_editable(`education.${i}.end_year`)}>${edu.end_year || 'End'}</span>` : '';
+		const s = showS ? `<span ${_editable(`education.${i}.start_year`)}>${edu.start_year}</span>` : '';
+		const e = showE ? `<span ${_editable(`education.${i}.end_year`)}>${edu.end_year}</span>` : '';
 		return `${s}${showS && showE ? ' – ' : ''}${e}`;
 	};
 
@@ -338,7 +338,7 @@ export function html(v: NormalizedData): string {
 
 	// ABOUT — highlights derived from skill groups (decorative teaser), core-expertise card from categories.
 	const highlights = (v.skill_groups ?? []).slice(0, 4).map(g =>
-		`<div class="highlight-item"><h4>${g.category || 'Expertise'}</h4><p>${(g.skills ?? []).slice(0, 3).join(' · ')}</p></div>`
+		`<div class="highlight-item"><h4>${g.category}</h4><p>${(g.skills ?? []).slice(0, 3).join(' · ')}</p></div>`
 	).join('');
 	const expertiseList = (v.core_expertise?.length ? v.core_expertise : (v.skill_groups ?? []).map(g => g.category).filter(Boolean));
 	const coreCard = expertiseList.length
@@ -361,7 +361,7 @@ export function html(v: NormalizedData): string {
 	const skillCards = (v.skill_groups ?? []).map((g, gi) => `<div class="skill-category reveal ${gi % 3 === 1 ? 'reveal-d1' : gi % 3 === 2 ? 'reveal-d2' : ''}" data-item-wrap>
   <button class="del-btn ce-del-btn" data-del-section="skills" data-del-index="${gi}">&#x2715;</button>
   <div class="skill-cat-icon">${SKILL_ICONS[gi % SKILL_ICONS.length]}</div>
-  <div class="skill-cat-title" ${_editable(`skills.${gi}.category`)}>${g.category || 'Skills'}</div>
+  <div class="skill-cat-title" ${_editable(`skills.${gi}.category`)}>${g.category}</div>
   <div class="skill-tag-wrap" ${_listEditable(`skills.${gi}.skills`)}>${(g.skills ?? []).map(s => `<span class="skill-tag">${s}</span>`).join('')}</div>
 </div>`).join('\n');
 	const toolsCard = (v.software_proficiency?.length || em)
@@ -503,8 +503,8 @@ ${v.achievements.map((a, i) => `<div class="band-card reveal" data-item-wrap>
 </div>`).join('\n');
 			return `<section id="${cs.section_id}" class="band">
   <div class="section-header">
-    <div class="section-eyebrow reveal"><span class="eyebrow-num">&#9679;</span><div class="eyebrow-line"></div><span class="eyebrow-label">${cs.title}</span></div>
-    <h2 class="section-title reveal reveal-d1">${cs.title}</h2>
+    <div class="section-eyebrow reveal"><span class="eyebrow-num">&#9679;</span><div class="eyebrow-line"></div><span class="eyebrow-label" ${v.edit_mode ? _editable(`custom_sections.${ci}.title`) : ''}>${cs.title}</span></div>
+    <h2 class="section-title reveal reveal-d1" ${v.edit_mode ? _editable(`custom_sections.${ci}.title`) : ''}>${cs.title}</h2>
   </div>
   <div class="band-grid">${cards}</div>
   <button class="add-btn ce-add-btn" data-add-section="custom_sections.${ci}.items">+ Add Item</button>

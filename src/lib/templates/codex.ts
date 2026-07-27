@@ -392,6 +392,9 @@ ${v.skill_groups
 <div class="projects-grid">
 ${v.projects
 	.map((p, i) => {
+		// Bind the chip row to whichever field actually supplied it, so clicking it
+		// opens the right list and saving writes back to the right field.
+		const techField = p.tech_stack?.length ? 'tech_stack' : 'software_used';
 		const techSource = p.tech_stack?.length ? p.tech_stack : p.software_used ?? [];
 		const tags = techSource.map((t) => `<span class="tech-tag">${t}</span>`).join('');
 		const links = [
@@ -410,7 +413,7 @@ ${v.projects
 <h3 class="project-title" ${_editable(`projects.${i}.title`)}>${p.title}</h3>
 ${p.description ? `<p class="project-description" ${_editable(`projects.${i}.description`, true)}>${p.description}</p>` : ''}
 ${respHtml}${outHtml}
-${tags ? `<div class="project-tech">${tags}</div>` : ''}
+${tags ? `<div class="project-tech" ${_listEditable(`projects.${i}.${techField}`)}>${tags}</div>` : ''}
 ${links ? `<div class="project-links">${links}</div>` : ''}
 </div>
 </div>`;
@@ -464,7 +467,7 @@ ${v.certifications
 <div class="certification-header">
 <div class="certification-icon">&#127942;</div>
 <div>
-<h3 class="certification-title"${!c.url ? ` ${_editable(`certifications.${i}.name`)}` : ''}>${nameHtml}</h3>
+<h3 class="certification-title" ${_editable(`certifications.${i}.name`)}>${nameHtml}</h3>
 ${c.issuer ? `<p class="certification-issuer" ${_editable(`certifications.${i}.issuer`)}>${c.issuer}</p>` : ''}
 ${c.year ? `<p class="certification-date" ${_editable(`certifications.${i}.year`)}>${c.year}</p>` : ''}
 </div>
@@ -561,7 +564,7 @@ ${item.url ? `<a href="${item.url}" class="project-link" target="_blank" rel="no
 				: `<div class="achievements-grid">${listItems}</div>`;
 			return `<section id="${cs.section_id}" class="section">
 <div class="container">
-<h2 class="section-title">${cs.title}</h2>
+<h2 class="section-title" ${v.edit_mode ? _editable(`custom_sections.${csIdx}.title`) : ''}>${cs.title}</h2>
 ${grid}
 <button class="ce-add-btn" data-add-section="custom_sections.${csIdx}.items">+ Add Item</button>
 </div>

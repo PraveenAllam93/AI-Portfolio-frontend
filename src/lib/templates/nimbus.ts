@@ -324,7 +324,7 @@ ${v.education.map((edu, i) => {
 ${range ? `<div class="card-yr">${range}</div>` : ''}
 <h3>${_pairEditable(`education.${i}.degree`, edu.degree, `education.${i}.field_of_study`, edu.field_of_study, em, ', ')}</h3>
 ${edu.institution ? `<div class="card-sub" ${ed(`education.${i}.institution`)}>${edu.institution}</div>` : ''}
-${edu.grade_or_score ? `<div class="card-grade" ${ed(`education.${i}.grade_or_score`)}>&#9733; ${edu.grade_or_score}</div>` : ''}
+${edu.grade_or_score ? `<div class="card-grade">&#9733; <span ${ed(`education.${i}.grade_or_score`)}>${edu.grade_or_score}</span></div>` : ''}
 </div>`;
 		}).join('\n')}
 </div>
@@ -338,7 +338,7 @@ ${addBtn('education', 'Education')}
 <div class="card-grid">
 ${v.certifications.map((c, i) => {
 			const nameHtml = c.url ? `<a href="${c.url}" target="_blank" rel="noopener noreferrer">${c.name}</a>` : c.name;
-			return `<div class="card${rev}"${iw}>${delBtn('certifications', i)}${c.year ? `<div class="card-yr" ${ed(`certifications.${i}.year`)}>${c.year}</div>` : ''}<h3${!c.url ? ` ${ed(`certifications.${i}.name`)}` : ''}>${nameHtml}</h3>${c.issuer ? `<div class="card-sub" ${ed(`certifications.${i}.issuer`)}>${c.issuer}</div>` : ''}</div>`;
+			return `<div class="card${rev}"${iw}>${delBtn('certifications', i)}${c.year ? `<div class="card-yr" ${ed(`certifications.${i}.year`)}>${c.year}</div>` : ''}<h3 ${ed(`certifications.${i}.name`)}>${nameHtml}</h3>${c.issuer ? `<div class="card-sub" ${ed(`certifications.${i}.issuer`)}>${c.issuer}</div>` : ''}</div>`;
 		}).join('\n')}
 </div>
 ${addBtn('certifications', 'Certification')}
@@ -362,7 +362,7 @@ ${addBtn('achievements', 'Achievement')}
 			const csIw = ` data-item-wrap data-cs-idx="${csIdx}"`;
 			const items = (cs.items ?? []).map((item, i) => `<div class="card"${csIw}>${csDel(i)}${item.subtitle ? `<div class="card-yr" ${_editable(`custom_sections.${csIdx}.items.${i}.subtitle`)}>${item.subtitle}</div>` : ''}${item.label ? `<h3 ${_editable(`custom_sections.${csIdx}.items.${i}.label`)}>${item.label}</h3>` : ''}${item.value ? `<p ${_editable(`custom_sections.${csIdx}.items.${i}.value`, true)}>${item.value}</p>` : ''}${item.tags?.length ? `<div class="tech" ${_listEditable(`custom_sections.${csIdx}.items.${i}.tags`)}>${item.tags.map((t) => `<span>${t}</span>`).join('')}</div>` : ''}${item.url ? `<div class="proj-links" style="margin-top:12px"><a href="${item.url}" target="_blank" rel="noopener noreferrer">View &#8599;</a></div>` : ''}</div>`).join('\n');
 			return `<section id="${cs.section_id}"><div class="container">
-<div class="section-head${rev}"><span class="eyebrow">More</span><h2>${cs.title}</h2></div>
+<div class="section-head${rev}"><span class="eyebrow">More</span><h2 ${v.edit_mode ? _editable(`custom_sections.${csIdx}.title`) : ''}>${cs.title}</h2></div>
 <div class="card-grid">${items}</div>
 ${em ? `<button class="ce-add-btn" data-add-section="custom_sections.${csIdx}.items">+ Add Item</button>` : ''}
 </div></section>`;
