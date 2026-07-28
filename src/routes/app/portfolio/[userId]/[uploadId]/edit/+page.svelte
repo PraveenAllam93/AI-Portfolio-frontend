@@ -7,6 +7,7 @@
 	import AppHeader from '$lib/components/common/AppHeader.svelte';
 	import LoadingState from '$lib/components/common/LoadingState.svelte';
 	import GuestPublishModal from '$lib/components/portfolio/GuestPublishModal.svelte';
+	import ShareMenu from '$lib/components/portfolio/ShareMenu.svelte';
 	import {
 		getPortfolioData,
 		savePortfolioContent,
@@ -21,6 +22,7 @@
 		getAiSuggestions,
 		saveTemplateOverrides,
 		addCustomSection as addCustomSectionApi,
+		listVersions,
 		type LlmSuggestion
 	} from '$lib/services/portfolio';
 	import { dndzone } from 'svelte-dnd-action';
@@ -550,6 +552,21 @@
 	let publishStatus = $state<'idle' | 'publishing' | 'done' | 'error'>('idle');
 	let publishToast = $state('');
 
+	// Public URL of the live portfolio, used by the share menu.
+	// The page has userId + uploadId but not the CloudFront domain (it is a
+	// private env var), so the URL has to come from the server. listVersions
+	// returns it already resolved for the active version.
+	let publishedUrl = $state<string | null>(null);
+	let portfolioIsLive = $state(false);
+
+	async function refreshPublishedUrl() {
+		const result = await listVersions(userId, uploadId);
+		if (!result.ok || !result.data) return;
+		portfolioIsLive = result.data.portfolioIsLive;
+		const active = result.data.versions.find((v) => v.isActive);
+		publishedUrl = active?.portfolioUrl ?? null;
+	}
+
 	// Anonymous "Try for free" guest: Publish opens the account-creation wall
 	// instead of publishing directly. `converting` suppresses the ownership guard
 	// during the brief window where we're authenticated as the real user but the
@@ -975,6 +992,10 @@
 		if (!result.ok || !result.data) {
 			pageError = 'Could not load existing portfolio data. You can still edit and save below.';
 		}
+
+		// Fire-and-forget: the share button appears once this resolves. Failing
+		// to load it must never block the editor.
+		void refreshPublishedUrl();
 
 		const portfolioContent = result.data?.portfolioContent ?? { bio: '', headline: '', uniqueValue: '' };
 		const parsedData = result.data?.parsedData ?? {};
@@ -2171,6 +2192,10 @@
 			publishStatus = 'done';
 			publishToast = 'Portfolio published! Changes are live.';
 			hasUnpublishedChanges = false;
+			// Publishing creates a new active version, so the public URL changes
+			// (…/v4 → …/v5). Re-read it or the share menu would hand out the
+			// previous version's link.
+			void refreshPublishedUrl();
 			setTimeout(() => { publishStatus = 'idle'; publishToast = ''; }, 8000);
 		} else {
 			publishStatus = 'error';
@@ -3074,6 +3099,15 @@
 		<div class="flex flex-shrink-0 items-center gap-2">
 			{#if !isGuest && (publishStatus === 'done' || (!hasUnpublishedChanges && publishStatus === 'idle'))}
 				<span class="hidden rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-600 ring-1 ring-emerald-200 sm:inline">Published ✓</span>
+			{/if}
+			<!-- Only once there is a live, publicly reachable URL: an offline
+			     portfolio 403s at the edge, so a shared link would be dead. -->
+			{#if !isGuest && publishedUrl && portfolioIsLive}
+				<ShareMenu
+					url={publishedUrl}
+					title="{$authStore.user?.name ?? 'My'} — Portfolio"
+					text="Check out my portfolio"
+				/>
 			{/if}
 			{#if isGuest}
 				<button onclick={() => (showGuestPublish = true)} title="Create an account to publish your portfolio live" class="rounded-xl bg-brand px-4 py-2 text-sm font-bold text-white transition-all hover:bg-brand-dark active:scale-95">

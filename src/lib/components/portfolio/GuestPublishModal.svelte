@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { register, confirmEmail, resendConfirmationCode, login } from '$lib/services/auth';
+	import { normalizeUsername, validateUsername } from '$lib/username';
 	import { claimGuestPortfolio } from '$lib/services/guest';
 	import { authStore } from '$lib/stores/auth';
 	import Spinner from '$lib/components/common/Spinner.svelte';
@@ -20,6 +21,7 @@
 	let step = $state<Step>('signup');
 
 	let name = $state('');
+	let username = $state('');
 	let email = $state('');
 	let password = $state('');
 	let code = $state('');
@@ -32,12 +34,24 @@
 		e.preventDefault();
 		if (busy) return;
 		errorMessage = '';
-		if (!name || !email || !password) {
+		if (!name || !username || !email || !password) {
 			errorMessage = 'Please fill in every field.';
 			return;
 		}
+		// The handle becomes this portfolio's public URL, so check the format
+		// before signing up rather than surfacing it as a trigger error.
+		const usernameError = validateUsername(username);
+		if (usernameError) {
+			errorMessage = usernameError;
+			return;
+		}
 		busy = true;
-		const result = await register({ name, email, password });
+		const result = await register({
+			name,
+			username: normalizeUsername(username),
+			email,
+			password
+		});
 		busy = false;
 		if (!result.success) {
 			errorMessage = result.error ?? 'Could not create your account.';
@@ -72,7 +86,7 @@
 	async function loginAndClaim() {
 		step = 'working';
 		workingLabel = 'Signing you in…';
-		const loggedIn = await login({ email, password });
+		const loggedIn = await login({ identifier: email, password });
 		if (!loggedIn.success || !loggedIn.data) {
 			busy = false;
 			step = 'confirm';
@@ -151,6 +165,23 @@
 						placeholder="Your name"
 						class="rounded-xl border border-surface-muted bg-surface-subtle px-4 py-3 text-sm text-ink outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
 					/>
+					<div class="relative">
+						<span
+							class="pointer-events-none absolute top-1/2 left-4 -translate-y-1/2 text-sm text-ink-muted select-none"
+							aria-hidden="true">/u/</span
+						>
+						<input
+							bind:value={username}
+							type="text"
+							autocomplete="username"
+							autocapitalize="none"
+							spellcheck="false"
+							maxlength={30}
+							placeholder="username"
+							aria-label="Username — becomes your public portfolio link"
+							class="w-full rounded-xl border border-surface-muted bg-surface-subtle py-3 pr-4 pl-11 text-sm text-ink outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
+						/>
+					</div>
 					<input
 						bind:value={email}
 						type="email"

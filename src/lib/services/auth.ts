@@ -10,16 +10,20 @@ export interface AuthUser {
 	email: string;
 	/** True for an anonymous "Try for free" guest (not yet a real account). */
 	isGuest?: boolean;
+	/** Public handle used in portfolio URLs. Null for guests. */
+	username: string | null;
 }
 
 export interface SignUpParams {
 	name: string;
+	username: string;
 	email: string;
 	password: string;
 }
 
 export interface LoginParams {
-	email: string;
+	/** Username or email address. */
+	identifier: string;
 	password: string;
 }
 
@@ -39,11 +43,11 @@ async function _errorMessage(res: Response, fallback: string): Promise<string> {
 	}
 }
 
-export async function login({ email, password }: LoginParams): Promise<AuthResult<AuthUser>> {
+export async function login({ identifier, password }: LoginParams): Promise<AuthResult<AuthUser>> {
 	const res = await fetch('/api/auth/login', {
 		method: 'POST',
 		headers: { 'Content-Type': 'application/json' },
-		body: JSON.stringify({ email, password })
+		body: JSON.stringify({ identifier, password })
 	});
 
 	if (!res.ok) {
@@ -56,13 +60,14 @@ export async function login({ email, password }: LoginParams): Promise<AuthResul
 
 export async function register({
 	name,
+	username,
 	email,
 	password
 }: SignUpParams): Promise<AuthResult<{ needsConfirmation: boolean }>> {
 	const res = await fetch('/api/auth/signup', {
 		method: 'POST',
 		headers: { 'Content-Type': 'application/json' },
-		body: JSON.stringify({ name, email, password })
+		body: JSON.stringify({ name, username, email, password })
 	});
 
 	if (!res.ok) {
@@ -71,6 +76,27 @@ export async function register({
 
 	const data = await res.json();
 	return { success: true, data: { needsConfirmation: data.needsConfirmation } };
+}
+
+export interface UsernameCheck {
+	available: boolean;
+	reason: string;
+	/** True when the backend could not be reached and availability is unknown. */
+	unverified?: boolean;
+}
+
+/**
+ * Advisory availability check for the signup form.
+ * The real decision is made server-side when the account is created.
+ */
+export async function checkUsername(username: string): Promise<UsernameCheck> {
+	try {
+		const res = await fetch(`/api/auth/username-check?username=${encodeURIComponent(username)}`);
+		if (!res.ok) return { available: true, reason: '', unverified: true };
+		return await res.json();
+	} catch {
+		return { available: true, reason: '', unverified: true };
+	}
 }
 
 export async function confirmEmail(email: string, code: string): Promise<AuthResult> {
@@ -101,11 +127,12 @@ export async function resendConfirmationCode(email: string): Promise<AuthResult>
 	return { success: true };
 }
 
-export async function forgotPassword(email: string): Promise<AuthResult> {
+/** `identifier` may be a username or an email address. */
+export async function forgotPassword(identifier: string): Promise<AuthResult> {
 	const res = await fetch('/api/auth/forgot-password', {
 		method: 'POST',
 		headers: { 'Content-Type': 'application/json' },
-		body: JSON.stringify({ email })
+		body: JSON.stringify({ identifier })
 	});
 
 	if (!res.ok) {
@@ -115,15 +142,16 @@ export async function forgotPassword(email: string): Promise<AuthResult> {
 	return { success: true };
 }
 
+/** `identifier` may be a username or an email address. */
 export async function resetPassword(
-	email: string,
+	identifier: string,
 	code: string,
 	newPassword: string
 ): Promise<AuthResult> {
 	const res = await fetch('/api/auth/reset-password', {
 		method: 'POST',
 		headers: { 'Content-Type': 'application/json' },
-		body: JSON.stringify({ email, code, newPassword })
+		body: JSON.stringify({ identifier, code, newPassword })
 	});
 
 	if (!res.ok) {

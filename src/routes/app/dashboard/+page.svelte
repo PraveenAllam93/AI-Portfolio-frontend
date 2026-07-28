@@ -7,6 +7,7 @@
 	import AppHeader from '$lib/components/common/AppHeader.svelte';
 	import Badge from '$lib/components/common/Badge.svelte';
 	import LoadingState from '$lib/components/common/LoadingState.svelte';
+	import ShareMenu from '$lib/components/portfolio/ShareMenu.svelte';
 	import {
 		listPortfolios,
 		togglePortfolioLive,
@@ -95,12 +96,20 @@
 
 <div class="flex min-h-screen flex-col bg-surface-subtle">
 	<AppHeader>
-		<button
-			onclick={handleLogout}
-			class="text-sm font-medium text-ink-soft transition-colors hover:text-ink"
-		>
-			Log Out
-		</button>
+		<div class="flex items-center gap-4">
+			<a
+				href="/app/settings"
+				class="text-sm font-medium text-ink-soft transition-colors hover:text-ink"
+			>
+				Settings
+			</a>
+			<button
+				onclick={handleLogout}
+				class="text-sm font-medium text-ink-soft transition-colors hover:text-ink"
+			>
+				Log Out
+			</button>
+		</div>
 	</AppHeader>
 
 	<main class="mx-auto w-full max-w-6xl flex-1 px-6 py-12">
@@ -262,6 +271,17 @@
 									Versions
 								</a>
 								{#if portfolio.portfolioUrl}
+									<!-- Sharing is offered only when the portfolio is actually reachable:
+									     an offline portfolio 403s at the edge, so a shared link would be dead. -->
+									{#if portfolio.isLive}
+										<ShareMenu
+											url={portfolio.portfolioUrl}
+											title="{$authStore.user?.name ?? 'My'} — Portfolio"
+											text="Check out my portfolio"
+											align="left"
+											compact
+										/>
+									{/if}
 									<a
 										href={portfolio.portfolioUrl}
 										target="_blank"

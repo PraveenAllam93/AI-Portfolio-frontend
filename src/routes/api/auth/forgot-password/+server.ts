@@ -3,18 +3,21 @@ import { cognitoForgotPassword, parseCognitoError } from '$lib/server/cognito';
 import type { RequestHandler } from './$types';
 
 export const POST: RequestHandler = async ({ request }) => {
-	const { email } = await request.json();
+	const body = await request.json();
+	// Accepts a username or an email; `email` kept for older clients.
+	const identifier = body.identifier ?? body.email;
 
-	if (!email || typeof email !== 'string') {
-		throw error(400, 'Email is required.');
+	if (!identifier || typeof identifier !== 'string') {
+		throw error(400, 'Username or email is required.');
 	}
 
 	try {
-		await cognitoForgotPassword(email.trim().toLowerCase());
+		await cognitoForgotPassword(identifier.trim().toLowerCase());
 		return json({ success: true });
 	} catch (err) {
-		// Always return success for unknown emails — prevents user enumeration.
-		// UserNotFoundException means email doesn't exist; we silently succeed.
+		// Always return success for unknown accounts — prevents enumeration of
+		// both emails and usernames. UserNotFoundException means no such
+		// account; we silently succeed.
 		if (err instanceof Error && err.name === 'UserNotFoundException') {
 			return json({ success: true });
 		}

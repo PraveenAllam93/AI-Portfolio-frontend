@@ -6,7 +6,8 @@
 	import Spinner from '$lib/components/common/Spinner.svelte';
 	import AuthPanel from '$lib/components/auth/AuthPanel.svelte';
 
-	let email = $state('');
+	/** Username or email — resolved server-side. */
+	let identifier = $state('');
 	let password = $state('');
 	let errorMessage = $state('');
 	let isLoading = $state(false);
@@ -16,7 +17,7 @@
 		errorMessage = '';
 		isLoading = true;
 
-		const result = await login({ email, password });
+		const result = await login({ identifier, password });
 
 		if (result.success && result.data) {
 			authStore.setUser(result.data);
@@ -72,19 +73,21 @@
 					{/if}
 
 					<div class="space-y-2">
-						<label for="email" class="ml-1 text-xs font-bold tracking-widest text-ink-muted uppercase">
-							Email Address
+						<label for="identifier" class="ml-1 text-xs font-bold tracking-widest text-ink-muted uppercase">
+							Username or Email
 						</label>
 						<input
-							id="email"
-							type="email"
-							autocomplete="email"
+							id="identifier"
+							type="text"
+							autocomplete="username"
+							autocapitalize="none"
+							spellcheck="false"
 							required
-							bind:value={email}
+							bind:value={identifier}
 							disabled={isLoading}
 							aria-describedby={errorMessage ? 'login-error' : undefined}
 							class="w-full rounded-2xl border border-surface-muted bg-surface-subtle/50 px-6 py-4 text-base font-medium text-ink transition-all outline-none placeholder:text-ink-muted focus:border-brand/60 focus:bg-white focus:ring-2 focus:ring-brand/15 disabled:opacity-60"
-							placeholder="you@example.com"
+							placeholder="janedoe or you@example.com"
 						/>
 					</div>
 

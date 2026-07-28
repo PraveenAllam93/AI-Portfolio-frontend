@@ -24,12 +24,15 @@ export const GET: RequestHandler = async ({ params, cookies }) => {
 
 	const data = (await upstream.json()) as Record<string, unknown>;
 
-	// Resolve portfolioPath to full CloudFront URL for each version
+	// Resolve to a full CloudFront URL for each version. Prefer the backend's
+	// publicPath (the /u/{username} form); fall back to the raw userId path for
+	// accounts that have no username yet.
 	const rawCloudfront = env.CLOUDFRONT_URL ?? '';
 	if (rawCloudfront && Array.isArray(data.versions)) {
 		const base = rawCloudfront.startsWith('http') ? rawCloudfront : `https://${rawCloudfront}`;
 		data.versions = (data.versions as Array<Record<string, unknown>>).map((v) => {
-			const path = (v.portfolioPath as string | undefined) ?? '';
+			const path =
+				(v.publicPath as string | undefined) || (v.portfolioPath as string | undefined) || '';
 			if (path && !path.startsWith('http')) {
 				const clean = path.replace(/^\/+|\/+$/g, '');
 				v = { ...v, portfolioUrl: `${base}/${clean}/index.html` };

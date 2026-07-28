@@ -12,6 +12,7 @@ import {
 	ResendConfirmationCodeCommand,
 	ForgotPasswordCommand,
 	ConfirmForgotPasswordCommand,
+	ListUsersCommand,
 	AdminCreateUserCommand,
 	AdminSetUserPasswordCommand,
 	type AuthenticationResultType
@@ -35,8 +36,26 @@ export function isGuestEmail(email: string | undefined | null): boolean {
 // ─── Cognito client ───────────────────────────────────────────────────────────
 
 function getClient() {
+	// Credentials are passed explicitly rather than left to the SDK's default
+	// chain. The chain reads process.env, but SvelteKit exposes .env through
+	// $env/dynamic/private — the values do not reliably reach process.env, and
+	// dotenv will not override anything already exported in the shell. Either
+	// gap surfaces as "The security token included in the request is invalid".
+	//
+	// In production, leave AWS_ACCESS_KEY_ID unset: this falls through to the
+	// default chain and picks up the task/instance IAM role automatically.
+	const credentials =
+		env.AWS_ACCESS_KEY_ID && env.AWS_SECRET_ACCESS_KEY
+			? {
+					accessKeyId: env.AWS_ACCESS_KEY_ID,
+					secretAccessKey: env.AWS_SECRET_ACCESS_KEY,
+					...(env.AWS_SESSION_TOKEN ? { sessionToken: env.AWS_SESSION_TOKEN } : {})
+				}
+			: undefined;
+
 	return new CognitoIdentityProviderClient({
-		region: env.COGNITO_REGION ?? 'us-east-1'
+		region: env.COGNITO_REGION ?? 'us-east-1',
+		...(credentials ? { credentials } : {})
 	});
 }
 
@@ -50,15 +69,72 @@ function userPoolId(): string {
 	return env.COGNITO_USER_POOL_ID;
 }
 
+// ─── Identifier resolution ────────────────────────────────────────────────────
+
+/**
+ * A Cognito Username that cannot exist in this pool. Real Usernames here are
+ * UUIDs (the pool uses username_attributes = ["email"]), and our own handles
+ * must start with a letter or number, so nothing can collide with this.
+ */
+const IMPOSSIBLE_USERNAME = '__nonexistent__';
+
+/**
+ * Resolve whatever the user typed into the value Cognito expects as `Username`.
+ *
+ * The pool is configured with username_attributes = ["email"], so a Cognito
+ * user's Username *is* its sub and an email works directly. A handle does not,
+ * so we look it up: `preferred_username` is a standard attribute and therefore
+ * searchable through ListUsers (custom attributes are not — that is precisely
+ * why the handle is stored on this attribute).
+ *
+ * Returns null when the handle matches no account. Callers must treat that the
+ * same as a wrong password, so this never becomes a username oracle.
+ */
+export async function resolveIdentifier(identifier: string): Promise<string | null> {
+	const value = identifier.trim();
+	if (!value) return null;
+
+	// Emails are accepted by Cognito as-is.
+	if (value.includes('@')) return value.toLowerCase();
+
+	const handle = value.toLowerCase();
+
+	// Quote-escape defensively: the filter syntax is string-delimited, and an
+	// unescaped quote would otherwise let input break out of the predicate.
+	const escaped = handle.replace(/"/g, '\\"');
+
+	const res = await getClient().send(
+		new ListUsersCommand({
+			UserPoolId: userPoolId(),
+			Filter: `preferred_username = "${escaped}"`,
+			Limit: 1
+		})
+	);
+
+	const user = res.Users?.[0];
+	if (!user) return null;
+
+	// Username === sub for this pool type; prefer the explicit sub attribute.
+	return user.Attributes?.find((a) => a.Name === 'sub')?.Value ?? user.Username ?? null;
+}
+
 // ─── Auth operations ──────────────────────────────────────────────────────────
 
-export async function cognitoLogin(email: string, password: string) {
+/** `identifier` may be an email address or a username. */
+export async function cognitoLogin(identifier: string, password: string) {
+	const username = await resolveIdentifier(identifier);
+
+	// Unknown handle: hand Cognito something that cannot exist so it produces the
+	// same error a wrong password does. Returning early with a distinct error
+	// would reveal which handles are registered.
+	const resolved = username ?? IMPOSSIBLE_USERNAME;
+
 	return getClient().send(
 		new AdminInitiateAuthCommand({
 			AuthFlow: 'ADMIN_USER_PASSWORD_AUTH',
 			ClientId: clientId(),
 			UserPoolId: userPoolId(),
-			AuthParameters: { USERNAME: email, PASSWORD: password }
+			AuthParameters: { USERNAME: resolved, PASSWORD: password }
 		})
 	);
 }
@@ -73,7 +149,12 @@ export async function cognitoRefresh(refreshToken: string) {
 	);
 }
 
-export async function cognitoSignUp(email: string, password: string, name: string) {
+export async function cognitoSignUp(
+	email: string,
+	password: string,
+	name: string,
+	username: string
+) {
 	return getClient().send(
 		new SignUpCommand({
 			ClientId: clientId(),
@@ -81,45 +162,65 @@ export async function cognitoSignUp(email: string, password: string, name: strin
 			Password: password,
 			UserAttributes: [
 				{ Name: 'email', Value: email },
-				{ Name: 'name', Value: name }
+				{ Name: 'name', Value: name },
+				// Claimed atomically by the PreSignUp trigger, which fails the
+				// whole sign-up if the handle is already taken.
+				{ Name: 'preferred_username', Value: username }
 			]
 		})
 	);
 }
 
-export async function cognitoConfirm(email: string, code: string) {
+/**
+ * The remaining flows all accept an email address or a username.
+ *
+ * Each resolves the identifier first. When a handle is unknown, the raw input
+ * is passed through unchanged so Cognito returns its own UserNotFoundException
+ * — the callers already convert that into a neutral response, so an unknown
+ * handle is indistinguishable from an unknown email.
+ */
+
+export async function cognitoConfirm(identifier: string, code: string) {
+	const username = (await resolveIdentifier(identifier)) ?? identifier;
 	return getClient().send(
 		new ConfirmSignUpCommand({
 			ClientId: clientId(),
-			Username: email,
+			Username: username,
 			ConfirmationCode: code
 		})
 	);
 }
 
-export async function cognitoResendCode(email: string) {
+export async function cognitoResendCode(identifier: string) {
+	const username = (await resolveIdentifier(identifier)) ?? identifier;
 	return getClient().send(
 		new ResendConfirmationCodeCommand({
 			ClientId: clientId(),
-			Username: email
+			Username: username
 		})
 	);
 }
 
-export async function cognitoForgotPassword(email: string) {
+export async function cognitoForgotPassword(identifier: string) {
+	const username = (await resolveIdentifier(identifier)) ?? identifier;
 	return getClient().send(
 		new ForgotPasswordCommand({
 			ClientId: clientId(),
-			Username: email
+			Username: username
 		})
 	);
 }
 
-export async function cognitoResetPassword(email: string, code: string, newPassword: string) {
+export async function cognitoResetPassword(
+	identifier: string,
+	code: string,
+	newPassword: string
+) {
+	const username = (await resolveIdentifier(identifier)) ?? identifier;
 	return getClient().send(
 		new ConfirmForgotPasswordCommand({
 			ClientId: clientId(),
-			Username: email,
+			Username: username,
 			ConfirmationCode: code,
 			Password: newPassword
 		})
@@ -207,6 +308,21 @@ export interface SessionUser {
 	name: string;
 	/** True when this is an anonymous "Try for free" guest (placeholder email). */
 	isGuest: boolean;
+	/**
+	 * Public handle used in portfolio URLs.
+	 *
+	 * Stored on Cognito as the standard `preferred_username` attribute, so it
+	 * rides along on the ID token (no round trip to build a URL) and is
+	 * searchable via ListUsers (which is how username logins resolve).
+	 *
+	 * DynamoDB remains the authority for uniqueness; this is a searchable copy
+	 * and can lag by up to one token lifetime after a rename. That is safe — the
+	 * old handle stays resolvable as a tombstone, and the rename endpoint forces
+	 * a token refresh so the UI updates immediately.
+	 *
+	 * Null for guests and any account created before usernames existed.
+	 */
+	username: string | null;
 }
 
 /** Decode JWT payload without verifying signature (payload is plain Base64url JSON). */
@@ -230,7 +346,9 @@ export function decodeIdToken(token: string): SessionUser | null {
 			typeof payload.name === 'string'
 				? payload.name
 				: email || '',
-		isGuest: isGuestEmail(email)
+		isGuest: isGuestEmail(email),
+		username:
+			typeof payload.preferred_username === 'string' ? payload.preferred_username : null
 	};
 }
 
@@ -350,13 +468,33 @@ export async function getSessionUser(cookies: Cookies): Promise<SessionUser | nu
 
 // ─── Error parsing ────────────────────────────────────────────────────────────
 
+/**
+ * Cognito wraps anything a Lambda trigger throws in a UserLambdaValidationException
+ * whose message looks like:
+ *
+ *   "PreSignUp failed with error That username is already taken.."
+ *
+ * The trigger's messages are written to be user-facing, so pull the original
+ * back out rather than showing the wrapper.
+ */
+function unwrapTriggerError(message: string): string | null {
+	const match = message.match(/failed with error\s+(.*?)\.?\s*$/i);
+	if (!match) return null;
+	const inner = match[1].trim();
+	return inner ? (inner.endsWith('.') ? inner : `${inner}.`) : null;
+}
+
 export function parseCognitoError(err: unknown): string {
 	if (err instanceof Error) {
+		if (err.name === 'UserLambdaValidationException') {
+			return unwrapTriggerError(err.message) ?? 'Could not complete signup. Please try again.';
+		}
+
 		switch (err.name) {
 			case 'NotAuthorizedException':
-				return 'Incorrect email or password.';
+				return 'Incorrect username/email or password.';
 			case 'UserNotFoundException':
-				return 'No account found with this email.';
+				return 'No account found with those details.';
 			case 'UserNotConfirmedException':
 				return 'Please confirm your email before logging in.';
 			case 'UsernameExistsException':

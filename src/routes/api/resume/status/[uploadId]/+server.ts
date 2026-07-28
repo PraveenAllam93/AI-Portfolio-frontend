@@ -1,6 +1,7 @@
 import { error, json } from '@sveltejs/kit';
 import { env } from '$env/dynamic/private';
 import { getSessionUser } from '$lib/server/cognito';
+import { publicPath } from '$lib/username';
 import type { RequestHandler } from './$types';
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -31,10 +32,11 @@ export const GET: RequestHandler = async ({ params, cookies }) => {
 
 	const data = (await upstream.json()) as Record<string, unknown>;
 
-	// 4. portfolioPath from backend is a relative path e.g. "{userId}/v1"
+	// 4. portfolioPath from backend is a relative path e.g. "{userId}/{uploadId}/v1".
 	//    Construct the full CloudFront URL here so the browser never needs
 	//    CLOUDFRONT_URL as a public env var.
-	//    Pattern matches /api/portfolio/url: https://{cloudfront}/{userId}/v1/index.html
+	//    Published links are addressed by username:
+	//    https://{cloudfront}/u/{username}/{uploadId}/v1/index.html
 	if (typeof data.portfolioPath === 'string' && data.portfolioPath) {
 		const rawCloudfront = env.CLOUDFRONT_URL ?? '';
 		if (rawCloudfront) {
@@ -42,8 +44,11 @@ export const GET: RequestHandler = async ({ params, cookies }) => {
 				? rawCloudfront
 				: `https://${rawCloudfront}`;
 
-			// Normalise: strip leading/trailing slashes from the path segment
-			const path = data.portfolioPath.replace(/^\/+|\/+$/g, '');
+			// Normalise: strip leading/trailing slashes, then swap the leading
+			// userId segment for the public /u/{username} form.
+			const path = (
+				publicPath(data.portfolioPath, user.username) ?? data.portfolioPath
+			).replace(/^\/+|\/+$/g, '');
 
 			// Only assemble if not already a full URL (defensive)
 			if (!path.startsWith('http')) {

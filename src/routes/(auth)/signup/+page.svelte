@@ -1,13 +1,21 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import { register, confirmEmail, resendConfirmationCode, login } from '$lib/services/auth';
+	import {
+		register,
+		confirmEmail,
+		resendConfirmationCode,
+		login,
+		checkUsername
+	} from '$lib/services/auth';
 	import { authStore } from '$lib/stores/auth';
 	import { reveal } from '$lib/actions/animate';
 	import Spinner from '$lib/components/common/Spinner.svelte';
 	import AuthPanel from '$lib/components/auth/AuthPanel.svelte';
+	import { normalizeUsername, validateUsername } from '$lib/username';
 
 	let step: 'register' | 'confirm' = $state('register');
 	let name = $state('');
+	let username = $state('');
 	let email = $state('');
 	let password = $state('');
 	let confirmationCode = $state('');
@@ -16,12 +24,75 @@
 	let successMessage = $state('');
 	let isLoading = $state(false);
 
+	// ─── Username availability ────────────────────────────────────────────────
+	// Advisory only: the account-creation call is what actually enforces
+	// uniqueness, so a stale "available" here just surfaces as a submit error.
+	type UsernameState = 'idle' | 'checking' | 'available' | 'taken' | 'invalid';
+	let usernameState: UsernameState = $state('idle');
+	let usernameHint = $state('');
+	let checkTimer: ReturnType<typeof setTimeout> | undefined;
+	let checkSeq = 0;
+
+	function onUsernameInput() {
+		clearTimeout(checkTimer);
+
+		const handle = normalizeUsername(username);
+		if (!handle) {
+			usernameState = 'idle';
+			usernameHint = '';
+			return;
+		}
+
+		const formatError = validateUsername(handle);
+		if (formatError) {
+			usernameState = 'invalid';
+			usernameHint = formatError;
+			return;
+		}
+
+		usernameState = 'checking';
+		usernameHint = 'Checking availability…';
+
+		// Debounce so we don't fire a request per keystroke.
+		const seq = ++checkSeq;
+		checkTimer = setTimeout(async () => {
+			const result = await checkUsername(handle);
+			// Drop responses that arrived out of order.
+			if (seq !== checkSeq) return;
+
+			if (result.unverified) {
+				usernameState = 'idle';
+				usernameHint = '';
+			} else if (result.available) {
+				usernameState = 'available';
+				usernameHint = `portfolio.ai/u/${handle} is yours`;
+			} else {
+				usernameState = 'taken';
+				usernameHint = result.reason || 'That username is already taken.';
+			}
+		}, 400);
+	}
+
 	async function handleRegister(e: SubmitEvent) {
 		e.preventDefault();
 		errorMessage = '';
+
+		const formatError = validateUsername(username);
+		if (formatError) {
+			usernameState = 'invalid';
+			usernameHint = formatError;
+			errorMessage = formatError;
+			return;
+		}
+
 		isLoading = true;
 
-		const result = await register({ name, email, password });
+		const result = await register({
+			name,
+			username: normalizeUsername(username),
+			email,
+			password
+		});
 
 		if (result.success) {
 			if (result.data?.needsConfirmation) {
@@ -51,7 +122,7 @@
 		}
 
 		// Auto-login after successful confirmation so the user lands on dashboard.
-		const loginResult = await login({ email, password });
+		const loginResult = await login({ identifier: email, password });
 		if (loginResult.success) {
 			authStore.setUser(loginResult.data ?? null);
 			await goto('/app/dashboard');
@@ -150,6 +221,57 @@
 								class="w-full rounded-2xl border border-surface-muted bg-surface-subtle/50 px-6 py-4 text-base font-medium text-ink transition-all outline-none focus:border-brand/60 focus:bg-white focus:ring-2 focus:ring-brand/15 disabled:opacity-60"
 								placeholder="Jane Doe"
 							/>
+						</div>
+
+						<div class="space-y-2">
+							<label for="signup-username" class="ml-1 text-xs font-bold tracking-widest text-ink-muted uppercase">
+								Username
+							</label>
+							<div class="relative">
+								<span
+									class="pointer-events-none absolute top-1/2 left-6 -translate-y-1/2 text-base font-medium text-ink-muted select-none"
+									aria-hidden="true"
+								>/u/</span>
+								<input
+									id="signup-username"
+									type="text"
+									autocomplete="username"
+									required
+									autocapitalize="none"
+									spellcheck="false"
+									maxlength={30}
+									bind:value={username}
+									oninput={onUsernameInput}
+									disabled={isLoading}
+									aria-describedby="username-hint"
+									aria-invalid={usernameState === 'taken' || usernameState === 'invalid'}
+									class="w-full rounded-2xl border bg-surface-subtle/50 py-4 pr-12 pl-14 text-base font-medium text-ink transition-all outline-none focus:bg-white focus:ring-2 disabled:opacity-60
+										{usernameState === 'taken' || usernameState === 'invalid'
+											? 'border-red-300 focus:border-red-400 focus:ring-red-100'
+											: usernameState === 'available'
+												? 'border-emerald-300 focus:border-emerald-400 focus:ring-emerald-100'
+												: 'border-surface-muted focus:border-brand/60 focus:ring-brand/15'}"
+									placeholder="janedoe"
+								/>
+								{#if usernameState === 'checking'}
+									<span class="absolute top-1/2 right-5 -translate-y-1/2"><Spinner size="sm" /></span>
+								{:else if usernameState === 'available'}
+									<span class="absolute top-1/2 right-5 -translate-y-1/2 text-lg text-emerald-500" aria-hidden="true">✓</span>
+								{:else if usernameState === 'taken' || usernameState === 'invalid'}
+									<span class="absolute top-1/2 right-5 -translate-y-1/2 text-lg text-red-500" aria-hidden="true">✕</span>
+								{/if}
+							</div>
+							<p
+								id="username-hint"
+								aria-live="polite"
+								class="ml-1 text-xs {usernameState === 'available'
+									? 'text-emerald-600'
+									: usernameState === 'taken' || usernameState === 'invalid'
+										? 'text-red-600'
+										: 'text-ink-muted'}"
+							>
+								{usernameHint || 'This becomes your public portfolio link.'}
+							</p>
 						</div>
 
 						<div class="space-y-2">

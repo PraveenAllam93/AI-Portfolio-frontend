@@ -2,6 +2,7 @@ import { env } from '$env/dynamic/private';
 import { json, error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { getSessionUser } from '$lib/server/cognito';
+import { publicPath } from '$lib/username';
 
 export const GET: RequestHandler = async ({ cookies }) => {
 	const user = await getSessionUser(cookies);
@@ -34,13 +35,15 @@ export const GET: RequestHandler = async ({ cookies }) => {
 		// fall through — portfolioPath stays null
 	}
 
-	const liveUrl = portfolioPath
-		? `${cloudfrontBase}/${portfolioPath}/index.html`
-		: null;
+	// Public URL is addressed by username; the draft URL stays on the userId
+	// form because it is owner-only and never shared.
+	const publicLivePath = publicPath(portfolioPath, user.username);
+	const liveUrl = publicLivePath ? `${cloudfrontBase}/${publicLivePath}/index.html` : null;
 
 	return json({
 		url: liveUrl,
 		draftUrl: `${cloudfrontBase}/${user.userId}/draft/index.html`,
-		userId: user.userId
+		userId: user.userId,
+		username: user.username
 	});
 };

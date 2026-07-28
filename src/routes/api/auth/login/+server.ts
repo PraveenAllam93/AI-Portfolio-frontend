@@ -8,20 +8,23 @@ import {
 } from '$lib/server/cognito';
 
 export const POST: RequestHandler = async ({ request, cookies }) => {
-	let email: string, password: string;
+	let identifier: string, password: string;
 
 	try {
-		({ email, password } = await request.json());
+		const body = await request.json();
+		// `email` is still accepted so older clients keep working.
+		identifier = body.identifier ?? body.email;
+		password = body.password;
 	} catch {
 		throw error(400, 'Invalid request body');
 	}
 
-	if (!email || !password) {
-		throw error(400, 'Email and password are required');
+	if (!identifier || !password) {
+		throw error(400, 'Username or email, and password are required');
 	}
 
 	try {
-		const res = await cognitoLogin(email, password);
+		const res = await cognitoLogin(identifier, password);
 
 		if (!res.AuthenticationResult) {
 			throw error(401, 'Authentication failed');

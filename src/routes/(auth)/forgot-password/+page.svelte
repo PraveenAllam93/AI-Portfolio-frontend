@@ -8,7 +8,8 @@
 	type Step = 'request' | 'reset' | 'done';
 
 	let step = $state<Step>('request');
-	let email = $state('');
+	/** Username or email — resolved server-side. */
+	let identifier = $state('');
 	let code = $state('');
 	let newPassword = $state('');
 	let confirmPassword = $state('');
@@ -20,7 +21,7 @@
 		errorMessage = '';
 		isLoading = true;
 
-		const result = await forgotPassword(email);
+		const result = await forgotPassword(identifier);
 
 		if (result.success) {
 			step = 'reset';
@@ -47,7 +48,7 @@
 
 		isLoading = true;
 
-		const result = await resetPassword(email, code, newPassword);
+		const result = await resetPassword(identifier, code, newPassword);
 
 		if (result.success) {
 			step = 'done';
@@ -87,7 +88,9 @@
 				{#if step === 'request'}
 					<div class="mb-10">
 						<h1 class="font-display text-4xl font-bold tracking-tight text-ink" style="letter-spacing:-0.02em">Forgot password?</h1>
-						<p class="mt-3 text-lg text-ink-soft">Enter your email and we'll send a reset code.</p>
+						<p class="mt-3 text-lg text-ink-soft">
+							Enter your username or email and we'll send a reset code.
+						</p>
 					</div>
 
 					<form class="space-y-6" onsubmit={handleRequestCode} aria-label="Request password reset">
@@ -103,18 +106,20 @@
 						{/if}
 
 						<div class="space-y-2">
-							<label for="email" class="ml-1 text-xs font-bold tracking-widest text-ink-muted uppercase">
-								Email Address
+							<label for="identifier" class="ml-1 text-xs font-bold tracking-widest text-ink-muted uppercase">
+								Username or Email
 							</label>
 							<input
-								id="email"
-								type="email"
-								autocomplete="email"
+								id="identifier"
+								type="text"
+								autocomplete="username"
+								autocapitalize="none"
+								spellcheck="false"
 								required
-								bind:value={email}
+								bind:value={identifier}
 								disabled={isLoading}
 								class="w-full rounded-2xl border border-surface-muted bg-surface-subtle/50 px-6 py-4 text-base font-medium text-ink transition-all outline-none placeholder:text-ink-muted focus:border-brand/60 focus:bg-white focus:ring-2 focus:ring-brand/15 disabled:opacity-60"
-								placeholder="you@example.com"
+								placeholder="janedoe or you@example.com"
 							/>
 						</div>
 
@@ -139,7 +144,11 @@
 					<div class="mb-10">
 						<h1 class="font-display text-4xl font-bold tracking-tight text-ink" style="letter-spacing:-0.02em">Set new password</h1>
 						<p class="mt-3 text-lg text-ink-soft">
-							Check <span class="font-bold text-ink">{email}</span> for the code.
+							{#if identifier.includes('@')}
+								Check <span class="font-bold text-ink">{identifier}</span> for the code.
+							{:else}
+								Check the email on your account for the code.
+							{/if}
 						</p>
 					</div>
 
@@ -226,7 +235,7 @@
 							onclick={() => { step = 'request'; errorMessage = ''; }}
 							class="w-full text-center text-sm font-bold text-ink-soft transition-colors hover:text-ink"
 						>
-							← Use a different email
+							← Use a different account
 						</button>
 					</form>
 
