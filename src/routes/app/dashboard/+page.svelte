@@ -12,6 +12,7 @@
 		listPortfolios,
 		togglePortfolioLive,
 		deletePortfolio,
+		setMainPortfolio,
 		type PortfolioSummary
 	} from '$lib/services/portfolio';
 
@@ -27,6 +28,23 @@
 	let deletingId: string | null = $state(null);
 	let togglingId: string | null = $state(null);
 	let errorMsg: string | null = $state(null);
+	let settingMainId: string | null = $state(null);
+
+	async function handleSetMain(portfolio: PortfolioSummary) {
+		if (settingMainId || portfolio.isMain || portfolio.portfolioNumber == null) return;
+		settingMainId = portfolio.uploadId;
+		errorMsg = null;
+
+		const result = await setMainPortfolio(portfolio.portfolioNumber);
+		if (result.ok) {
+			// Exactly one portfolio is main, so clear the others locally rather
+			// than refetching the whole list.
+			portfolios = portfolios.map((p) => ({ ...p, isMain: p.uploadId === portfolio.uploadId }));
+		} else {
+			errorMsg = result.error ?? 'Could not set main portfolio.';
+		}
+		settingMainId = null;
+	}
 
 	onMount(async () => {
 		try {
@@ -199,9 +217,22 @@
 								<!-- Title + badges -->
 								<div class="min-w-0">
 									<div class="flex flex-wrap items-center gap-2">
+										{#if portfolio.portfolioNumber != null}
+											<!-- Permanent public number: the {n} in /u/{username}/{n}.
+											     Never reused, so gaps after a delete are expected. -->
+											<span
+												class="inline-flex h-6 min-w-6 items-center justify-center rounded-lg bg-ink px-1.5 text-xs font-bold text-white"
+												title="Portfolio #{portfolio.portfolioNumber} — permanent share number"
+											>
+												{portfolio.portfolioNumber}
+											</span>
+										{/if}
 										<h2 class="font-display text-xl font-bold text-ink" style="letter-spacing:-0.01em">
 											{templateLabel(portfolio.templateId)}
 										</h2>
+										{#if portfolio.isMain}
+											<Badge variant="neutral">★ Main</Badge>
+										{/if}
 										{#if portfolio.isLive}
 											<Badge variant="live" pulse>Live</Badge>
 										{:else}
@@ -270,12 +301,22 @@
 									<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="h-3.5 w-3.5" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>
 									Versions
 								</a>
+								{#if portfolio.isLive && portfolio.portfolioNumber != null && !portfolio.isMain}
+									<button
+										onclick={() => handleSetMain(portfolio)}
+										disabled={settingMainId === portfolio.uploadId}
+										title="Serve this portfolio at your bare /u/{$authStore.user?.username ?? 'username'} link"
+										class="inline-flex items-center gap-1.5 rounded-full border border-surface-muted bg-white px-4 py-2 text-sm font-bold text-ink-soft transition-all hover:bg-surface-subtle hover:text-ink disabled:opacity-50"
+									>
+										{settingMainId === portfolio.uploadId ? 'Setting…' : '★ Set as main'}
+									</button>
+								{/if}
 								{#if portfolio.portfolioUrl}
 									<!-- Sharing is offered only when the portfolio is actually reachable:
 									     an offline portfolio 403s at the edge, so a shared link would be dead. -->
 									{#if portfolio.isLive}
 										<ShareMenu
-											url={portfolio.portfolioUrl}
+											url={portfolio.mainUrl ?? portfolio.portfolioUrl}
 											title="{$authStore.user?.name ?? 'My'} — Portfolio"
 											text="Check out my portfolio"
 											align="left"

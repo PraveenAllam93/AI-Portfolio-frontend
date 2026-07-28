@@ -27,6 +27,34 @@ export interface PortfolioSummary {
 	version: number;
 	createdAt: string;
 	updatedAt: string | null;
+	/**
+	 * Permanent public number — the {n} in /u/{username}/{n}.
+	 * Assigned at first publish and never reused, so gaps are expected after a
+	 * delete. Null for portfolios that have never been published.
+	 */
+	portfolioNumber: number | null;
+	/** True when this portfolio answers the bare /u/{username}. */
+	isMain: boolean;
+	/** The bare /u/{username} URL — only set on the main portfolio. */
+	mainUrl: string | null;
+}
+
+/** Point the bare /u/{username} at a different portfolio. */
+export async function setMainPortfolio(portfolioNumber: number): Promise<ServiceResult> {
+	try {
+		const res = await fetch('/api/profile', {
+			method: 'PATCH',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ mainPortfolioNumber: portfolioNumber })
+		});
+		if (!res.ok) {
+			const data = await res.json().catch(() => ({}));
+			return { ok: false, error: data.message || data.error || 'Could not set main portfolio.' };
+		}
+		return { ok: true };
+	} catch {
+		return { ok: false, error: 'Network error' };
+	}
 }
 
 export async function listPortfolios(
