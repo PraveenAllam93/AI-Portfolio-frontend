@@ -13,8 +13,10 @@ node_modules
 Thumbs.db
 
 # Env
-.env
-.env.*
+# `.env*` is deliberately broad: `.env` + `.env.*` match only dot-separated
+# variants, so a hand-named copy like `.env_from-praveen` stays UNIGNORED and
+# `git add -A` would commit it. Matches the backend repo's rule. Do not narrow.
+.env*
 !.env.example
 !.env.test
 
