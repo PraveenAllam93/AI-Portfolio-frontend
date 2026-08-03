@@ -88,6 +88,7 @@ nav ul li a:hover{color:var(--secondary-blue)}
 
 /* SUMMARY / ABOUT */
 .summary-content{display:grid;grid-template-columns:3fr 2fr;align-items:stretch;gap:3rem}
+.summary-content--solo{grid-template-columns:minmax(0,760px);justify-content:center}
 .summary-text p{margin-bottom:1.4rem;font-size:1.08rem}
 .summary-image{position:relative;border-radius:12px;overflow:hidden;box-shadow:var(--shadow-lg);border:1px solid var(--border-color);min-height:360px}
 .summary-image img{width:100%;height:100%;min-height:360px;object-fit:cover;display:block;transition:transform .5s}
@@ -317,14 +318,19 @@ export function html(v: NormalizedData): string {
 	// ABOUT — text on the left + a SEPARATE uploadable image on the right.
 	// This is its own image (NOT the hero profile photo); it is uploaded from the
 	// "Portfolio Fields" tab and stored as profile.summary_image.
+	// The upload prompt is EDITOR-ONLY. Rendering it unconditionally leaked
+	// "Add a summary image" onto published portfolios for every user who had a
+	// bio but never uploaded a section image.
 	const summaryImage = v.summary_image
 		? `<div class="summary-image" ${_imgUpload('profile.summary_image', v.edit_mode, 'Upload image')}><img src="${v.summary_image}" alt="${v.name} — summary">${v.headline ? `<span class="badge">${v.headline}</span>` : ''}</div>`
-		: `<div class="summary-image" ${_imgUpload('profile.summary_image', v.edit_mode, 'Upload image')}><div class="ph"><div class="ph-ic">${IC.camera}</div><div class="ph-tx">Add a summary image</div><div class="ph-sub">Upload a section image from the <strong>Portfolio Fields</strong> tab — it appears here.</div></div></div>`;
+		: em
+			? `<div class="summary-image" ${_imgUpload('profile.summary_image', v.edit_mode, 'Upload image')}><div class="ph"><div class="ph-ic">${IC.camera}</div><div class="ph-tx">Add a summary image</div><div class="ph-sub">Upload a section image from the <strong>Portfolio Fields</strong> tab — it appears here.</div></div></div>`
+			: '';
 	const aboutHtml = v.bio || v.summary_image || em
 		? `<section id="about" class="section-light">
 <div class="container fade-up">
   <h2>Professional Summary</h2>
-  <div class="summary-content">
+  <div class="summary-content${summaryImage ? '' : ' summary-content--solo'}">
     <div class="summary-text">${v.bio ? `<p ${_editable('portfolio.bio', true)}>${v.bio}</p>` : ''}</div>
     ${summaryImage}
   </div>

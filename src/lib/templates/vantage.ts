@@ -126,6 +126,12 @@ section{position:relative;padding:120px 48px;max-width:1400px;margin:0 auto}
 .about-img-wrap{border-radius:20px;overflow:hidden;aspect-ratio:4/5;background:linear-gradient(145deg,var(--navy-light),var(--surface-2));position:relative;display:flex;align-items:center;justify-content:center}
 .about-img-wrap img{width:100%;height:100%;object-fit:cover}
 .about-img-mark{font-family:var(--font-display);font-weight:800;font-size:5rem;color:var(--gold);opacity:.2}
+.about-grid--solo{grid-template-columns:minmax(0,760px);justify-content:center}
+.about-img-wrap.is-empty{border:2px dashed var(--border-gold)}
+.about-ph{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:32px;text-align:center}
+.about-ph-ic{font-size:2.25rem;line-height:1;opacity:.85}
+.about-ph-tx{font-family:var(--font-display);font-size:1.15rem;font-weight:700;color:var(--gold)}
+.about-ph-sub{font-size:.78rem;line-height:1.6;color:var(--text-muted);max-width:26ch}
 .about-stat-card{position:absolute;bottom:-24px;right:-24px;background:var(--black);border:1px solid var(--border-gold);border-radius:16px;padding:20px 24px;box-shadow:var(--shadow-gold)}
 [data-theme="light"] .about-stat-card{background:var(--white)}
 .about-stat-number{font-family:var(--font-display);font-size:2.5rem;font-weight:800;color:var(--gold);line-height:1;margin-bottom:4px}
@@ -295,12 +301,21 @@ export function html(v: NormalizedData): string {
 
 	// ABOUT
 	const highlights = (v.skill_groups ?? []).slice(0, 4).map(g => `<div class="highlight-item"><div class="highlight-dot"></div><div class="highlight-text"><strong>${g.category}</strong><small>${g.skills.slice(0, 2).join(' · ')}</small></div></div>`).join('');
-	const aboutHtml = (v.bio || v.uniqueValue)
-		? `<section id="about" class="bg-surface"><div class="about-grid">
-<div class="about-visual reveal">
-<div class="about-img-wrap" ${_imgUpload('profile.profile_image', em)}>${v.profile_image ? `<img src="${v.profile_image}" alt="${v.name}">` : `<div class="about-img-mark">${initials}</div>`}</div>
+	// The About visual is its OWN image (profile.summary_image), uploaded from the
+	// "Portfolio Fields" tab — NOT the hero portrait, which used to render here a
+	// second time. With no image set the column is dropped on the published site
+	// (grid collapses to one column); in the editor it becomes an upload prompt.
+	const aboutVisual = v.summary_image
+		? `<div class="about-img-wrap" ${_imgUpload('profile.summary_image', em, 'Upload image')}><img src="${v.summary_image}" alt="${v.name} — about"></div>`
+		: em
+			? `<div class="about-img-wrap is-empty" ${_imgUpload('profile.summary_image', em, 'Upload image')}><div class="about-ph"><div class="about-ph-ic">🖼️</div><div class="about-ph-tx">Add a section image</div><div class="about-ph-sub">Upload one from the <strong>Portfolio Fields</strong> tab — it appears here, separate from your hero portrait.</div></div></div>`
+			: '';
+	const aboutHtml = (v.bio || v.uniqueValue || v.summary_image)
+		? `<section id="about" class="bg-surface"><div class="about-grid${aboutVisual ? '' : ' about-grid--solo'}">
+${aboutVisual ? `<div class="about-visual reveal">
+${aboutVisual}
 ${showYears ? `<div class="about-stat-card"><div class="about-stat-number">${statNum('years_experience', yearsExp)}+</div><div class="about-stat-label">Years Experience</div></div>` : ''}
-</div>
+</div>` : ''}
 <div class="about-content reveal reveal-delay-1">
 <div class="section-eyebrow">About</div>
 <h2 class="section-title">The strategy behind the brand</h2>

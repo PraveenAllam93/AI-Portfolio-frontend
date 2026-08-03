@@ -178,9 +178,15 @@
 				{ key: 'campaign_type', label: 'Campaign Type', inputType: 'text', limit: 200 },
 				{ key: 'channels_used', label: 'Channels Used (one per line)', inputType: 'list' },
 				{ key: 'budget', label: 'Budget', inputType: 'text', limit: 100 },
-				{ key: 'performance_metrics', label: 'Performance Metrics (one per line)', inputType: 'list', aiEnhanceable: true }
+				{ key: 'performance_metrics', label: 'Performance Metrics (one per line)', inputType: 'list', aiEnhanceable: true },
+				// Case-study fields. Templates with a click-through case page (momentum)
+				// render these; card-only templates ignore them. Not produced by resume
+				// parsing — the user fills them in here.
+				{ key: 'challenge', label: 'The Challenge (case study)', inputType: 'textarea', limit: 1500, aiEnhanceable: true },
+				{ key: 'approach', label: 'What I Did (one per line, case study)', inputType: 'list', aiEnhanceable: true },
+				{ key: 'images', label: 'Campaign Gallery (max 3)', inputType: 'images' }
 			],
-			emptyItem: () => ({ campaign_name: '', campaign_type: '', channels_used: [], budget: '', performance_metrics: [] })
+			emptyItem: () => ({ campaign_name: '', campaign_type: '', channels_used: [], budget: '', performance_metrics: [], challenge: '', approach: [], images: [] })
 		},
 		financial_modeling: {
 			label: 'Financial Modeling',
@@ -2048,6 +2054,36 @@
 		autoSaveCustomSections();
 	}
 
+	/** Hides/shows a whole custom section. Mirrors toggleItemHidden for regular
+	 *  sections: `_hidden` is persisted inside the stored data, and normalize()
+	 *  filters it out of BOTH the preview and the published HTML. */
+	function toggleCustomSectionHidden(csIdx: number) {
+		const updated = [...customSections];
+		const cur = updated[csIdx];
+		if (!cur) return;
+		const next = { ...cur };
+		if (cur._hidden) delete next._hidden;
+		else next._hidden = true;
+		updated[csIdx] = next;
+		customSections = updated;
+		autoSaveCustomSections();
+	}
+
+	/** Hides/shows a single item inside a custom section. */
+	function toggleCsItemHidden(csIdx: number, itemIdx: number) {
+		const updated = [...customSections];
+		const items = [...(updated[csIdx]?.items ?? [])];
+		const cur = items[itemIdx];
+		if (!cur) return;
+		const next = { ...cur };
+		if (cur._hidden) delete next._hidden;
+		else next._hidden = true;
+		items[itemIdx] = next;
+		updated[csIdx] = { ...updated[csIdx], items };
+		customSections = updated;
+		autoSaveCustomSections();
+	}
+
 	function moveCsItemUp(csIdx: number, itemIdx: number) {
 		if (itemIdx === 0) return;
 		const updated = [...customSections];
@@ -2151,6 +2187,22 @@
 		sectionOrder = newOrder;
 		await updatePortfolioConfig(userId, uploadId, { sectionOrder });
 		queuePreviewRefresh();
+	}
+
+	/**
+	 * Left-pane section click: open the section's form AND scroll the preview to
+	 * it. This is the mirror of the preview→editor sync (the iframe posts
+	 * `focus-item` when a card is clicked); without the postMessage the preview
+	 * just sat where it was. Deferred a tick so a repaint queued by an in-flight
+	 * edit can't swallow the message. A hidden section isn't in the DOM, so the
+	 * in-iframe handler no-ops for it.
+	 */
+	function selectSection(key: string) {
+		activeTab = key;
+		mobileTab = 'edit';
+		setTimeout(() => {
+			iframeEl?.contentWindow?.postMessage({ type: 'scroll-to-section', section: key }, '*');
+		}, 60);
 	}
 
 	async function toggleSectionVisibility(key: string) {
@@ -2295,8 +2347,11 @@
 			const num = digitsOnly ? parseInt(digitsOnly) : null;
 			templateOverrides = { ...templateOverrides, [idxOrKey]: num };
 		} else if (ns === 'custom_sections') {
-			const csIdx = parseInt(idxOrKey);
-			if (isNaN(csIdx) || !customSections[csIdx]) return;
+			// Path indices are VISIBLE indices — map them before touching state.
+			const visCsIdx = parseInt(idxOrKey);
+			if (isNaN(visCsIdx)) return;
+			const { csIdx, itemIdx } = csActual(visCsIdx, parseInt(parts[3]));
+			if (!customSections[csIdx]) return;
 			if (field === 'title') {
 				// path: custom_sections.{csIdx}.title — the section heading itself
 				const u = [...customSections];
@@ -2305,9 +2360,8 @@
 				return;
 			}
 			// path: custom_sections.{csIdx}.items.{itemIdx}.{csField}
-			const itemIdx = parseInt(parts[3]);
 			const csField = parts[4];
-			if (!isNaN(itemIdx) && csField) {
+			if (itemIdx >= 0 && csField) {
 				const u = [...customSections];
 				if (u[csIdx]?.items?.[itemIdx]) {
 					const updatedItems = [...u[csIdx].items];
@@ -2347,9 +2401,8 @@
 			return v == null ? '' : String(v);
 		}
 		if (ns === 'custom_sections') {
-			const csIdx = parseInt(idxOrKey);
+			const { csIdx, itemIdx } = csActual(parseInt(idxOrKey), parseInt(parts[3]));
 			if (field === 'title') return customSections[csIdx]?.title ?? '';
-			const itemIdx = parseInt(parts[3]);
 			const csField = parts[4];
 			const item = customSections[csIdx]?.items?.[itemIdx] as Record<string, unknown> | undefined;
 			const cur = item?.[csField];
@@ -2480,9 +2533,8 @@
 			const raw = (rawProfile.core_expertise ?? '').split('\n').map((s) => s.trim()).filter(Boolean);
 			items = raw.length ? raw : skillGroups.map((g) => g.category).filter(Boolean);
 		} else if (ns === 'custom_sections') {
-			// path: custom_sections.{csIdx}.items.{itemIdx}.tags
-			const csIdx = parseInt(idxStr);
-			const itemIdx = parseInt(parts[3]);
+			// path: custom_sections.{visCsIdx}.items.{visItemIdx}.tags
+			const { csIdx, itemIdx } = csActual(parseInt(idxStr), parseInt(parts[3]));
 			items = [...(customSections[csIdx]?.items?.[itemIdx]?.tags ?? [])];
 		} else {
 			// Path index is the visible (preview) index — map to actual sections[] index.
@@ -2520,9 +2572,8 @@
 			await persistProfile();
 			queuePreviewRefresh();
 		} else if (ns === 'custom_sections') {
-			// path: custom_sections.{csIdx}.items.{itemIdx}.tags
-			const csIdx = parseInt(idxStr);
-			const itemIdx = parseInt(parts[3]);
+			// path: custom_sections.{visCsIdx}.items.{visItemIdx}.tags
+			const { csIdx, itemIdx } = csActual(parseInt(idxStr), parseInt(parts[3]));
 			const u = [...customSections];
 			if (u[csIdx]?.items?.[itemIdx]) {
 				const updatedItems = [...u[csIdx].items];
@@ -2649,6 +2700,45 @@
 		}
 		return result;
 	});
+
+	/**
+	 * Same visible↔actual problem as visibleToActual, for custom sections.
+	 * normalize() drops hidden sections and hidden items before rendering, so
+	 * every index in a preview path (custom_sections.{ci}.items.{ii}.{field}) is
+	 * a VISIBLE index. Writing it straight back into customSections[] would edit,
+	 * delete or reorder the wrong section/item as soon as anything is hidden.
+	 */
+	const csVisibleToActual = $derived.by(() => {
+		const mapping: number[] = [];
+		customSections.forEach((cs, actualIdx) => {
+			if (!cs._hidden) mapping.push(actualIdx);
+		});
+		return mapping;
+	});
+
+	/** Per ACTUAL custom-section index: visible item index → actual item index. */
+	const csItemVisibleToActual = $derived.by(() => {
+		const result: Record<number, number[]> = {};
+		customSections.forEach((cs, actualIdx) => {
+			const mapping: number[] = [];
+			(cs.items ?? []).forEach((item, itemIdx) => {
+				if (!item._hidden) mapping.push(itemIdx);
+			});
+			result[actualIdx] = mapping;
+		});
+		return result;
+	});
+
+	/** Resolves a preview path's visible custom-section/item indices to actual
+	 *  customSections[] indices. Pass only the section index to map a section. */
+	function csActual(visCsIdx: number, visItemIdx?: number): { csIdx: number; itemIdx: number } {
+		const csIdx = csVisibleToActual[visCsIdx] ?? visCsIdx;
+		const itemIdx =
+			visItemIdx == null || isNaN(visItemIdx)
+				? -1
+				: (csItemVisibleToActual[csIdx]?.[visItemIdx] ?? visItemIdx);
+		return { csIdx, itemIdx };
+	}
 
 	function focusListItem(index: number) {
 		setTimeout(() => {
@@ -2835,8 +2925,8 @@
 						const overrideKey = parts[1] ?? '';
 						if (overrideKey) setTimeout(() => scrollRightPanelToField(`tov-${overrideKey}`, 80), 60);
 					} else if (ns === 'custom_sections') {
-						// path: custom_sections.{csIdx}.items.{itemIdx}.{field}
-						const csIdx = parseInt(parts[1]);
+						// path: custom_sections.{visCsIdx}.items.{visItemIdx}.{field}
+						const { csIdx } = csActual(parseInt(parts[1]));
 						activeTab = 'custom_sections';
 						mobileTab = 'edit';
 						if (!isNaN(csIdx)) {
@@ -2925,8 +3015,8 @@
 					const sec = d.section as string;
 					mobileTab = 'edit';
 					if (sec.startsWith('custom_sections.')) {
-						// "custom_sections.0.items" → csIdx = 0
-						const csIdx = parseInt(sec.split('.')[1]);
+						// "custom_sections.0.items" → visible csIdx = 0
+						const { csIdx } = csActual(parseInt(sec.split('.')[1]));
 						activeTab = 'custom_sections';
 						csExpanded = { ...csExpanded, [csIdx]: true };
 						addCsItem(csIdx);
@@ -2945,9 +3035,9 @@
 				case 'focus-item': {
 					const sec = d.section as string;
 					const visIdx = d.index as number;
-					// Custom sections encode their index as "custom_sections.{csIdx}"
+					// Custom sections encode their index as "custom_sections.{visCsIdx}"
 					if (sec.startsWith('custom_sections.')) {
-						const csIdx = parseInt(sec.split('.')[1]);
+						const { csIdx } = csActual(parseInt(sec.split('.')[1]));
 						activeTab = 'custom_sections';
 						mobileTab = 'edit';
 						if (!isNaN(csIdx)) {
@@ -3014,8 +3104,11 @@
 					const sec = d.section as string;
 					const visIdx = d.index as number;
 					if (sec.startsWith('custom_sections.')) {
-						const csIdx = parseInt(sec.split('.')[1]);
-						if (!isNaN(csIdx)) removeCsItem(csIdx, visIdx);
+						// Both indices are visible indices — map before deleting, or a
+						// hidden section/item earlier in the array shifts the delete
+						// onto the wrong row.
+						const { csIdx, itemIdx } = csActual(parseInt(sec.split('.')[1]), visIdx);
+						if (!isNaN(csIdx) && itemIdx >= 0) removeCsItem(csIdx, itemIdx);
 						break;
 					}
 					const actualIdx = visibleToActual[sec]?.[visIdx] ?? visIdx;
@@ -3131,7 +3224,7 @@
 
 		<aside class="{mobileTab === 'sections' ? 'flex' : 'hidden'} sm:flex w-full sm:w-64 flex-col flex-shrink-0 overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden border-r border-surface-muted bg-surface-subtle sm:bg-surface-subtle sm:p-0 sm:pt-3">
 			<div class="flex-shrink-0 p-3 space-y-0.5 sm:mx-3 sm:rounded-2xl sm:border sm:border-surface-muted sm:bg-white sm:shadow-md sm:p-3 sm:mb-2">
-				<button onclick={() => { activeTab = 'profile'; mobileTab = 'edit'; }} class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm font-medium transition-colors {activeTab === 'profile' ? 'bg-brand text-white' : 'text-ink-soft hover:bg-surface-muted'}">
+				<button onclick={() => selectSection('profile')} class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm font-medium transition-colors {activeTab === 'profile' ? 'bg-brand text-white' : 'text-ink-soft hover:bg-surface-muted'}">
 					Profile
 				</button>
 				{#if !pageLoading}
@@ -3141,7 +3234,7 @@
 								<div class="flex-shrink-0 cursor-grab px-2 py-2 opacity-40 active:cursor-grabbing">
 									<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="h-4 w-4"><path d="M7 2a2 2 0 1 0 .001 4.001A2 2 0 0 0 7 2zm0 6a2 2 0 1 0 .001 4.001A2 2 0 0 0 7 8zm0 6a2 2 0 1 0 .001 4.001A2 2 0 0 0 7 14zm6-8a2 2 0 1 0-.001-4.001A2 2 0 0 0 13 6zm0 2a2 2 0 1 0 .001 4.001A2 2 0 0 0 13 8zm0 6a2 2 0 1 0 .001 4.001A2 2 0 0 0 13 14z"/></svg>
 								</div>
-								<button class="flex-1 py-2 text-left text-sm font-medium" onclick={() => { activeTab = item.id; mobileTab = 'edit'; }}>{sectionLabel(item.id)}</button>
+								<button class="flex-1 py-2 text-left text-sm font-medium" onclick={() => selectSection(item.id)}>{sectionLabel(item.id)}</button>
 								<button onclick={(e) => { e.stopPropagation(); toggleSectionVisibility(item.id); }} class="flex-shrink-0 rounded p-1.5 opacity-60 transition-opacity hover:opacity-100" title={hiddenSections.has(item.id) ? 'Show section' : 'Hide section'}>
 									{#if hiddenSections.has(item.id)}
 										<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="h-4 w-4 text-ink-muted"><path stroke-linecap="round" stroke-linejoin="round" d="M3.98 8.223A10.477 10.477 0 0 0 1.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.451 10.451 0 0 1 12 4.5c4.756 0 8.773 3.162 10.065 7.498a10.522 10.522 0 0 1-4.293 5.774M6.228 6.228 3 3m3.228 3.228 3.65 3.65m7.894 7.894L21 21m-3.228-3.228-3.65-3.65m0 0a3 3 0 1 0-4.243-4.243m4.242 4.242L9.88 9.88" /></svg>
@@ -3722,7 +3815,7 @@
 							<div class="mb-4 flex items-start justify-between">
 								<div>
 									<p class="text-xs font-bold uppercase tracking-widest text-ink-muted">Summary Image</p>
-									<p class="mt-0.5 text-xs text-ink-muted">A separate image shown beside the Professional Summary (not your hero profile photo).</p>
+									<p class="mt-0.5 text-xs text-ink-muted">A separate image shown in your About / Summary section (not your hero profile photo).</p>
 								</div>
 								{#if summaryImageUploadStatus === 'done'}<span class="flex-shrink-0 rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-600 ring-1 ring-emerald-100">Saved ✓</span>
 								{:else if summaryImageUploadStatus === 'uploading'}<span class="flex-shrink-0 rounded-full bg-surface-muted px-3 py-1 text-xs font-bold text-ink-muted">Uploading…</span>
@@ -3831,19 +3924,27 @@
 
 						<!-- Existing custom sections -->
 						{#each customSections as cs, csIdx}
-							<div data-item-card="custom_sections-{csIdx}" class="overflow-hidden rounded-[1.5rem] border bg-white shadow-sm transition-all {csExpanded[csIdx] ? 'border-brand/20 shadow-md' : 'border-surface-muted hover:shadow-md'}">
+							<div data-item-card="custom_sections-{csIdx}" class="overflow-hidden rounded-[1.5rem] border bg-white shadow-sm transition-all {cs._hidden ? 'border-surface-muted opacity-60' : csExpanded[csIdx] ? 'border-brand/20 shadow-md' : 'border-surface-muted hover:shadow-md'}">
 								<!-- Section header -->
 								<div class="flex w-full items-center gap-2 px-4 py-3">
 									<button type="button" onclick={() => { csExpanded = { ...csExpanded, [csIdx]: !csExpanded[csIdx] }; }} class="flex min-w-0 flex-1 items-center gap-2 text-left">
 										<div class="min-w-0 flex-1">
-											<p class="truncate text-sm font-bold text-ink">{cs.title || `Section ${csIdx + 1}`}</p>
-											<p class="mt-0.5 text-xs text-ink-muted capitalize">{cs.display_type} · {cs.items.length} item{cs.items.length !== 1 ? 's' : ''}</p>
+											<p class="truncate text-sm font-bold text-ink {cs._hidden ? 'line-through text-ink-muted' : ''}">{cs.title || `Section ${csIdx + 1}`}</p>
+											<p class="mt-0.5 text-xs text-ink-muted capitalize">{cs._hidden ? 'Hidden · ' : ''}{cs.display_type} · {cs.items.length} item{cs.items.length !== 1 ? 's' : ''}</p>
 										</div>
 										<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="h-4 w-4 flex-shrink-0 text-ink-muted transition-transform {csExpanded[csIdx] ? 'rotate-180' : ''}"><path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" /></svg>
 									</button>
 									<div class="flex flex-shrink-0 items-center gap-1">
 										<button type="button" onclick={() => moveCustomSectionUp(csIdx)} disabled={csIdx === 0} title="Move section up" class="rounded p-1 text-ink-muted hover:text-ink-soft disabled:opacity-20"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="h-3.5 w-3.5"><path stroke-linecap="round" stroke-linejoin="round" d="m4.5 15.75 7.5-7.5 7.5 7.5" /></svg></button>
 										<button type="button" onclick={() => moveCustomSectionDown(csIdx)} disabled={csIdx === customSections.length - 1} title="Move section down" class="rounded p-1 text-ink-muted hover:text-ink-soft disabled:opacity-20"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="h-3.5 w-3.5"><path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" /></svg></button>
+										<!-- Hide toggle (whole section) -->
+										<button type="button" onclick={() => toggleCustomSectionHidden(csIdx)} title={cs._hidden ? 'Show in portfolio' : 'Hide from portfolio'} class="flex-shrink-0 rounded-lg border p-1.5 transition-colors {cs._hidden ? 'border-surface-muted bg-surface-muted text-ink-muted hover:bg-surface-muted' : 'border-surface-muted text-ink-muted hover:bg-surface-muted hover:text-ink-soft'}">
+											{#if cs._hidden}
+												<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="h-3.5 w-3.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3.98 8.223A10.477 10.477 0 0 0 1.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.451 10.451 0 0 1 12 4.5c4.756 0 8.773 3.162 10.065 7.498a10.522 10.522 0 0 1-4.293 5.774M6.228 6.228 3 3m3.228 3.228 3.65 3.65m7.894 7.894L21 21m-3.228-3.228-3.65-3.65m0 0a3 3 0 1 0-4.243-4.243m4.242 4.242L9.88 9.88" /></svg>
+											{:else}
+												<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="h-3.5 w-3.5"><path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" /><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" /></svg>
+											{/if}
+										</button>
 										<button type="button" onclick={() => deleteCustomSection(csIdx)} class="rounded-lg border border-red-100 bg-red-50 px-2 py-1 text-xs font-bold text-red-500 hover:bg-red-100">Delete</button>
 									</div>
 								</div>
@@ -3872,12 +3973,20 @@
 
 										<!-- Items -->
 										{#each cs.items as item, itemIdx}
-											<div class="rounded-xl border border-surface-muted bg-white p-4 space-y-3">
+											<div class="rounded-xl border border-surface-muted bg-white p-4 space-y-3 {item._hidden ? 'opacity-60' : ''}">
 												<div class="flex items-center justify-between gap-2">
-													<p class="text-xs font-bold text-ink-soft">Item {itemIdx + 1}</p>
+													<p class="text-xs font-bold text-ink-soft">Item {itemIdx + 1}{item._hidden ? ' · Hidden' : ''}</p>
 													<div class="flex items-center gap-1">
 														<button type="button" onclick={() => moveCsItemUp(csIdx, itemIdx)} disabled={itemIdx === 0} title="Move up" class="rounded p-0.5 text-ink-muted hover:text-ink-soft disabled:opacity-20"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="h-3.5 w-3.5"><path stroke-linecap="round" stroke-linejoin="round" d="m4.5 15.75 7.5-7.5 7.5 7.5" /></svg></button>
 														<button type="button" onclick={() => moveCsItemDown(csIdx, itemIdx)} disabled={itemIdx === cs.items.length - 1} title="Move down" class="rounded p-0.5 text-ink-muted hover:text-ink-soft disabled:opacity-20"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="h-3.5 w-3.5"><path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" /></svg></button>
+														<!-- Hide toggle (single item) -->
+														<button type="button" onclick={() => toggleCsItemHidden(csIdx, itemIdx)} title={item._hidden ? 'Show in portfolio' : 'Hide from portfolio'} class="rounded-lg border p-1 transition-colors {item._hidden ? 'border-surface-muted bg-surface-muted text-ink-muted' : 'border-surface-muted text-ink-muted hover:bg-surface-muted hover:text-ink-soft'}">
+															{#if item._hidden}
+																<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="h-3.5 w-3.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3.98 8.223A10.477 10.477 0 0 0 1.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.451 10.451 0 0 1 12 4.5c4.756 0 8.773 3.162 10.065 7.498a10.522 10.522 0 0 1-4.293 5.774M6.228 6.228 3 3m3.228 3.228 3.65 3.65m7.894 7.894L21 21m-3.228-3.228-3.65-3.65m0 0a3 3 0 1 0-4.243-4.243m4.242 4.242L9.88 9.88" /></svg>
+															{:else}
+																<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="h-3.5 w-3.5"><path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" /><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" /></svg>
+															{/if}
+														</button>
 														<button type="button" onclick={() => removeCsItem(csIdx, itemIdx)} class="rounded-lg border border-red-100 bg-red-50 px-2 py-1 text-xs font-bold text-red-500 hover:bg-red-100">Remove</button>
 													</div>
 												</div>

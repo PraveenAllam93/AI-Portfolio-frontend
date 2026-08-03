@@ -143,6 +143,12 @@ nav.scrolled{border-color:var(--border);box-shadow:0 2px 24px rgba(77,74,93,0.07
 .about-photo-wrap{border-radius:var(--r-2xl);overflow:hidden;background:linear-gradient(135deg,var(--blush) 0%,var(--sage-lite) 100%);aspect-ratio:3/4;display:flex;align-items:center;justify-content:center;position:relative}
 .about-photo-wrap img{width:100%;height:100%;object-fit:cover}
 .about-photo-inner{width:70%;aspect-ratio:1;background:linear-gradient(135deg,var(--sage) 0%,var(--sage-dark) 100%);border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:var(--font-display);font-size:clamp(3rem,7vw,6rem);font-weight:700;color:var(--white)}
+.about-grid--solo{grid-template-columns:minmax(0,760px);justify-content:center}
+.about-photo-wrap.is-empty{border:2px dashed var(--border-sage)}
+.about-ph{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.5rem;padding:2rem;text-align:center;color:var(--sage-dark)}
+.about-ph-ic{font-size:2.25rem;line-height:1}
+.about-ph-tx{font-family:var(--font-display);font-size:1.15rem;font-weight:700;color:var(--charcoal)}
+.about-ph-sub{font-size:.8rem;line-height:1.55;color:var(--muted);max-width:26ch}
 .about-tag{position:absolute;background:rgba(255,255,255,0.85);backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,0.9);border-radius:var(--r-md);box-shadow:var(--shadow-glass);padding:1rem 1.25rem;display:flex;align-items:center;gap:.75rem}
 .about-tag.t1{bottom:2rem;right:-1.5rem}
 .about-tag.t2{top:2rem;left:-1.5rem}
@@ -307,13 +313,23 @@ export function html(v: NormalizedData): string {
 
 	// ABOUT
 	const pillars = (v.skill_groups ?? []).slice(0, 4).map(g => `<div class="pillar"><div class="pillar-title">${g.category}</div><div class="pillar-text">${g.skills.slice(0, 3).join(' · ')}</div></div>`).join('');
-	const aboutHtml = (v.bio || v.uniqueValue)
-		? `<section class="section" id="about"><div class="max-w about-grid">
-<div class="about-visual reveal">
-<div class="about-photo-wrap" ${_imgUpload('profile.profile_image', em)}>${v.profile_image ? `<img src="${v.profile_image}" alt="${v.name}">` : `<div class="about-photo-inner">${initials}</div>`}</div>
+	// The About visual is its OWN image (profile.summary_image), uploaded from the
+	// "Portfolio Fields" tab — NOT the hero photo. Reusing profile_image here
+	// showed the same portrait twice on one scroll. When no image is set the
+	// column is dropped entirely on the published site (and the grid collapses to
+	// one column); in the editor it becomes an upload prompt instead.
+	const aboutVisual = v.summary_image
+		? `<div class="about-photo-wrap" ${_imgUpload('profile.summary_image', em, 'Upload image')}><img src="${v.summary_image}" alt="${v.name} — about"></div>`
+		: em
+			? `<div class="about-photo-wrap is-empty" ${_imgUpload('profile.summary_image', em, 'Upload image')}><div class="about-ph"><div class="about-ph-ic">🖼️</div><div class="about-ph-tx">Add a section image</div><div class="about-ph-sub">Upload one from the <strong>Portfolio Fields</strong> tab — it appears here, separate from your hero photo.</div></div></div>`
+			: '';
+	const aboutHtml = (v.bio || v.uniqueValue || v.summary_image)
+		? `<section class="section" id="about"><div class="max-w about-grid${aboutVisual ? '' : ' about-grid--solo'}">
+${aboutVisual ? `<div class="about-visual reveal">
+${aboutVisual}
 ${showRoas ? `<div class="about-tag t1"><div class="tag-icon">📈</div><div><div class="tag-val">${statNum('avg_roas', avgRoas)}×</div><div class="tag-label">Avg. ROAS</div></div></div>` : ''}
 ${showYears ? `<div class="about-tag t2"><div class="tag-icon">⭐</div><div><div class="tag-val">${statNum('years_experience', yearsExp)}+ yrs</div><div class="tag-label">Experience</div></div></div>` : ''}
-</div>
+</div>` : ''}
 <div class="reveal reveal-delay-1">
 <div class="section-label">About</div>
 <h2 class="section-title">The strategy<br><em>behind the story</em></h2>

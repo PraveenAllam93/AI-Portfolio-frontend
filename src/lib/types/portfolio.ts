@@ -101,6 +101,11 @@ export interface CampaignItem {
 	channels_used?: string[];
 	budget?: string;
 	performance_metrics?: string[];
+	/** Case-study fields — user-filled in the editor (not produced by resume parsing). */
+	challenge?: string;
+	approach?: string[];
+	/** Campaign gallery images (max 3), same uploader as project/experience images. */
+	images?: string[];
 }
 
 export interface FinancialModelItem {
@@ -121,6 +126,9 @@ export interface CustomSectionItem {
 	subtitle?: string;
 	tags?: string[];
 	url?: string;
+	/** Hidden from the portfolio via the eye toggle. Filtered out in normalize(),
+	 *  so it never reaches the preview or the published HTML. */
+	_hidden?: boolean;
 }
 
 export interface CustomSection {
@@ -128,6 +136,8 @@ export interface CustomSection {
 	title: string;
 	display_type: 'cards' | 'list' | 'timeline';
 	items: CustomSectionItem[];
+	/** Hides the whole custom section (see CustomSectionItem._hidden). */
+	_hidden?: boolean;
 }
 
 export interface ParsedData {

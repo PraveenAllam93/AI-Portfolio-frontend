@@ -182,6 +182,12 @@ a{color:inherit;text-decoration:none}
 .about__img-frame{width:100%;aspect-ratio:3/4;background:linear-gradient(160deg,var(--teal-mid) 0%,var(--teal-deep) 100%);position:relative;overflow:hidden}
 .about__img-frame img{width:100%;height:100%;object-fit:cover}
 .about__initials{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:var(--font-display);font-size:8rem;font-weight:700;color:rgba(245,240,232,0.18);letter-spacing:-.05em}
+.about__inner--solo{grid-template-columns:minmax(0,760px);justify-content:center}
+.about__img-frame--empty{display:flex;align-items:center;justify-content:center;border:2px dashed rgba(245,240,232,0.35)}
+.about__ph{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.6rem;padding:2rem;text-align:center}
+.about__ph-ic{font-size:2.25rem;line-height:1}
+.about__ph-tx{font-family:var(--font-display);font-size:1.15rem;font-weight:600;color:var(--cream)}
+.about__ph-sub{font-size:.78rem;line-height:1.6;color:rgba(245,240,232,0.7);max-width:26ch}
 .about__badge{position:absolute;bottom:-1.5rem;right:-1.5rem;width:120px;height:120px;background:var(--gold);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:2}
 .about__badge-num{font-family:var(--font-display);font-size:2.5rem;font-weight:700;color:var(--forest);line-height:1}
 .about__badge-label{font-family:var(--font-mono);font-size:.55rem;letter-spacing:.15em;text-transform:uppercase;color:var(--forest);text-align:center;margin-top:.25rem}
@@ -396,12 +402,21 @@ ${addBtn(`custom_sections.${ci}.items`, 'Item')}
 
 	// ABOUT
 	const aboutSkills = (v.skill_groups ?? []).flatMap(g => g.skills).slice(0, 8);
-	const aboutHtml = (v.bio || v.uniqueValue)
-		? `<section class="section about section--sage" id="about"><div class="container about__inner">
-<div class="about__visual reveal">
-<div class="about__img-frame" ${_imgUpload('profile.profile_image', em)}>${v.profile_image ? `<img src="${v.profile_image}" alt="${v.name}">` : `<div class="about__initials">${initials}</div>`}</div>
+	// The About visual is its OWN image (profile.summary_image), uploaded from the
+	// "Portfolio Fields" tab — NOT the hero photo, which used to render here a
+	// second time. With no image set the column is dropped on the published site
+	// (grid collapses to one column); in the editor it becomes an upload prompt.
+	const aboutVisual = v.summary_image
+		? `<div class="about__img-frame" ${_imgUpload('profile.summary_image', em, 'Upload image')}><img src="${v.summary_image}" alt="${v.name} — about"></div>`
+		: em
+			? `<div class="about__img-frame about__img-frame--empty" ${_imgUpload('profile.summary_image', em, 'Upload image')}><div class="about__ph"><div class="about__ph-ic">🖼️</div><div class="about__ph-tx">Add a section image</div><div class="about__ph-sub">Upload one from the <strong>Portfolio Fields</strong> tab — it appears here, separate from your hero photo.</div></div></div>`
+			: '';
+	const aboutHtml = (v.bio || v.uniqueValue || v.summary_image)
+		? `<section class="section about section--sage" id="about"><div class="container about__inner${aboutVisual ? '' : ' about__inner--solo'}">
+${aboutVisual ? `<div class="about__visual reveal">
+${aboutVisual}
 ${showYears ? `<div class="about__badge"><div class="about__badge-num">${statNum('years_experience', yearsExp)}+</div><div class="about__badge-label">Years</div></div>` : ''}
-</div>
+</div>` : ''}
 <div class="about__content reveal">
 <div class="tag">About</div>
 <h2>The person <em>behind the feed</em></h2>

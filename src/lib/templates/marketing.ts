@@ -369,23 +369,65 @@ a{color:inherit;text-decoration:none}
 .ach-year-mk{font-size:.8rem;color:var(--rose);flex-shrink:0}
 @media(max-width:900px){#s-ach{padding:80px 24px}}
 
-/* ── Custom sections ── */
+/* ── Custom sections ──
+   The section background rotates (two cream, one dark green --g-impact), so
+   EVERY colour below is scoped to .cs-mk--light / .cs-mk--dark. Keep it that
+   way: an inline colour on these elements beats these rules and is what put
+   near-black text on the dark green section. */
+.cs-mk{padding:100px 60px;position:relative;overflow:hidden}
+/* .sec-heading is 32px and .sec-heading-dark is 60px (native sections
+   compensate via their content's margin-top). Custom sections share one
+   content block, so pin the gap or the dark section sits visibly tighter
+   than the two cream ones. */
+.cs-mk .sec-heading,
+.cs-mk .sec-heading-dark{margin-bottom:40px}
 .cs-mk-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));
   gap:20px;margin-top:40px}
-.cs-mk-card{background:rgba(255,255,255,.06);border:1px solid rgba(196,83,106,.15);
-  padding:24px;position:relative;transition:border-color .25s}
-.cs-mk-card:hover{border-color:rgba(196,83,106,.35)}
-.cs-mk-card h3{font-family:var(--font-display);font-size:1rem;font-weight:700;margin-bottom:8px}
-.cs-mk-card p{font-size:.85rem;color:var(--muted);line-height:1.6}
+.cs-mk-card{padding:24px;position:relative;transition:border-color .25s,background .25s}
+.cs-mk-title{font-family:var(--font-display);font-size:1rem;font-weight:700;line-height:1.25}
+.cs-mk-card .cs-mk-title{margin-bottom:8px}
+.cs-mk-body{font-size:.85rem;line-height:1.6;margin-top:4px}
+.cs-mk-meta{font-family:var(--font-body);font-size:.58rem;letter-spacing:.2em;
+  text-transform:uppercase;margin-bottom:10px}
+.cs-mk-date{font-size:.8rem;flex-shrink:0}
+.cs-mk-chips{margin-top:10px}
 .cs-mk-list{display:flex;flex-direction:column;gap:0;margin-top:32px}
-.cs-mk-row{display:flex;align-items:baseline;gap:20px;padding:16px 0;
-  border-bottom:1px solid rgba(196,83,106,.12);position:relative}
-.cs-mk-row:first-child{border-top:1px solid rgba(196,83,106,.12)}
+.cs-mk-row{display:flex;align-items:baseline;gap:20px;padding:16px 0;position:relative}
 .cs-mk-tl{display:flex;flex-direction:column;gap:0;margin-top:32px}
 .cs-mk-tl-row{display:grid;grid-template-columns:130px 1fr;gap:20px;
-  padding:20px 0;border-bottom:1px solid rgba(196,83,106,.12);position:relative}
-.cs-mk-tl-row:first-child{border-top:1px solid rgba(196,83,106,.12)}
-.cs-mk-tl-sub{font-size:.72rem;letter-spacing:.1em;text-transform:uppercase;color:var(--rose)}
+  padding:20px 0;position:relative}
+.cs-mk-tl-sub{font-size:.72rem;letter-spacing:.1em;text-transform:uppercase}
+
+/* cream background — mirrors #s-edu / .edu-card */
+.cs-mk--light .cs-mk-card{background:rgba(255,255,255,.55);backdrop-filter:blur(20px);
+  border:1px solid rgba(196,83,106,.15)}
+.cs-mk--light .cs-mk-card:hover{border-color:rgba(196,83,106,.35)}
+.cs-mk--light .cs-mk-title{color:var(--charcoal)}
+.cs-mk--light .cs-mk-body{color:var(--muted)}
+.cs-mk--light .cs-mk-meta,
+.cs-mk--light .cs-mk-date,
+.cs-mk--light .cs-mk-tl-sub{color:var(--rose)}
+.cs-mk--light .cs-mk-row,
+.cs-mk--light .cs-mk-tl-row{border-bottom:1px solid rgba(196,83,106,.12)}
+.cs-mk--light .cs-mk-row:first-child,
+.cs-mk--light .cs-mk-tl-row:first-child{border-top:1px solid rgba(196,83,106,.12)}
+.cs-mk--light .chip{border-color:rgba(196,83,106,.3);color:var(--rose)}
+
+/* dark green background — mirrors #s-impact / #s-exp */
+.cs-mk--dark .cs-mk-card{background:rgba(255,255,255,.06);
+  border:1px solid rgba(255,255,255,.14)}
+.cs-mk--dark .cs-mk-card:hover{border-color:rgba(180,230,220,.4)}
+.cs-mk--dark .cs-mk-title{color:#fff}
+.cs-mk--dark .cs-mk-body{color:rgba(255,255,255,.72)}
+.cs-mk--dark .cs-mk-meta,
+.cs-mk--dark .cs-mk-date,
+.cs-mk--dark .cs-mk-tl-sub{color:rgba(180,230,220,.9)}
+.cs-mk--dark .cs-mk-row,
+.cs-mk--dark .cs-mk-tl-row{border-bottom:1px solid rgba(255,255,255,.12)}
+.cs-mk--dark .cs-mk-row:first-child,
+.cs-mk--dark .cs-mk-tl-row:first-child{border-top:1px solid rgba(255,255,255,.12)}
+@media(max-width:900px){.cs-mk{padding:80px 24px}
+  .cs-mk-tl-row{grid-template-columns:1fr;gap:8px}}
 
 /* ── Contact ── */
 #s-contact{min-height:100vh;background:var(--g-contact);display:flex;
@@ -444,20 +486,34 @@ function customSectionsHtml(v: NormalizedData, em: boolean): string {
 		em ? `<button class="ce-del-btn" data-del-section="${sec}" data-del-index="${i}">&#x2715;</button>` : '';
 	const addBtn = (sec: string, label: string) =>
 		em ? `<button class="ce-add-btn" data-add-section="${sec}">+ Add ${label}</button>` : '';
-	const bgOptions = ['background:var(--g-about)', 'background:var(--g-edu)', 'background:var(--g-impact)'];
+	// Backgrounds rotate per section and the third one is the DARK green
+	// --g-impact. The text treatment must follow the background, exactly the way
+	// every native section already does it: #s-exp / #s-skills / #s-impact are
+	// dark gradients + the *-light classes, #s-edu / #s-certs / #s-ach are cream
+	// + the *-dark classes. Hard-coding the *-dark classes here (and inline
+	// charcoal/muted colours on the rows) put near-black text on dark green.
+	// Colours now live in .cs-mk--light / .cs-mk--dark CSS — do NOT reintroduce
+	// inline `color:` here, it would beat those rules and bring the bug back.
+	const bgOptions: Array<{ bg: string; dark: boolean }> = [
+		{ bg: 'background:var(--g-about)',  dark: false },
+		{ bg: 'background:var(--g-edu)',    dark: false },
+		{ bg: 'background:var(--g-impact)', dark: true  },
+	];
 
 	return (v.custom_sections ?? []).map((cs, csIdx) => {
 		if (!cs.items?.length && !em) return '';
-		const bg = bgOptions[csIdx % bgOptions.length];
+		const { bg, dark } = bgOptions[csIdx % bgOptions.length];
+		const tagClass = dark ? 'sec-tag sec-tag-light' : 'sec-tag-dark';
+		const headClass = dark ? 'sec-heading sec-heading-light' : 'sec-heading-dark';
 		let inner = '';
 		if (cs.display_type === 'cards') {
 			inner = `<div class="cs-mk-cards">
 ${(cs.items ?? []).map((item, i) => `<div class="cs-mk-card"${iw}>
 ${delBtn(`custom_sections.${csIdx}`, i)}
-${item.label ? `<h3 ${em ? _editable(`custom_sections.${csIdx}.items.${i}.label`) : ''}>${item.label}</h3>` : ''}
-${item.subtitle ? `<p class="cert-issuer" ${em ? _editable(`custom_sections.${csIdx}.items.${i}.subtitle`) : ''}>${item.subtitle}</p>` : ''}
-${item.value ? `<p ${em ? _editable(`custom_sections.${csIdx}.items.${i}.value`, true) : ''}>${item.value}</p>` : ''}
-${item.tags?.length ? `<div class="tl-chips" style="margin-top:10px" ${em ? _listEditable(`custom_sections.${csIdx}.items.${i}.tags`) : ''}>${item.tags.map(t => `<span class="chip">${t}</span>`).join('')}</div>` : ''}
+${item.label ? `<h3 class="cs-mk-title" ${em ? _editable(`custom_sections.${csIdx}.items.${i}.label`) : ''}>${item.label}</h3>` : ''}
+${item.subtitle ? `<p class="cs-mk-meta" ${em ? _editable(`custom_sections.${csIdx}.items.${i}.subtitle`) : ''}>${item.subtitle}</p>` : ''}
+${item.value ? `<p class="cs-mk-body" ${em ? _editable(`custom_sections.${csIdx}.items.${i}.value`, true) : ''}>${item.value}</p>` : ''}
+${item.tags?.length ? `<div class="tl-chips cs-mk-chips" ${em ? _listEditable(`custom_sections.${csIdx}.items.${i}.tags`) : ''}>${item.tags.map(t => `<span class="chip">${t}</span>`).join('')}</div>` : ''}
 </div>`).join('\n')}
 </div>${addBtn(`custom_sections.${csIdx}.items`, 'Item')}`;
 		} else if (cs.display_type === 'timeline') {
@@ -466,8 +522,8 @@ ${(cs.items ?? []).map((item, i) => `<div class="cs-mk-tl-row"${iw}>
 ${delBtn(`custom_sections.${csIdx}`, i)}
 <div>${item.subtitle ? `<div class="cs-mk-tl-sub" ${em ? _editable(`custom_sections.${csIdx}.items.${i}.subtitle`) : ''}>${item.subtitle}</div>` : ''}</div>
 <div>
-${item.label ? `<div style="font-family:var(--font-display);font-size:1rem;font-weight:700;color:var(--charcoal)" ${em ? _editable(`custom_sections.${csIdx}.items.${i}.label`) : ''}>${item.label}</div>` : ''}
-${item.value ? `<div style="font-size:.85rem;color:var(--muted);line-height:1.6;margin-top:4px" ${em ? _editable(`custom_sections.${csIdx}.items.${i}.value`, true) : ''}>${item.value}</div>` : ''}
+${item.label ? `<div class="cs-mk-title" ${em ? _editable(`custom_sections.${csIdx}.items.${i}.label`) : ''}>${item.label}</div>` : ''}
+${item.value ? `<div class="cs-mk-body" ${em ? _editable(`custom_sections.${csIdx}.items.${i}.value`, true) : ''}>${item.value}</div>` : ''}
 </div>
 </div>`).join('\n')}
 </div>${addBtn(`custom_sections.${csIdx}.items`, 'Item')}`;
@@ -476,17 +532,17 @@ ${item.value ? `<div style="font-size:.85rem;color:var(--muted);line-height:1.6;
 ${(cs.items ?? []).map((item, i) => `<div class="cs-mk-row"${iw}>
 ${delBtn(`custom_sections.${csIdx}`, i)}
 <div style="flex:1">
-${item.label ? `<div style="font-family:var(--font-display);font-size:.95rem;font-weight:700;color:var(--charcoal)" ${em ? _editable(`custom_sections.${csIdx}.items.${i}.label`) : ''}>${item.label}</div>` : ''}
-${item.value ? `<div style="font-size:.85rem;color:var(--muted);line-height:1.6;margin-top:4px" ${em ? _editable(`custom_sections.${csIdx}.items.${i}.value`, true) : ''}>${item.value}</div>` : ''}
+${item.label ? `<div class="cs-mk-title" ${em ? _editable(`custom_sections.${csIdx}.items.${i}.label`) : ''}>${item.label}</div>` : ''}
+${item.value ? `<div class="cs-mk-body" ${em ? _editable(`custom_sections.${csIdx}.items.${i}.value`, true) : ''}>${item.value}</div>` : ''}
 </div>
-${item.subtitle ? `<div style="font-size:.8rem;color:var(--rose);flex-shrink:0" ${em ? _editable(`custom_sections.${csIdx}.items.${i}.subtitle`) : ''}>${item.subtitle}</div>` : ''}
+${item.subtitle ? `<div class="cs-mk-date" ${em ? _editable(`custom_sections.${csIdx}.items.${i}.subtitle`) : ''}>${item.subtitle}</div>` : ''}
 </div>`).join('\n')}
 </div>${addBtn(`custom_sections.${csIdx}.items`, 'Item')}`;
 		}
-		return `<section id="${cs.section_id}" style="${bg};padding:100px 60px;position:relative;overflow:hidden">
+		return `<section id="${cs.section_id}" class="cs-mk ${dark ? 'cs-mk--dark' : 'cs-mk--light'}" style="${bg}">
 <div style="max-width:1100px;margin:0 auto">
-<div class="sec-tag-dark reveal" ${v.edit_mode ? _editable(`custom_sections.${csIdx}.title`) : ''}>${cs.title}</div>
-<h2 class="sec-heading-dark reveal d1" ${v.edit_mode ? _editable(`custom_sections.${csIdx}.title`) : ''}>${cs.title}</h2>
+<div class="${tagClass} reveal" ${v.edit_mode ? _editable(`custom_sections.${csIdx}.title`) : ''}>${cs.title}</div>
+<h2 class="${headClass} reveal d1" ${v.edit_mode ? _editable(`custom_sections.${csIdx}.title`) : ''}>${cs.title}</h2>
 ${inner}
 </div>
 </section>`;

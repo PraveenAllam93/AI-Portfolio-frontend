@@ -321,7 +321,7 @@ export const TEMPLATE_FIELDS: Record<string, TemplateField[]> = {
  * profile photo), uploaded from the edit page's "Portfolio Fields" tab and stored
  * as profile.summary_image.
  */
-export const SUMMARY_IMAGE_TEMPLATES: ReadonlySet<string> = new Set(['structura', 'citrus']);
+export const SUMMARY_IMAGE_TEMPLATES: ReadonlySet<string> = new Set(['structura', 'citrus', 'bloom', 'vantage', 'canopy']);
 
 /**
  * Templates with an editable "Core Expertise" list, managed from the Portfolio

@@ -6,8 +6,15 @@
  * case-style campaign cards with gradient cover art, experience rows, dark
  * rounded contact band, scroll reveals.
  * Faithful port of marketing-01.html, mapped to our marketing data model
- * (work→campaigns, tool chips→skills; drops the dead case-detail SPA + counters;
- * no foreign projects section).
+ * (work→campaigns, tool chips→skills; no foreign projects section — `projects`
+ * is not a marketing section in SECTION_CATEGORIES).
+ *
+ * Clicking a work card opens a full case-study view for that campaign. Unlike the
+ * source HTML — which built the case page in JS from a hardcoded CASES object —
+ * every case view here is SERVER-RENDERED and merely toggled by class, so all of
+ * its fields keep normal data-paths (inline-editable) and survive the editor's
+ * iframe repaints. Case-study copy lives on new campaign fields: `challenge`,
+ * `approach[]`, and `images[]` (the gallery).
  */
 
 import type { NormalizedData } from './base';
@@ -70,7 +77,7 @@ nav{position:fixed;top:0;left:0;right:0;z-index:200;background:rgba(255,255,255,
 /* HERO */
 #hero{padding:158px 0 64px}
 .kicker{font-size:13px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);margin-bottom:22px}
-.hero-h{font-family:var(--ff-d);font-size:clamp(42px,7vw,92px);font-weight:700;line-height:.98;letter-spacing:-.035em;max-width:16ch;margin-bottom:28px}
+.hero-h{font-family:var(--ff-d);font-size:clamp(42px,7vw,92px);font-weight:700;line-height:.98;letter-spacing:-.035em;max-width:14ch;margin-bottom:28px}
 .hero-h .o{color:var(--accent)}
 .hero-sub{font-size:18px;color:var(--gray);max-width:56ch;line-height:1.7;margin-bottom:38px}
 .hero-cta{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
@@ -102,16 +109,17 @@ nav{position:fixed;top:0;left:0;right:0;z-index:200;background:rgba(255,255,255,
 
 /* WORK / CAMPAIGNS */
 .work-list{display:flex;flex-direction:column;gap:26px}
-.case{display:grid;grid-template-columns:1.05fr 1fr;border:1px solid var(--line);border-radius:22px;overflow:hidden;background:#fff;transition:transform .4s var(--ease),box-shadow .4s var(--ease)}
+.case{display:grid;grid-template-columns:1.05fr 1fr;border:1px solid var(--line);border-radius:22px;overflow:hidden;cursor:pointer;background:#fff;transition:transform .4s var(--ease),box-shadow .4s var(--ease)}
 .case:hover{transform:translateY(-4px);box-shadow:0 30px 70px -30px rgba(14,14,14,.25)}
+.case:focus-visible{outline:3px solid var(--accent);outline-offset:3px}
 .case:nth-child(even){grid-template-columns:1fr 1.05fr}
 .case:nth-child(even) .case-cover{order:2}
-.case-cover{position:relative;min-height:300px;padding:30px;display:flex;flex-direction:column;justify-content:space-between;overflow:hidden}
+.case-cover{position:relative;min-height:340px;padding:30px;display:flex;flex-direction:column;justify-content:space-between;overflow:hidden}
 .case-cover .art{position:absolute;inset:0;transition:transform .7s var(--ease)}
 .case:hover .art{transform:scale(1.04)}
 .ct{position:relative;z-index:2;font-size:11.5px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;opacity:.85}
 .cs{position:relative;z-index:2}
-.cs .n{font-family:var(--ff-d);font-size:clamp(40px,5vw,72px);font-weight:800;letter-spacing:-.035em;line-height:.95;display:block}
+.cs .n{font-family:var(--ff-d);font-size:clamp(52px,6vw,84px);font-weight:800;letter-spacing:-.035em;line-height:.95;display:block}
 .cs .l{font-size:13px;font-weight:500;opacity:.85;margin-top:10px;display:block;max-width:30ch}
 .tw{color:#fff}.tk{color:#4a3113}
 .case-info{padding:38px 40px;display:flex;flex-direction:column}
@@ -119,10 +127,19 @@ nav{position:fixed;top:0;left:0;right:0;z-index:200;background:rgba(255,255,255,
 .pill{font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;padding:5px 12px;border-radius:100px;background:var(--bg-soft);color:var(--gray)}
 .pill.hot{background:#ffede5;color:var(--accent)}
 .ci-title{font-family:var(--ff-d);font-size:clamp(23px,2.4vw,30px);font-weight:700;letter-spacing:-.02em;line-height:1.12;margin-bottom:14px}
-.ci-budget{font-size:13px;font-weight:600;color:var(--accent);margin-bottom:14px}
-.ci-metrics{display:flex;flex-direction:column;gap:8px;margin-top:auto}
-.ci-metric{font-size:14px;color:var(--gray);line-height:1.6;padding-left:22px;position:relative}
-.ci-metric::before{content:'';position:absolute;left:0;top:10px;width:12px;height:2px;background:var(--accent)}
+/* Card body: description (the case "challenge"), a horizontal metric row, and the
+   read-case-study affordance. The clamp is visual only — the full text stays in the
+   DOM so inline editing never truncates the stored value — and lifts on focus. */
+.ci-desc{font-size:14.5px;color:var(--gray);line-height:1.7;margin-bottom:22px;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.ci-desc:focus{-webkit-line-clamp:unset;overflow:visible}
+.ci-metrics{display:flex;gap:26px;flex-wrap:wrap;margin-bottom:26px}
+/* Transparent to layout so the editable-list region does not break the flex row. */
+.ci-metrics-list{display:contents}
+.cim .v{font-family:var(--ff-d);font-size:22px;font-weight:700;letter-spacing:-.02em}
+.cim .k{font-size:11.5px;color:var(--gray-lt);margin-top:2px}
+.ci-link{margin-top:auto;display:inline-flex;align-items:center;gap:10px;font-size:14px;font-weight:600;color:var(--ink)}
+.ci-link .arr{width:36px;height:36px;border-radius:50%;background:var(--bg-soft);display:flex;align-items:center;justify-content:center;transition:all .3s}
+.case:hover .ci-link .arr{background:var(--accent);color:#fff;transform:translateX(4px)}
 
 /* COVER ART */
 .art-osn{background:#0b1030}
@@ -145,7 +162,7 @@ nav{position:fixed;top:0;left:0;right:0;z-index:200;background:rgba(255,255,255,
 .xp{display:flex;flex-direction:column}
 .xp-row{display:grid;grid-template-columns:200px 1fr;gap:28px;padding:28px 0;border-bottom:1px solid var(--line);align-items:start}
 .xp-row:last-child{border-bottom:none}
-.xp-date{font-size:13px;color:var(--gray-lt);font-weight:500;padding-top:4px}
+.xp-date{font-size:13px;color:var(--gray-lt);font-weight:500}
 .xp-role{font-family:var(--ff-d);font-size:20px;font-weight:700;letter-spacing:-.015em}
 .xp-co{font-size:13.5px;color:var(--gray);margin-top:3px}
 .xp-desc{font-size:14.5px;color:var(--gray);line-height:1.7;margin-top:12px}
@@ -174,14 +191,19 @@ nav{position:fixed;top:0;left:0;right:0;z-index:200;background:rgba(255,255,255,
 
 /* ABOUT / SKILLS */
 #about{background:var(--bg-soft)}
-.about-grid{display:grid;grid-template-columns:1.15fr 1fr;gap:70px;align-items:start}
+/* Skills: lede across the top, then the groups in an auto-filling grid.
+   The old layout was two fixed columns — lede on the left, ALL groups stacked in
+   one tall column on the right — so any portfolio with more than a couple of
+   skill groups left the entire left half blank down the length of the section. */
+.skills-lede{max-width:60ch;margin-bottom:56px}
 .about-lede{font-family:var(--ff-d);font-size:clamp(21px,2.4vw,28px);font-weight:500;letter-spacing:-.015em;line-height:1.42}
 .about-lede .o{color:var(--accent)}
 .about-p{font-size:15px;color:var(--gray);line-height:1.8;margin-top:22px}
-.tool-group{margin-bottom:24px}
+.tool-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:36px 40px;align-items:start}
+.tool-group{break-inside:avoid}
 .tg-h{font-size:11.5px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--gray-lt);margin-bottom:12px}
 .tg-chips{display:flex;flex-wrap:wrap;gap:8px}
-.chip{font-size:13px;font-weight:500;padding:7px 15px;border-radius:100px;border:1px solid var(--line);color:var(--gray);white-space:nowrap}
+.chip{font-size:13px;font-weight:500;padding:7px 15px;border-radius:100px;border:1px solid var(--line);color:var(--gray)}
 
 /* CONTACT */
 #contact{background:var(--dark);border-radius:28px;margin:0 20px 20px;color:#fff}
@@ -198,6 +220,59 @@ nav{position:fixed;top:0;left:0;right:0;z-index:200;background:rgba(255,255,255,
 .c-foot a{color:rgba(255,255,255,.6)}
 .c-foot a:hover{color:#fff}
 
+/* ── CASE DETAIL (click-through page per campaign) ──
+   Server-rendered, one .cd-view per campaign, hidden until opened. Rendering it
+   up front (rather than building it in JS) keeps every field inline-editable with
+   normal data-paths and lets it survive the editor's iframe repaints. */
+.cd-view{display:none}
+.cd-view.open{display:block}
+#case-container .cd{padding-top:120px}
+.cd-back{background:none;border:none;cursor:pointer;font-size:13.5px;font-weight:600;color:var(--gray);display:inline-flex;gap:8px;align-items:center;margin-bottom:28px;padding:0;font-family:var(--ff-b);transition:color .2s}
+.cd-back:hover{color:var(--accent)}
+.cd-band{border-radius:24px;overflow:hidden;position:relative;padding:56px 52px;min-height:340px;display:flex;flex-direction:column;justify-content:flex-end;margin-bottom:26px}
+.cd-band .art{position:absolute;inset:0}
+.cd-band-in{position:relative;z-index:2;max-width:700px}
+.cd-tag{font-size:12px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;opacity:.85;display:block;margin-bottom:16px}
+.cd-title{font-family:var(--ff-d);font-size:clamp(34px,5vw,62px);font-weight:800;letter-spacing:-.03em;line-height:1}
+.cd-facts{display:flex;border:1px solid var(--line);border-radius:16px;overflow:hidden;margin-bottom:70px;flex-wrap:wrap}
+.cd-fact{flex:1;min-width:160px;padding:18px 24px;border-right:1px solid var(--line)}
+.cd-fact:last-child{border-right:none}
+.cd-fact .k{font-size:11px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--gray-lt);margin-bottom:5px}
+.cd-fact .v{font-size:14.5px;font-weight:600}
+.cd-grid{display:grid;grid-template-columns:1fr 1fr;gap:64px;margin-bottom:74px}
+.cd-block h3{font-family:var(--ff-d);font-size:21px;font-weight:700;letter-spacing:-.015em;margin-bottom:18px;display:flex;align-items:center;gap:12px}
+.cd-block h3 .num{font-size:12px;font-weight:600;color:var(--accent);letter-spacing:.08em}
+.cd-block p{font-size:15.5px;color:var(--gray);line-height:1.8;margin-bottom:14px}
+.cd-block ul{list-style:none;display:flex;flex-direction:column;gap:14px}
+.cd-block li{font-size:15px;color:var(--gray);line-height:1.7;padding-left:24px;position:relative}
+.cd-block li::before{content:'';position:absolute;left:0;top:10px;width:10px;height:2px;background:var(--accent)}
+/* Empty-state hints for the case fields. These are ::before generated content,
+   NOT DOM text, so an untouched placeholder can never be saved as the value. */
+.cd-block p:empty::before,.ci-desc:empty::before{content:'Add the challenge behind this campaign…';color:var(--gray-lt)}
+.cd-block ul:empty{min-height:26px;cursor:pointer}
+.cd-block ul:empty::before{content:'Add what you did — one step per line…';color:var(--gray-lt);font-size:15px}
+.cd-results{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:16px;margin-bottom:74px}
+.res{border:1px solid var(--line);border-radius:16px;padding:26px;background:#fff}
+.res .v{font-family:var(--ff-d);font-size:36px;font-weight:800;letter-spacing:-.03em;line-height:1}
+.res .k{font-size:12.5px;color:var(--gray);margin-top:10px;line-height:1.5}
+.res.todo{border-style:dashed;border-color:#f0c9a8;background:#fffbf6}
+.res.todo .add{font-size:13px;font-weight:600;color:#c7722b;border:1.5px dashed #e8c49a;border-radius:8px;padding:6px 12px;display:inline-block}
+/* Campaign gallery — real uploaded images; the dashed tile is an editor-only
+   upload target and never ships to a published portfolio. */
+.gal-h{font-family:var(--ff-d);font-size:21px;font-weight:700;letter-spacing:-.015em;margin-bottom:20px}
+.gal-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:74px}
+.gal{aspect-ratio:16/10;border-radius:14px;overflow:hidden;background:var(--bg-soft);position:relative}
+.gal img{width:100%;height:100%;object-fit:cover;display:block}
+.gal-add{aspect-ratio:16/10;border-radius:14px;border:1.5px dashed #dcdcd6;background:var(--bg-soft);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;color:var(--gray-lt);font-size:13px;font-weight:500;text-align:center;padding:18px;cursor:pointer;transition:all .3s}
+.gal-add small{font-size:11px;font-weight:400;opacity:.75}
+.gal-add:hover{border-color:var(--accent);color:var(--accent)}
+.cd-nav{display:flex;justify-content:space-between;gap:20px;border-top:1px solid var(--line);padding:36px 0 100px}
+.cdn{background:none;border:none;cursor:pointer;text-align:left;padding:0;max-width:45%;font-family:var(--ff-b)}
+.cdn .d{font-size:11px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--gray-lt);display:block;margin-bottom:8px}
+.cdn .t{font-family:var(--ff-d);font-size:19px;font-weight:700;letter-spacing:-.015em;line-height:1.25;color:var(--ink);transition:color .2s}
+.cdn.nx{text-align:right}
+.cdn:hover .t{color:var(--accent)}
+
 /* EDIT CONTROLS */
 .ce-add-btn{display:block;margin-top:24px;padding:11px 18px;border:1.5px dashed var(--line);border-radius:12px;background:var(--bg-soft);color:var(--accent);font-family:var(--ff-b);font-size:13px;font-weight:600;cursor:pointer;width:100%;text-align:center}
 .ce-add-btn:hover{border-color:var(--accent)}
@@ -209,12 +284,27 @@ nav{position:fixed;top:0;left:0;right:0;z-index:200;background:rgba(255,255,255,
   .stats{grid-template-columns:1fr 1fr!important}
   .case,.case:nth-child(even){grid-template-columns:1fr}
   .case:nth-child(even) .case-cover{order:0}
-  .card-grid,.about-grid{grid-template-columns:1fr}
+  .card-grid{grid-template-columns:1fr}
   .xp-row{grid-template-columns:1fr;gap:8px}
   .sec-sub{display:none}
   .nav-links a:not(.nav-btn){display:none}.avail{display:none}
+  .cd-grid{grid-template-columns:1fr}
+  .gal-grid{grid-template-columns:1fr 1fr}
 }
-@media(max-width:540px){.wrap{padding:0 18px}.stats{grid-template-columns:1fr 1fr}#contact{margin:0 10px 10px;border-radius:20px}.c-foot{flex-direction:column;gap:12px;align-items:center}}
+@media(max-width:540px){.wrap{padding:0 18px}.stats{grid-template-columns:1fr 1fr}#contact{margin:0 10px 10px;border-radius:20px}.c-foot{flex-direction:column;gap:12px;align-items:center}
+  .case-info{padding:24px 20px}
+  .cd-band{padding:32px 24px;min-height:220px}
+  .cd-facts{flex-direction:column}
+  .cd-fact{border-right:none;border-bottom:1px solid var(--line)}
+  .cd-fact:last-child{border-bottom:none}
+  .cd-grid{gap:32px;margin-bottom:40px}
+  .cd-results{grid-template-columns:1fr 1fr}
+  .gal-grid{grid-template-columns:1fr 1fr;gap:10px}
+  .gal-add{font-size:11px;padding:12px}
+  .cd-nav{flex-direction:column;gap:20px;padding-bottom:60px}
+  .cdn{max-width:100%}
+  .cdn.nx{text-align:left}
+}
 `;
 }
 
@@ -222,6 +312,52 @@ const MOMENTUM_SCRIPT = `<script>
 (function(){
   var io=new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target);}});},{threshold:.1});
   document.querySelectorAll('.rv').forEach(function(el){io.observe(el);});
+})();
+(function(){
+  /* Case-study view switching. Views are already in the DOM — we only toggle a
+     class, so nothing is rebuilt and every field keeps its data-path binding. */
+  var grid=document.getElementById('grid-view');
+  var views=document.querySelectorAll('.cd-view');
+  if(!grid||!views.length)return;
+  function showGrid(){
+    for(var i=0;i<views.length;i++)views[i].classList.remove('open');
+    grid.style.display='';
+  }
+  function openCase(idx){
+    var target=document.getElementById('case-'+idx);
+    if(!target)return;
+    for(var i=0;i<views.length;i++)views[i].classList.remove('open');
+    target.classList.add('open');
+    grid.style.display='none';
+    window.scrollTo({top:0,behavior:'auto'});
+    /* Reveals inside a case view never intersected while it was display:none. */
+    target.querySelectorAll('.rv').forEach(function(el){el.classList.add('in');});
+  }
+  document.addEventListener('click',function(e){
+    if(e.target.closest('[data-case-close]')){showGrid();return;}
+    /* In the editor the whole card is also an edit surface: never hijack a click
+       meant for an inline field, a list region, an upload zone or an add/delete
+       button. Those all carry their own attributes/classes. */
+    if(e.target.closest('[data-path],[data-list-path],[data-img-upload],.ce-del-btn,.ce-add-btn'))return;
+    var trigger=e.target.closest('[data-case-open]');
+    if(!trigger)return;
+    e.preventDefault();
+    openCase(trigger.getAttribute('data-case-open'));
+  });
+  document.addEventListener('keydown',function(e){
+    if(e.key==='Escape'){showGrid();return;}
+    if(e.key!=='Enter')return;
+    var card=e.target.closest&&e.target.closest('.case[data-case-open]');
+    if(card){e.preventDefault();openCase(card.getAttribute('data-case-open'));}
+  });
+  /* Nav/anchor links must restore the grid before scrolling to a section. */
+  document.querySelectorAll('a[href^="#"]').forEach(function(a){
+    a.addEventListener('click',function(){
+      var id=a.getAttribute('href').slice(1);
+      if(!id||!document.getElementById(id))return;
+      showGrid();
+    });
+  });
 })();
 <\/script>`;
 
@@ -264,34 +400,100 @@ export function html(v: NormalizedData): string {
 		? `<section id="brands"><div class="brands-label rv">Capabilities &amp; toolkit</div>
 <div class="marquee"><div class="marquee-track">${allSkills.map(s => `<span class="brand">${s}</span>`).join('')}</div><div class="marquee-track" aria-hidden="true">${allSkills.map(s => `<span class="brand">${s}</span>`).join('')}</div></div></section>` : '';
 
+	// A performance metric is a free-text string like "45% YoY subscriber growth".
+	// Split it into a big number + its label for the metric tiles. Same regex the
+	// cover stat already used, so a card and its case page agree.
+	const metricValue = (m: string): string => (m.match(/[\d.,]+[%x×+MK$]*/) || [m])[0];
+	const metricLabel = (m: string): string => {
+		const val = metricValue(m);
+		const rest = m.replace(val, '').trim().replace(/^[–—-]\s*/, '');
+		return rest || m;
+	};
+
 	// CAMPAIGNS (case cards)
 	const campaignsHtml = !hidden.has('campaigns') && (v.campaigns?.length || em)
 		? `<section class="sec" id="campaigns"><div class="wrap">
-<div class="sec-head rv"><h2 class="sec-h">Selected work</h2><p class="sec-sub">Campaigns told the way they happened — objective, channels, and measurable results.</p></div>
+<div class="sec-head rv"><h2 class="sec-h">Selected work</h2><p class="sec-sub">Campaigns told the way they happened — challenge, approach, results.</p></div>
 <div class="work-list">
 ${(v.campaigns ?? []).map((c, i) => {
 			const art = ART[i % ART.length];
 			const tone = art === 'art-gautam' ? 'tk' : 'tw';
 			const headline = (c.performance_metrics ?? [])[0] || '';
-			return `<article class="case rv"${iw}>
+			return `<article class="case rv" tabindex="0" data-case-open="${i}"${iw}>
 ${delBtn('campaigns', i)}
 <div class="case-cover ${tone}">
 <div class="art ${art}"></div>
 ${c.campaign_type ? `<span class="ct" ${ed(`campaigns.${i}.campaign_type`)}>${c.campaign_type}</span>` : ''}
-<div class="cs">${headline ? `<span class="n">${(headline.match(/[\d.,]+[%x×+MK$]*/) || [headline])[0]}</span>` : ''}<span class="l">${headline || c.campaign_name}</span></div>
+<div class="cs">${headline ? `<span class="n">${metricValue(headline)}</span>` : ''}<span class="l">${headline || c.campaign_name}</span></div>
 </div>
 <div class="case-info">
 <div class="ci-meta">${(c.channels_used ?? []).length ? `<span class="pill hot">${c.channels_used[0]}</span>` + (c.channels_used.slice(1).map(ch => `<span class="pill">${ch}</span>`).join('')) : ''}</div>
 <h3 class="ci-title" ${ed(`campaigns.${i}.campaign_name`)}>${c.campaign_name || (em ? 'Campaign' : '')}</h3>
-${c.budget ? `<div class="ci-budget">Budget: <span ${ed(`campaigns.${i}.budget`)}>${c.budget}</span></div>` : ''}
 ${(c.channels_used?.length) ? `<div class="ci-meta" ${le(`campaigns.${i}.channels_used`)}>${c.channels_used.map(ch => `<span class="pill">${ch}</span>`).join('')}</div>` : ''}
-${(c.performance_metrics?.length) ? `<div class="ci-metrics" ${le(`campaigns.${i}.performance_metrics`)}>${c.performance_metrics.map(m => `<div class="ci-metric">${m}</div>`).join('')}</div>` : ''}
+${(c.challenge || em) ? `<p class="ci-desc" ${ed(`campaigns.${i}.challenge`, true)}>${c.challenge}</p>` : ''}
+<div class="ci-metrics">
+${c.budget ? `<div class="cim"><div class="v" ${ed(`campaigns.${i}.budget`)}>${c.budget}</div><div class="k">Budget</div></div>` : ''}
+${(c.performance_metrics?.length) ? `<div class="ci-metrics-list" ${le(`campaigns.${i}.performance_metrics`)}>${c.performance_metrics.map(m => `<div class="cim"><div class="v">${metricValue(m)}</div><div class="k">${metricLabel(m)}</div></div>`).join('')}</div>` : ''}
+</div>
+<span class="ci-link">Read case study <span class="arr">&#8594;</span></span>
 </div>
 </article>`;
 		}).join('\n')}
 </div>
 ${addBtn('campaigns', 'Campaign')}
 </div></section>` : '';
+
+	// CASE DETAIL VIEWS — one per campaign, rendered up front, shown on demand.
+	const caseCount = v.campaigns?.length ?? 0;
+	const caseViews = (v.campaigns ?? []).map((c, i) => {
+		const art = ART[i % ART.length];
+		const tone = art === 'art-gautam' ? 'tk' : 'tw';
+		const prev = (i - 1 + caseCount) % caseCount;
+		const next = (i + 1) % caseCount;
+		const facts = [
+			c.campaign_type ? `<div class="cd-fact"><div class="k">Type</div><div class="v" ${ed(`campaigns.${i}.campaign_type`)}>${c.campaign_type}</div></div>` : '',
+			c.budget ? `<div class="cd-fact"><div class="k">Budget</div><div class="v" ${ed(`campaigns.${i}.budget`)}>${c.budget}</div></div>` : '',
+			c.channels_used?.length ? `<div class="cd-fact"><div class="k">Channels</div><div class="v" ${le(`campaigns.${i}.channels_used`)}>${c.channels_used.join(' · ')}</div></div>` : '',
+		].filter(Boolean).join('');
+		// Gallery: real uploaded images, plus an upload tile in the editor only.
+		const tiles = (c.images ?? []).map(src => `<div class="gal"><img src="${src}" alt="${c.campaign_name}"></div>`).join('');
+		const addTile = (em && (c.images?.length ?? 0) < 3)
+			? `<div class="gal-add" ${_imgUpload(`campaigns.${i}.images`, em)}>&#9106;&nbsp; Add gallery image<small>A creative, screenshot, or deck slide</small></div>`
+			: '';
+		const gallery = (tiles || addTile)
+			? `<div class="gal-h">Campaign gallery</div><div class="gal-grid">${tiles}${addTile}</div>`
+			: '';
+		return `<div class="cd-view" id="case-${i}"><div class="wrap cd">
+<button class="cd-back" data-case-close>&#8592; All work</button>
+<div class="cd-band ${tone}">
+<div class="art ${art}"></div>
+<div class="cd-band-in">
+${c.campaign_type ? `<span class="cd-tag" ${ed(`campaigns.${i}.campaign_type`)}>${c.campaign_type}</span>` : ''}
+<h1 class="cd-title" ${ed(`campaigns.${i}.campaign_name`)}>${c.campaign_name}</h1>
+</div>
+</div>
+${facts ? `<div class="cd-facts">${facts}</div>` : ''}
+<div class="cd-grid">
+${(c.challenge || em) ? `<div class="cd-block"><h3><span class="num">01</span>The challenge</h3><p ${ed(`campaigns.${i}.challenge`, true)}>${c.challenge}</p></div>` : ''}
+${(c.approach?.length || em) ? `<div class="cd-block"><h3><span class="num">02</span>What I did</h3><ul ${le(`campaigns.${i}.approach`)}>${(c.approach ?? []).map(s => `<li>${s}</li>`).join('')}</ul></div>` : ''}
+</div>
+<div class="cd-block" style="margin-bottom:20px"><h3><span class="num">03</span>Results</h3></div>
+${(c.performance_metrics?.length)
+			? `<div class="cd-results" ${le(`campaigns.${i}.performance_metrics`)}>${c.performance_metrics.map(m => `<div class="res"><div class="v">${metricValue(m)}</div><div class="k">${metricLabel(m)}</div></div>`).join('')}</div>`
+			: (em ? `<div class="cd-results"><div class="res todo" ${le(`campaigns.${i}.performance_metrics`)}><span class="add">+ Add metric</span><div class="k">Performance metrics appear here</div></div></div>` : '')}
+${gallery}
+${caseCount > 1 ? `<div class="cd-nav">
+<button class="cdn" data-case-open="${prev}"><span class="d">&#8592; Previous</span><span class="t">${v.campaigns[prev].campaign_name}</span></button>
+<button class="cdn nx" data-case-open="${next}"><span class="d">Next &#8594;</span><span class="t">${v.campaigns[next].campaign_name}</span></button>
+</div>` : ''}
+</div></div>`;
+	}).join('\n');
+
+	// NOTE: the source design had per-role buttons linking a job to its case studies.
+	// Those were hand-wired by its author; our model has no campaign↔experience
+	// relation, and deriving one by matching the company name against campaign names
+	// produced stray, truncated links on real data. Dropped deliberately (skill Z15:
+	// no dead or invented controls). Case studies are reached by clicking a work card.
 
 	// EXPERIENCE
 	const experienceHtml = !hidden.has('experience') && (v.experience?.length || em)
@@ -317,17 +519,15 @@ ${addBtn('experience', 'Experience')}
 	const skillsHtml = !hidden.has('skills') && (v.skill_groups?.length || em)
 		? `<section class="sec" id="skills"><div class="wrap">
 <div class="sec-head rv"><h2 class="sec-h">Skills &amp; tools</h2><p class="sec-sub">Strategy, channels, and the stack behind the numbers.</p></div>
-<div class="about-grid">
-<div class="rv">${v.uniqueValue ? `<p class="about-lede" ${ed('portfolio.uniqueValue', true)}>${v.uniqueValue}</p>` : ''}</div>
-<div class="rv">
+${v.uniqueValue ? `<div class="skills-lede rv"><p class="about-lede" ${ed('portfolio.uniqueValue', true)}>${v.uniqueValue}</p></div>` : ''}
+<div class="tool-grid rv">
 ${v.skill_groups.map((g, gi) => `<div class="tool-group"${iw}>
 ${delBtn('skills', gi)}
 <div class="tg-h" ${ed(`skills.${gi}.category`)}>${g.category}</div>
 <div class="tg-chips" ${le(`skills.${gi}.skills`)}>${g.skills.map(s => `<span class="chip">${s}</span>`).join('')}</div>
 </div>`).join('\n')}
+</div>
 ${addBtn('skills', 'Skill Group')}
-</div>
-</div>
 </div></section>` : '';
 
 	// EDUCATION
@@ -437,7 +637,7 @@ ${addBtn(`custom_sections.${ci}.items`, 'Item')}
 </head>
 <body>
 <nav><div class="nav-in">
-<span class="logo" ${ed('profile.full_name')}>${v.name}</span>
+<a href="#hero"><span class="logo" ${ed('profile.full_name')}>${v.name}</span></a>
 <ul class="nav-links">
 <li><a href="#campaigns">Work</a></li>
 <li><a href="#experience">Experience</a></li>
@@ -446,6 +646,7 @@ ${v.email ? `<li><a class="nav-btn" href="mailto:${v.email}">Get in touch</a></l
 </ul>
 </div></nav>
 
+<div id="grid-view">
 <header id="hero"><div class="wrap">
 <div class="kicker rv">${v.profile_headline ? `<span ${ed('profile.headline')}>${v.profile_headline}</span>` : 'Marketing &amp; Growth'}${v.location ? ` · ${v.location}` : ''}</div>
 <h1 class="hero-h rv" ${ed('profile.full_name')}>${heroName}</h1>
@@ -467,6 +668,9 @@ ${v.bio ? `<p class="c-sub rv">${v.bio.slice(0, 150)}${v.bio.length > 150 ? '…
 ${ctaBtns ? `<div class="c-btns rv">${ctaBtns}</div>` : ''}
 ${footItems ? `<div class="c-foot rv">${footItems}</div>` : ''}
 </div></section>
+</div><!-- /grid-view -->
+
+<div id="case-container">${caseViews}</div>
 
 ${MOMENTUM_SCRIPT}
 ${EDITOR_SCRIPT}

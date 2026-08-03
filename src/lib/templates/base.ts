@@ -317,7 +317,19 @@ export const EDITOR_JS = `(function(){
         window.scrollBy({top:rect.top-navH-24,behavior:'smooth'});
       }
     } else if(e.data.type==='scroll-to-section'){
-      var sec=document.getElementById(e.data.section)||document.querySelector('[data-add-section="'+e.data.section+'"]');
+      /* Section key != DOM id everywhere: the profile section renders as the
+         hero/about block, and custom sections render one <section> each under
+         their own section_id — so resolve those two by hand. */
+      var key=e.data.section,sec=null;
+      if(key==='profile'){
+        sec=document.getElementById('about')||document.getElementById('profile')||document.getElementById('hero');
+        if(!sec){window.scrollTo({top:0,behavior:'smooth'});return;}
+      } else if(key==='custom_sections'){
+        sec=document.querySelector('[data-add-section^="custom_sections"]')
+           ||document.querySelector('[data-del-section^="custom_sections"]');
+      } else {
+        sec=document.getElementById(key)||document.querySelector('[data-add-section="'+key+'"]');
+      }
       var target=sec&&(sec.tagName==='SECTION'?sec:(sec.closest('section')||sec));
       if(target){
         var navEl2=document.querySelector('nav');
@@ -440,6 +452,13 @@ export interface NormalizedData {
 		channels_used: string[];
 		budget: string;
 		performance_metrics: string[];
+		/** Long-form case-study context. Optional — templates that only render
+		 *  campaign cards ignore it; case-study templates (momentum) use it. */
+		challenge: string;
+		/** Case-study "what I did" steps. */
+		approach: string[];
+		/** Campaign gallery images (same uploader as projects/experience images). */
+		images: string[];
 	}>;
 	// Finance
 	financial_modeling: Array<{ model_type: string; tools_used: string[]; outcome: string }>;
@@ -629,7 +648,10 @@ export function normalize(
 			campaign_type: _e(c.campaign_type),
 			channels_used: (c.channels_used ?? []).filter(Boolean).map(_e),
 			budget: _e(c.budget),
-			performance_metrics: (c.performance_metrics ?? []).filter(Boolean).map(_e)
+			performance_metrics: (c.performance_metrics ?? []).filter(Boolean).map(_e),
+			challenge: _e(c.challenge),
+			approach: (Array.isArray(c.approach) ? c.approach : []).filter(Boolean).map(_e),
+			images: (Array.isArray(c.images) ? c.images : []).map(_safeUrl).filter(Boolean)
 		}));
 
 	const financial_modeling = _visibleItems(parsedData.financial_modeling)
@@ -648,13 +670,17 @@ export function normalize(
 			performance_return: _e(ip.performance_return)
 		}));
 
-	const custom_sections = (parsedData.custom_sections ?? [])
+	// Both the section and its items honour the eye toggle. Because hidden entries
+	// are dropped here, the indices templates emit into edit paths
+	// (custom_sections.{i}.items.{j}) are VISIBLE indices — the edit page maps
+	// them back to actual array indices before writing.
+	const custom_sections = _visibleItems(parsedData.custom_sections)
 		.filter((cs) => cs.section_id && cs.title)
 		.map((cs) => ({
 			section_id: _e(cs.section_id),
 			title: _e(cs.title),
 			display_type: cs.display_type,
-			items: (cs.items ?? []).map((item) => ({
+			items: _visibleItems(cs.items).map((item) => ({
 				label: _e(item.label),
 				value: _e(item.value),
 				subtitle: _e(item.subtitle),
