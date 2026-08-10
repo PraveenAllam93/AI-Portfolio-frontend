@@ -2,6 +2,7 @@ import { env } from '$env/dynamic/private';
 import { json, error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { getSessionUser } from '$lib/server/cognito';
+import { LIMIT_STATUS } from '$lib/server/limits';
 
 export const POST: RequestHandler = async ({ request, cookies }) => {
 	const user = await getSessionUser(cookies);
@@ -34,6 +35,16 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
 	});
 
 	const text = await upstream.text();
+
+	// The portfolio limit and the paid-template gate both answer 402 here.
+	// Forwarded verbatim (this route already has the body as text) so the upload
+	// wizard can open the upgrade modal with the real numbers.
+	if (upstream.status === LIMIT_STATUS) {
+		return new Response(text, {
+			status: LIMIT_STATUS,
+			headers: { 'Content-Type': 'application/json' }
+		});
+	}
 
 	if (!upstream.ok) {
 		throw error(upstream.status, text || 'Upstream request failed');

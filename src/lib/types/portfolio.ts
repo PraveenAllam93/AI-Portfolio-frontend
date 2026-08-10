@@ -120,6 +120,42 @@ export interface InvestmentPortfolioItem {
 	performance_return?: string;
 }
 
+/** Accountant — one audit / tax / bookkeeping / advisory engagement or client account. */
+export interface EngagementItem {
+	client_name?: string;
+	engagement_type?: string;
+	industry?: string;
+	start_date?: string;
+	end_date?: string;
+	description?: string;
+	responsibilities?: string[];
+	deliverables?: string[];
+	standards_applied?: string[];
+	tools_used?: string[];
+	engagement_value?: string;
+	measurable_outcomes?: string[];
+	/** Engagement gallery images (max 3), same uploader as project/experience images. */
+	images?: string[];
+	_hidden?: boolean;
+}
+
+/** HR — one programme / initiative (hiring drive, onboarding, L&D, D&I, HRIS rollout). */
+export interface HRProgramItem {
+	program_name?: string;
+	program_type?: string;
+	organization?: string;
+	start_date?: string;
+	end_date?: string;
+	description?: string;
+	scope?: string;
+	activities?: string[];
+	tools_used?: string[];
+	measurable_outcomes?: string[];
+	/** Programme gallery images (max 3), same uploader as project/experience images. */
+	images?: string[];
+	_hidden?: boolean;
+}
+
 export interface CustomSectionItem {
 	label?: string;
 	value?: string;
@@ -166,6 +202,12 @@ export interface ParsedData {
 	campaigns?: CampaignItem[];
 	financial_modeling?: FinancialModelItem[];
 	investment_portfolios?: InvestmentPortfolioItem[];
+	/** Accountant-only. */
+	engagements?: EngagementItem[];
+	/** HR-only. */
+	hr_programs?: HRProgramItem[];
+	/** Accountant + HR — standards, tax and employment-law frameworks. */
+	compliance_expertise?: string[];
 	custom_sections?: CustomSection[];
 }
 
@@ -197,6 +239,8 @@ export interface PortfolioConfig {
 export const DEFAULT_SECTION_ORDER: string[] = [
 	'experience',
 	'projects',
+	'engagements',
+	'hr_programs',
 	'skills',
 	'education',
 	'certifications',
@@ -207,5 +251,6 @@ export const DEFAULT_SECTION_ORDER: string[] = [
 	'investment_portfolios',
 	'design_philosophy',
 	'software_proficiency',
+	'compliance_expertise',
 	'custom_sections'
 ];

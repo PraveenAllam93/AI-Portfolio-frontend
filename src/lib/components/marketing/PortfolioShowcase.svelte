@@ -160,8 +160,8 @@
 			</div>
 
 			<div class="sx-actions">
-				<a class="sx-cta" href="/signup">Build mine free <span class="cta-gem">◆</span></a>
-				<a class="sx-cta-2" href="/signup">Browse all live portfolios →</a>
+				<a class="sx-cta" href="/try">Build mine free <span class="cta-gem">◆</span></a>
+				<a class="sx-cta-2" href="/try">Browse all live portfolios →</a>
 			</div>
 		</div>
 		{/if}

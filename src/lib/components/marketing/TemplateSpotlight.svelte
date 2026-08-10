@@ -65,9 +65,9 @@
 				{/each}
 			</div>
 			<div class="ts-actions">
-				<a href="/signup" class="ts-btn-primary">Use this template</a>
+				<a href="/try" class="ts-btn-primary">Use this template</a>
 				{#if SHOW_LIVE_PREVIEW}
-					<a href="/signup" class="ts-btn-ghost">Live preview →</a>
+					<a href="/try" class="ts-btn-ghost">Live preview →</a>
 				{/if}
 			</div>
 

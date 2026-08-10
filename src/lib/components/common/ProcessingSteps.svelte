@@ -77,7 +77,7 @@
 				{/if}
 			</div>
 
-			<div class="pb-8 {i === steps.length - 1 ? 'pb-2' : ''}">
+			<div class={i === steps.length - 1 ? 'pb-2' : 'pb-8'}>
 				<p class="mt-3 text-base font-bold transition-colors duration-300 {done || active ? 'text-ink' : 'text-ink-muted'}">
 					{step.label}
 				</p>

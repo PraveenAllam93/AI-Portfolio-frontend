@@ -15,6 +15,7 @@
 		setMainPortfolio,
 		type PortfolioSummary
 	} from '$lib/services/portfolio';
+	import { entitlements } from '$lib/stores/entitlements';
 
 	async function handleLogout() {
 		await logout();
@@ -29,6 +30,14 @@
 	let togglingId: string | null = $state(null);
 	let errorMsg: string | null = $state(null);
 	let settingMainId: string | null = $state(null);
+
+	// Portfolio allowance. A `null` limit means unlimited, so no counter shows.
+	// Gated on `loaded` so a slow entitlements request never briefly tells a
+	// paying user they are out of portfolios.
+	const portfolioLimit = $derived($entitlements.data.limits.portfolios);
+	const atPortfolioLimit = $derived(
+		$entitlements.loaded && portfolioLimit !== null && portfolios.length >= portfolioLimit
+	);
 
 	async function handleSetMain(portfolio: PortfolioSummary) {
 		if (settingMainId || portfolio.isMain || portfolio.portfolioNumber == null) return;
@@ -162,17 +171,45 @@
 					</svg>
 					Practice Interview
 				</a>
-				<a
-					href="/app/resumes/upload"
-					class="inline-flex items-center gap-2 rounded-full bg-brand px-6 py-3 text-sm font-bold text-white shadow-lg transition-all hover:bg-brand-dark active:scale-95"
-				>
-					<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="h-4 w-4" aria-hidden="true">
-						<path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-					</svg>
-					New Upload
-				</a>
+				{#if atPortfolioLimit}
+					<!-- Points at pricing rather than the upload wizard: the presign
+					     call would reject this anyway, so sending them there is a dead
+					     end with a confusing error at the far side. -->
+					<a
+						href="/#pricing"
+						title="Your plan includes {portfolioLimit} portfolio{portfolioLimit === 1 ? '' : 's'}"
+						class="inline-flex items-center gap-2 rounded-full bg-amber-500 px-6 py-3 text-sm font-bold text-white shadow-lg transition-all hover:bg-amber-600 active:scale-95"
+					>
+						<svg viewBox="0 0 20 20" fill="currentColor" class="h-4 w-4" aria-hidden="true">
+							<path d="M5 9V6a5 5 0 0 1 10 0v3h.5a1.5 1.5 0 0 1 1.5 1.5v6A1.5 1.5 0 0 1 15.5 18h-11A1.5 1.5 0 0 1 3 16.5v-6A1.5 1.5 0 0 1 4.5 9H5Zm2-3a3 3 0 0 1 6 0v3H7V6Z" />
+						</svg>
+						Upgrade for more
+					</a>
+				{:else}
+					<a
+						href="/app/resumes/upload"
+						class="inline-flex items-center gap-2 rounded-full bg-brand px-6 py-3 text-sm font-bold text-white shadow-lg transition-all hover:bg-brand-dark active:scale-95"
+					>
+						<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="h-4 w-4" aria-hidden="true">
+							<path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+						</svg>
+						New Upload
+					</a>
+				{/if}
 			</div>
 		</div>
+
+		{#if atPortfolioLimit}
+			<!-- Explains WHY the button changed, and names the way out that does not
+			     cost money: free users can always delete and rebuild. -->
+			<div class="mb-6 flex flex-wrap items-center gap-x-2 gap-y-1 rounded-2xl border border-amber-200 bg-amber-50 px-5 py-3 text-sm text-amber-900">
+				<span class="font-bold">
+					{portfolios.length} of {portfolioLimit} portfolio{portfolioLimit === 1 ? '' : 's'} used.
+				</span>
+				<span>Delete one below to build another, or</span>
+				<a href="/#pricing" class="font-bold underline hover:no-underline">upgrade for unlimited</a>.
+			</div>
+		{/if}
 
 		{#if errorMsg}
 			<div class="mb-6 flex items-center justify-between rounded-2xl border border-red-200 bg-red-50 px-5 py-3 text-sm text-red-700">

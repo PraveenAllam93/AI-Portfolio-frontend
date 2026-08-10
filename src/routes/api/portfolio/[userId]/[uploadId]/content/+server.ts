@@ -2,6 +2,7 @@ import { env } from '$env/dynamic/private';
 import { json, error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { getSessionUser } from '$lib/server/cognito';
+import { passThroughLimit } from '$lib/server/limits';
 
 export const PATCH: RequestHandler = async ({ params, cookies, request }) => {
 	const user = await getSessionUser(cookies);
@@ -25,6 +26,12 @@ export const PATCH: RequestHandler = async ({ params, cookies, request }) => {
 			body: JSON.stringify(body)
 		}
 	);
+
+	// A template switch to a paid template comes back as 402 — forward the
+	// payload so the editor can open the upgrade modal instead of showing a
+	// generic save failure.
+	const limited = await passThroughLimit(upstream);
+	if (limited) return limited;
 
 	if (!upstream.ok) {
 		const err = await upstream.json().catch(() => ({}));

@@ -56,6 +56,14 @@ import { html as obsidianHtml }  from './obsidian';
 import { html as museHtml }      from './muse';
 import { html as prismHtml }     from './prism';
 import { html as salonHtml }     from './salon';
+import { html as meridianHtml }  from './meridian';
+import { html as cambriaHtml }   from './cambria';
+import { html as verdantHtml }   from './verdant';
+import { html as havenHtml }     from './haven';
+import { html as solaceHtml }    from './solace';
+import { html as quillHtml }     from './quill';
+import { html as journalHtml }   from './journal';
+import { html as atriumHtml }    from './atrium';
 
 type TemplateRenderer = (v: ReturnType<typeof normalize>) => string;
 
@@ -106,6 +114,14 @@ const TEMPLATES: Record<string, TemplateRenderer> = {
 	muse:          museHtml,
 	prism:         prismHtml,
 	salon:         salonHtml,
+	meridian:      meridianHtml,
+	cambria:       cambriaHtml,
+	verdant:       verdantHtml,
+	haven:         havenHtml,
+	solace:        solaceHtml,
+	quill:         quillHtml,
+	journal:       journalHtml,
+	atrium:        atriumHtml,
 };
 
 /** Default template used when templateId is missing or unknown. */
@@ -314,6 +330,44 @@ export const TEMPLATE_FIELDS: Record<string, TemplateField[]> = {
 		{ key: 'years_experience', label: 'Years of Experience', hint: 'Computed years of experience' },
 		{ key: 'projects_count',   label: 'Projects Count',      hint: 'Computed count of projects' },
 	],
+	meridian: [
+		{ key: 'years_experience',     label: 'Years of Experience',  hint: 'Shown as "X+ Years Experience" in the hero stats row' },
+		{ key: 'clients_count',        label: 'Client Engagements',   hint: 'Shown as "X+ Client Engagements" in the hero stats row (defaults to the number of engagements)' },
+		{ key: 'certifications_count', label: 'Certifications Count', hint: 'Shown in the hero stats row' },
+	],
+	cambria: [
+		{ key: 'years_experience',     label: 'Years of Experience',  hint: 'Shown in the hero stats bar under the intro' },
+		{ key: 'clients_count',        label: 'Clients Served',       hint: 'Shown as "X+ Clients Served" in the hero stats bar (defaults to the number of engagements)' },
+		{ key: 'certifications_count', label: 'Credentials Count',    hint: 'Shown as "Credentials" in the hero stats bar' },
+	],
+	verdant: [
+		{ key: 'clients_count',        label: 'Engagements Delivered', hint: 'Shown in the hero stat row (defaults to the number of engagements)' },
+		{ key: 'certifications_count', label: 'Credentials Held',      hint: 'Shown in the hero stat row' },
+		{ key: 'years_experience',     label: 'Years of Experience',   hint: 'Shown in the hero stat row' },
+	],
+	haven: [
+		{ key: 'years_experience',     label: 'Years in HR',           hint: 'Shown in the hero stat row under the intro' },
+		{ key: 'campaigns_count',      label: 'Programmes Led',        hint: 'Shown as "Programmes Led" (defaults to the number of HR programmes)' },
+		{ key: 'roles_count',          label: 'Organisations',         hint: 'Shown as "Organisations" (defaults to the number of roles)' },
+	],
+	solace: [
+		{ key: 'years_experience',     label: 'Years Experience',      hint: 'Shown in the hero glass stat cards and the About metrics' },
+		{ key: 'campaigns_count',      label: 'Programmes Led',        hint: 'Shown in the hero stat cards (defaults to the number of HR programmes)' },
+		{ key: 'roles_count',          label: 'Organisations',         hint: 'Shown in the hero stat cards (defaults to the number of roles)' },
+		{ key: 'certifications_count', label: 'Certifications',        hint: 'Shown in the hero stat cards and About metrics' },
+	],
+	journal: [
+		{ key: 'years_experience',     label: 'Years of Experience',   hint: 'Shown in the dark stats strip below the hero' },
+		{ key: 'campaigns_count',      label: 'Programmes Built',      hint: 'Shown in the stats strip (defaults to the number of HR programmes)' },
+		{ key: 'roles_count',          label: 'Roles Held',            hint: 'Shown in the stats strip (defaults to the number of roles)' },
+		{ key: 'certifications_count', label: 'Credentials Earned',    hint: 'Shown in the stats strip' },
+	],
+	atrium: [
+		{ key: 'years_experience',     label: 'Years in HR',           hint: 'Shown in the bordered stat cells under the hero' },
+		{ key: 'campaigns_count',      label: 'Programmes Delivered',  hint: 'Shown in the stat cells (defaults to the number of HR programmes)' },
+		{ key: 'roles_count',          label: 'Roles Held',            hint: 'Shown in the stat cells (defaults to the number of roles)' },
+		{ key: 'certifications_count', label: 'Credentials',           hint: 'Shown in the stat cells' },
+	],
 };
 
 /**
@@ -321,24 +375,32 @@ export const TEMPLATE_FIELDS: Record<string, TemplateField[]> = {
  * profile photo), uploaded from the edit page's "Portfolio Fields" tab and stored
  * as profile.summary_image.
  */
-export const SUMMARY_IMAGE_TEMPLATES: ReadonlySet<string> = new Set(['structura', 'citrus', 'bloom', 'vantage', 'canopy']);
+export const SUMMARY_IMAGE_TEMPLATES: ReadonlySet<string> = new Set(['structura', 'citrus', 'bloom', 'vantage', 'canopy', 'meridian', 'cambria', 'verdant', 'haven', 'solace', 'quill']);
 
 /**
  * Templates with an editable "Core Expertise" list, managed from the Portfolio
  * Fields tab and stored newline-joined as profile.core_expertise. Falls back to
  * the skill-group categories when empty.
  */
-export const CORE_EXPERTISE_TEMPLATES: ReadonlySet<string> = new Set(['blueprint']);
+export const CORE_EXPERTISE_TEMPLATES: ReadonlySet<string> = new Set(['blueprint', 'meridian', 'cambria', 'verdant', 'haven', 'solace']);
 
 /**
  * Templates with an editable contact tagline (static call-to-action copy, not
  * from the résumé), stored as profile.contact_tagline and shown in Portfolio Fields.
  */
-export const CONTACT_TAGLINE_TEMPLATES: ReadonlySet<string> = new Set(['blueprint']);
+export const CONTACT_TAGLINE_TEMPLATES: ReadonlySet<string> = new Set(['blueprint', 'meridian', 'cambria', 'verdant', 'haven', 'solace', 'quill', 'journal', 'atrium']);
 
 /** Default contact tagline per template (shown until the user overrides it). */
 export const DEFAULT_CONTACT_TAGLINE: Record<string, string> = {
 	blueprint: 'Open to consulting engagements, full-time roles, and project-based collaborations across residential, commercial, and infrastructure sectors.',
+	haven: "Whether you're looking for an HR leader, a strategic advisor, or a speaking engagement, I'd love to hear from you.",
+	solace: "Whether you're scaling a startup, transforming a legacy culture, or building a world-class people function — I'd love to explore how we can work together.",
+	quill: 'Open to Opportunities',
+	journal: "Let's build a workplace people love.",
+	atrium: 'Open to opportunities',
+	meridian: "Ready to gain financial clarity? Whether you need tax strategy, audit support, or fractional CFO services — let's talk.",
+	cambria: "Whether you need a one-time consultation or an ongoing advisory partnership, I'm here to help you make sense of your finances — and make them work harder for you.",
+	verdant: 'Available for accounting engagements, statutory reporting, and reconciliation clean-up projects.',
 };
 
 /**
@@ -360,6 +422,14 @@ export const CUSTOM_DISPLAY_TYPES: Record<string, Array<'cards' | 'list' | 'time
 	'designer-2': ['cards', 'list', 'timeline'],
 	marketing:    ['cards', 'list', 'timeline'],
 	precision:    ['cards', 'list', 'timeline'],
+	meridian:     ['cards', 'list', 'timeline'],
+	cambria:      ['cards', 'list', 'timeline'],
+	verdant:      ['cards', 'list', 'timeline'],
+	haven:        ['cards', 'list', 'timeline'],
+	solace:       ['cards', 'list', 'timeline'],
+	quill:        ['cards', 'list', 'timeline'],
+	journal:      ['cards', 'list', 'timeline'],
+	atrium:       ['cards', 'list', 'timeline'],
 	// Two-way (cards vs list)
 	nebula:       ['cards', 'list'],
 	glitch:       ['cards', 'list'],
@@ -456,7 +526,66 @@ export const TEMPLATE_META: Record<string, { name: string; accent: string; profe
 	muse:          { name: 'Muse',        accent: '#a9c6ea', profession: 'designer' },
 	prism:         { name: 'Prism',       accent: '#4a90c4', profession: 'designer' },
 	salon:         { name: 'Salon',       accent: '#d4af37', profession: 'designer' },
+	meridian:      { name: 'Meridian',    accent: '#c6a15b', profession: 'accountant' },
+	cambria:       { name: 'Cambria',     accent: '#b8935a', profession: 'accountant' },
+	verdant:       { name: 'Verdant',     accent: '#B4823F', profession: 'accountant' },
+	haven:         { name: 'Haven',       accent: '#7a9e8e', profession: 'hr' },
+	solace:        { name: 'Solace',      accent: '#C7A17A', profession: 'hr' },
+	quill:         { name: 'Quill',       accent: '#d7b998', profession: 'hr' },
+	journal:       { name: 'Journal',     accent: '#9C4258', profession: 'hr' },
+	atrium:        { name: 'Atrium',      accent: '#C89B5C', profession: 'hr' },
 };
+
+/**
+ * Templates included on the free plan — one per profession, three for software
+ * engineering (which has 23 templates, against 2 for several others).
+ *
+ * This is a PRESENTATION fallback used before the entitlements request lands.
+ * The authoritative list is `freeTemplates` from GET /entitlements, which comes
+ * straight from the backend's FREE_TEMPLATES set — that is the copy that
+ * actually gates anything. Prefer the store (`freeTemplateIds`) wherever it is
+ * available, and keep this in sync with
+ * src/lambdas/auth/entitlements.py FREE_TEMPLATES.
+ */
+export const FREE_TEMPLATE_IDS: ReadonlySet<string> = new Set([
+	'nebula', 'codex', 'neon',   // software_engineer
+	'designer',                   // designer  (Luxe Studio)
+	'marketing',                  // marketing (Campaign)
+	'sterling',                   // finance
+	'blueprint',                  // civil_engineer
+	'torque',                     // mechanical_engineer
+	'meridian',                   // accountant
+	'haven'                       // hr
+]);
+
+/** True when `templateId` is included on the free plan. */
+export function isFreeTemplate(templateId: string, freeIds?: ReadonlySet<string>): boolean {
+	const ids = freeIds && freeIds.size > 0 ? freeIds : FREE_TEMPLATE_IDS;
+	return ids.has(templateId);
+}
+
+/**
+ * Reorder so free templates come first, preserving the existing relative order
+ * within each group.
+ *
+ * Done at render rather than by rewriting the source lists because the free set
+ * changes independently of the catalogue: hand-ordered lists would silently rot
+ * the next time a template moves tier. It also means the first item a free user
+ * sees — and the default the upload carousel lands on at index 0 — is always
+ * one they can actually use.
+ */
+export function sortFreeFirst<T>(
+	items: T[],
+	idOf: (item: T) => string,
+	freeIds?: ReadonlySet<string>
+): T[] {
+	const free: T[] = [];
+	const paid: T[] = [];
+	for (const item of items) {
+		(isFreeTemplate(idOf(item), freeIds) ? free : paid).push(item);
+	}
+	return [...free, ...paid];
+}
 
 function stripEditingUi(html: string): string {
 	return html

@@ -2,6 +2,7 @@
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { isSupportedFileType } from '$lib/services/upload';
+	import { setPendingUpload } from '$lib/stores/pendingUpload';
 
 	let expanded = $state(false);
 	let hidden = $state(false);
@@ -85,11 +86,13 @@
 		if (e.key === 'Escape' && expanded) toggle();
 	}
 
-	function continueToSignup() {
-		// Guest (no-login) upload isn't supported by the backend yet — once the
-		// guest-session + claim endpoints exist, start the upload here instead
-		// and gate the generated preview behind signup.
-		goto('/signup');
+	function continueToBuild() {
+		// Same entry path as the navbar's "Get Started Free": /try mints the guest
+		// session (behind the Turnstile check) and lands on the upload wizard. The
+		// picked file rides along so it isn't re-selected there. Signup only comes
+		// later, when the guest chooses to publish.
+		if (selectedFile) setPendingUpload(selectedFile);
+		goto('/try');
 	}
 </script>
 
@@ -115,7 +118,7 @@
 					</div>
 					<span class="file-check">✓</span>
 				</div>
-				<button class="panel-cta" onclick={continueToSignup}>✨ Create a free account to generate</button>
+				<button class="panel-cta" onclick={continueToBuild}>✨ Build my portfolio — no account needed</button>
 				<div class="panel-priv">🔒 Your resume is never stored, shared, or sold.</div>
 			{:else}
 				<button

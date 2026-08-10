@@ -1,12 +1,16 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import { onDestroy } from 'svelte';
+	import { onDestroy, onMount } from 'svelte';
 	import { fade } from 'svelte/transition';
 	import { startUpload, startGeneration, isSupportedFileType, type ResumeCategory } from '$lib/services/upload';
 	import { startPolling, type StatusResponse } from '$lib/services/resumeStatus';
 	import BreadcrumbHeader from '$lib/components/common/BreadcrumbHeader.svelte';
 	import ProcessingSteps from '$lib/components/common/ProcessingSteps.svelte';
-	import { renderPortfolio } from '$lib/templates';
+	import { renderPortfolio, sortFreeFirst, isFreeTemplate } from '$lib/templates';
+	import { takePendingUpload } from '$lib/stores/pendingUpload';
+	import { entitlements, freeTemplateIds, templatesRestricted } from '$lib/stores/entitlements';
+	import { readLimitError, type LimitError } from '$lib/services/entitlements';
+	import UpgradeModal from '$lib/components/common/UpgradeModal.svelte';
 	import type { ParsedData, PortfolioContent } from '$lib/types/portfolio';
 
 	type UploadStatus = 'idle' | 'uploading' | 'success' | 'error';
@@ -27,6 +31,8 @@
 	let phase = $state<Phase>('file');
 	let uploadStatus: UploadStatus = $state('idle');
 	let errorMessage = $state('');
+	// Non-null while the upgrade modal is open; carries the backend's 402 payload.
+	let limitError = $state<LimitError | null>(null);
 	let selectedFile: File | null = $state(null);
 	let isDragOver = $state(false);
 	let selectedTypeId = $state<ResumeCategory | ''>('');
@@ -69,7 +75,7 @@
 			label: 'Detecting your field',
 			fallback: 'Matching your resume to the right profession.',
 			iconPath:
-				'M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09Z'
+				'M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09ZM18.259 8.715 18 9.75l-.259-1.035a3.375 3.375 0 0 0-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 0 0 2.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 0 0 2.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 0 0-2.456 2.456ZM16.894 20.567 16.5 21.75l-.394-1.183a2.25 2.25 0 0 0-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 0 0 1.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 0 0 1.423 1.423l1.183.394-1.183.394a2.25 2.25 0 0 0-1.423 1.423Z'
 		}
 	] as const;
 
@@ -83,7 +89,9 @@
 		{ id: 'marketing', label: 'Marketing', description: 'Growth, content & brand' },
 		{ id: 'finance', label: 'Finance', description: 'Analyst, banking & consulting' },
 		{ id: 'civil_engineer', label: 'Civil Engineer', description: 'Structural, infra & construction' },
-		{ id: 'mechanical_engineer', label: 'Mechanical Engineer', description: 'Design, thermal & manufacturing' }
+		{ id: 'mechanical_engineer', label: 'Mechanical Engineer', description: 'Design, thermal & manufacturing' },
+		{ id: 'accountant', label: 'Accountant', description: 'Accounting, audit & taxation' },
+		{ id: 'hr', label: 'Human Resources', description: 'Talent, people ops & L&D' }
 	];
 
 	interface Template {
@@ -150,6 +158,18 @@
 		finance: [
 			{ id: 'ledger',   name: 'Ledger',   tag: 'Editorial' },
 			{ id: 'sterling', name: 'Sterling', tag: 'Executive' },
+		],
+		accountant: [
+			{ id: 'meridian', name: 'Meridian', tag: 'Navy & Gold' },
+			{ id: 'cambria',  name: 'Cambria',  tag: 'Luxe Editorial' },
+			{ id: 'verdant',  name: 'Verdant',  tag: 'Emerald' },
+		],
+		hr: [
+			{ id: 'haven',   name: 'Haven',   tag: 'Sage & Calm'  },
+			{ id: 'solace',  name: 'Solace',  tag: 'Glass Warm'   },
+			{ id: 'quill',   name: 'Quill',   tag: 'Editorial'    },
+			{ id: 'journal', name: 'Journal', tag: 'Berry & Gold' },
+			{ id: 'atrium',  name: 'Atrium',  tag: 'Forest File'  },
 		],
 	};
 
@@ -688,25 +708,304 @@
 		uniqueValue: "Good accounting doesn't just record the past — it gives a business the confidence to plan its next move.",
 	};
 
-	// Derived: templates visible for the selected profession
+	// Accountant mock data — used when profession is 'accountant'
+	const ACCOUNTANT_DOE_PARSED: ParsedData = {
+		profile: {
+			full_name: 'Priya Raghavan',
+			headline: 'Chartered Accountant · Audit & Taxation',
+			summary: 'Practising CA with 11+ years closing books, defending audits, and keeping multi-entity groups compliant across three tax regimes.',
+			email: 'priya.raghavan@example.com',
+			phone: '+91 98765 43210',
+			location: 'Bengaluru, India',
+			social_links: {
+				linkedin: 'https://linkedin.com/in/priya-raghavan',
+			},
+		},
+		skills: [
+			{ category: 'Financial Reporting', skills: ['Statutory Financials', 'Consolidation', 'Month-End Close', 'MIS Reporting'] },
+			{ category: 'Audit & Assurance', skills: ['Statutory Audit', 'Internal Audit', 'Risk-Based Sampling', 'Internal Controls'] },
+			{ category: 'Taxation', skills: ['GST', 'Corporate Tax', 'TDS', 'Transfer Pricing', 'Tax Assessments'] },
+			{ category: 'Accounts Operations', skills: ['Accounts Payable', 'Accounts Receivable', 'Payroll Accounting', 'Bank Reconciliation'] },
+		],
+		software_proficiency: ['SAP FICO', 'Tally ERP 9', 'QuickBooks', 'Zoho Books', 'Advanced Excel', 'Power BI'],
+		compliance_expertise: ['Ind AS', 'IFRS', 'US GAAP', 'Companies Act 2013', 'GST Act', 'Income Tax Act', 'SOX 404'],
+		experience: [
+			{
+				role: 'Manager — Audit & Assurance',
+				company: 'Nandan & Co., Chartered Accountants',
+				location: 'Bengaluru, India',
+				start_date: '2020-04',
+				is_current: true,
+				description: 'Lead a nine-member team across statutory audits, group consolidations, and tax representation for 20+ retained clients.',
+				key_points: [
+					'Cut average client close cycle from 11 to 4 days by standardising the reconciliation workflow',
+					'Represented 14 clients in GST and income-tax assessments with zero adverse orders',
+					'Built the firm-wide audit documentation template now used on every engagement',
+				],
+			},
+			{
+				role: 'Assistant Manager — Finance & Accounts',
+				company: 'Wintrex Industries Pvt. Ltd.',
+				location: 'Pune, India',
+				start_date: '2016-07',
+				end_date: '2020-03',
+				description: 'Owned the general ledger, statutory reporting, and audit coordination for a three-entity manufacturing group.',
+				key_points: [
+					'Recovered ₹1.8 Cr in duplicate and unclaimed vendor payments through an AP ledger scrub',
+					'Migrated the group from Tally to SAP FICO with no reporting downtime',
+				],
+			},
+			{
+				role: 'Audit Associate',
+				company: 'Kalyan Iyer & Associates',
+				location: 'Chennai, India',
+				start_date: '2013-06',
+				end_date: '2016-06',
+				description: 'Executed statutory and internal audits for manufacturing, NBFC, and healthcare clients.',
+				key_points: ['Completed 40+ statutory audits across three sectors during articleship and post-qualification'],
+			},
+		],
+		engagements: [
+			{
+				client_name: 'Wintrex Industries Group',
+				engagement_type: 'Statutory Audit',
+				industry: 'Manufacturing',
+				start_date: '2021-04',
+				end_date: '2024-03',
+				description: 'Three-year statutory audit of a multi-entity manufacturing group with consolidated reporting under Ind AS.',
+				responsibilities: [
+					'Planned and executed risk-based audit programmes across four subsidiaries',
+					'Reviewed inventory valuation, related-party transactions, and revenue cut-off',
+				],
+				deliverables: ['Audited consolidated financial statements', 'CARO 2020 report', 'Management letter with 12 control observations'],
+				standards_applied: ['Ind AS', 'Companies Act 2013', 'CARO 2020'],
+				tools_used: ['SAP FICO', 'Advanced Excel', 'CaseWare'],
+				engagement_value: '₹640 Cr consolidated turnover audited',
+				measurable_outcomes: ['Zero audit qualifications across three consecutive years', 'Closed 12 of 12 control gaps within one cycle'],
+			},
+			{
+				client_name: 'Tessellate Retail Pvt. Ltd.',
+				engagement_type: 'GST & Corporate Tax Compliance',
+				industry: 'Retail',
+				start_date: '2020-07',
+				description: 'End-to-end indirect and direct tax compliance for a 60-store retail chain filing across nine states.',
+				responsibilities: ['Monthly GSTR-1/3B filings and annual GSTR-9C reconciliation', 'Advance tax computation and TDS compliance'],
+				deliverables: ['108 monthly GST returns filed', 'Annual tax audit report (Form 3CD)'],
+				standards_applied: ['GST Act', 'Income Tax Act', 'TDS provisions'],
+				tools_used: ['Zoho Books', 'ClearTax', 'Advanced Excel'],
+				engagement_value: '₹210 Cr annual turnover',
+				measurable_outcomes: ['Zero penalty notices in four years', 'Recovered ₹34 lakh in blocked input tax credit'],
+			},
+			{
+				client_name: 'Aravind Healthcare Trust',
+				engagement_type: 'Internal Audit',
+				industry: 'Healthcare',
+				start_date: '2019-01',
+				end_date: '2021-12',
+				description: 'Rolling internal audit of procurement, payroll, and grant-utilisation cycles for a multi-site trust.',
+				responsibilities: ['Designed the risk register and quarterly audit calendar', 'Tested procurement controls across six locations'],
+				deliverables: ['Quarterly internal audit reports', 'Revised procurement SOP'],
+				standards_applied: ['Internal Financial Controls (IFC)', 'FCRA'],
+				tools_used: ['Tally ERP 9', 'Power BI'],
+				engagement_value: '₹90 Cr annual spend reviewed',
+				measurable_outcomes: ['Procurement leakage reduced by 22% within two quarters'],
+			},
+		],
+		education: [
+			{ degree: 'Chartered Accountancy', field_of_study: 'ICAI', institution: 'Institute of Chartered Accountants of India', location: 'India', start_year: '2010', end_year: '2013', grade_or_score: 'Rank holder — AIR 214' },
+			{ degree: 'B.Com', field_of_study: 'Accounting & Finance', institution: 'Christ University', location: 'Bengaluru, India', start_year: '2007', end_year: '2010', grade_or_score: 'Distinction' },
+		],
+		certifications: [
+			{ name: 'Chartered Accountant (CA)', issuer: 'ICAI', year: '2013' },
+			{ name: 'Diploma in IFRS', issuer: 'ACCA', year: '2019' },
+			{ name: 'Certified Concurrent Auditor', issuer: 'ICAI', year: '2021' },
+			{ name: 'SAP FICO Certified Associate', issuer: 'SAP', year: '2022' },
+		],
+		achievements: [
+			{ title: 'Zero Adverse Assessment Orders', description: 'Represented 14 clients across GST and income-tax assessments without a single adverse order.', year: '2024' },
+			{ title: '₹1.8 Cr Recovered', description: 'Identified and recovered duplicate and unclaimed vendor payments through a full AP ledger scrub.', year: '2019' },
+		],
+	};
+
+	const ACCOUNTANT_DOE_CONTENT: PortfolioContent = {
+		bio: 'Chartered Accountant with 11+ years across statutory audit, taxation, and group financial reporting. I take businesses from messy ledgers to clean, defensible books — closing faster, filing on time, and standing behind the numbers when the assessment notice arrives.',
+		headline: 'Chartered Accountant · Audit · Taxation · Ind AS',
+		uniqueValue: 'Clean books are not paperwork — they are the evidence a business can be trusted with someone else’s money.',
+	};
+
+	// HR mock data — used when profession is 'hr'
+	const HR_DOE_PARSED: ParsedData = {
+		profile: {
+			full_name: 'Danielle Okafor',
+			headline: 'Head of People & Talent',
+			summary: 'People leader who has scaled two companies past 1,000 employees without letting culture, hiring quality, or compliance slip.',
+			email: 'danielle.okafor@example.com',
+			phone: '+44 7700 900123',
+			location: 'London, UK',
+			social_links: {
+				linkedin: 'https://linkedin.com/in/danielle-okafor',
+			},
+		},
+		skills: [
+			{ category: 'Talent Acquisition', skills: ['Executive Search', 'Structured Interviewing', 'Employer Branding', 'Campus Hiring'] },
+			{ category: 'People Operations', skills: ['HR Policy Design', 'Onboarding', 'HRIS Migration', 'People Analytics'] },
+			{ category: 'Employee Relations', skills: ['Grievance Handling', 'Disciplinary Process', 'Union Negotiation', 'Investigations'] },
+			{ category: 'Total Rewards', skills: ['Compensation Benchmarking', 'Equity Plans', 'Benefits Design', 'Pay Equity Review'] },
+		],
+		software_proficiency: ['Workday', 'SAP SuccessFactors', 'Greenhouse', 'BambooHR', 'Culture Amp', 'Excel'],
+		compliance_expertise: ['UK Employment Rights Act', 'TUPE', 'GDPR', 'Equality Act 2010', 'IR35', 'Right to Work Checks'],
+		experience: [
+			{
+				role: 'Head of People & Talent',
+				company: 'Northwind Technologies',
+				location: 'London, UK',
+				start_date: '2021-02',
+				is_current: true,
+				description: 'Own the people function for a 1,200-person scale-up across five markets, reporting to the CEO.',
+				key_points: [
+					'Scaled headcount from 380 to 1,200 in three years while cutting regretted attrition from 19% to 8%',
+					'Rebuilt the hiring process end to end — time-to-hire down from 54 to 28 days',
+					'Led the people workstream for two acquisitions, including TUPE transfer of 140 staff',
+				],
+			},
+			{
+				role: 'Senior HR Business Partner',
+				company: 'Calderwood Retail Group',
+				location: 'Manchester, UK',
+				start_date: '2017-05',
+				end_date: '2021-01',
+				description: 'Partnered with retail operations leadership covering 3,400 employees across 90 sites.',
+				key_points: [
+					'Cut store-manager turnover by 31% through a targeted retention and progression programme',
+					'Handled 60+ complex employee-relations cases with zero tribunal escalations',
+				],
+			},
+			{
+				role: 'Talent Acquisition Manager',
+				company: 'Brightline Consulting',
+				location: 'Birmingham, UK',
+				start_date: '2014-08',
+				end_date: '2017-04',
+				description: 'Built and ran the in-house recruitment function, replacing an agency-led model.',
+				key_points: ['Reduced agency spend by £480K annually by taking 85% of hiring in-house'],
+			},
+		],
+		hr_programs: [
+			{
+				program_name: 'Global Onboarding Revamp',
+				program_type: 'Onboarding',
+				organization: 'Northwind Technologies',
+				start_date: '2022-01',
+				end_date: '2022-09',
+				description: 'Replaced a fragmented, country-by-country onboarding process with a single 90-day journey covering every market.',
+				scope: '1,200 employees across 5 countries',
+				activities: [
+					'Mapped the existing onboarding experience across all five markets',
+					'Built a 90-day structured plan with manager checkpoints at day 7, 30 and 90',
+					'Automated provisioning and paperwork through Workday',
+				],
+				tools_used: ['Workday', 'Culture Amp', 'Notion'],
+				measurable_outcomes: ['New-hire 90-day attrition down from 14% to 4%', 'Time-to-productivity shortened by 3 weeks', 'Onboarding satisfaction 4.6/5'],
+			},
+			{
+				program_name: 'Inclusive Hiring Programme',
+				program_type: 'Diversity & Inclusion',
+				organization: 'Northwind Technologies',
+				start_date: '2021-06',
+				end_date: '2023-06',
+				description: 'Structured-interview rollout and sourcing overhaul aimed at widening the senior-hire pipeline.',
+				scope: 'All engineering and commercial hiring, 5 markets',
+				activities: [
+					'Trained 140 interviewers on structured, evidence-based interviewing',
+					'Introduced anonymised CV screening for first-round review',
+					'Set quarterly pipeline targets reported to the board',
+				],
+				tools_used: ['Greenhouse', 'Applied', 'Culture Amp'],
+				measurable_outcomes: ['Women in senior roles up from 18% to 34%', 'Interview-to-offer consistency up 41%'],
+			},
+			{
+				program_name: 'Workday HRIS Implementation',
+				program_type: 'HRIS Implementation',
+				organization: 'Northwind Technologies',
+				start_date: '2021-03',
+				end_date: '2021-12',
+				description: 'Migrated five disconnected country HR systems onto a single Workday tenant.',
+				scope: '5 legal entities, 900 employee records',
+				activities: ['Ran data cleansing and mapping across five source systems', 'Designed approval workflows and role-based access', 'Trained 60 managers on self-service'],
+				tools_used: ['Workday', 'Excel'],
+				measurable_outcomes: ['Payroll error rate down 76%', 'Manual HR admin reduced by 22 hours per week'],
+			},
+			{
+				program_name: 'Manager Essentials Academy',
+				program_type: 'Learning & Development',
+				organization: 'Calderwood Retail Group',
+				start_date: '2018-09',
+				end_date: '2020-12',
+				description: 'A six-module leadership curriculum for first-time store managers.',
+				scope: '210 managers across 90 sites',
+				activities: ['Designed six modules with an external L&D partner', 'Ran 34 cohorts and a peer-coaching circle'],
+				tools_used: ['SAP SuccessFactors', 'Kahoot'],
+				measurable_outcomes: ['Store-manager turnover down 31%', 'Internal promotion rate up from 22% to 47%'],
+			},
+		],
+		education: [
+			{ degree: 'MSc', field_of_study: 'Human Resource Management', institution: 'London School of Economics', location: 'London, UK', start_year: '2012', end_year: '2013', grade_or_score: 'Distinction' },
+			{ degree: 'BA (Hons)', field_of_study: 'Psychology', institution: 'University of Bristol', location: 'Bristol, UK', start_year: '2009', end_year: '2012', grade_or_score: 'First Class' },
+		],
+		certifications: [
+			{ name: 'Chartered MCIPD', issuer: 'CIPD', year: '2018' },
+			{ name: 'SHRM-SCP', issuer: 'SHRM', year: '2021' },
+			{ name: 'Workday HCM Fundamentals', issuer: 'Workday', year: '2021' },
+		],
+		achievements: [
+			{ title: 'HR Team of the Year', description: 'Recognised at the UK People Awards for the onboarding and retention turnaround.', year: '2023' },
+			{ title: 'Zero Tribunal Escalations', description: 'Handled 60+ complex employee-relations cases without a single tribunal claim.', year: '2020' },
+		],
+	};
+
+	const HR_DOE_CONTENT: PortfolioContent = {
+		bio: 'People leader with 11+ years across talent acquisition, employee relations, and people operations. I have scaled two companies past 1,000 employees — building hiring processes that hold up under pressure, and the policies, systems, and managers to keep those people once they arrive.',
+		headline: 'Head of People & Talent · Scaling · Employee Relations',
+		uniqueValue: 'Hiring well is only half the job — I build the systems that make people want to stay.',
+	};
+
+	// Derived: templates visible for the selected profession.
+	// Free ones are floated to the front so a free user's first impression — and
+	// the carousel's index-0 default — is always something they can actually use.
+	// Order within each tier is preserved.
 	const currentTemplates = $derived(
-		TEMPLATES_BY_PROFESSION[selectedTypeId as string] ?? TEMPLATES_BY_PROFESSION['software_engineer']
+		sortFreeFirst(
+			TEMPLATES_BY_PROFESSION[selectedTypeId as string] ??
+				TEMPLATES_BY_PROFESSION['software_engineer'],
+			(t) => t.id,
+			$freeTemplateIds
+		)
+	);
+
+	/** True when the carousel's current slide is not on the caller's plan. */
+	const currentIsLocked = $derived(
+		$templatesRestricted &&
+			!isFreeTemplate(currentTemplates[carouselIndex]?.id ?? '', $freeTemplateIds)
 	);
 
 	// Derived: mock data for the selected profession
 	const mockParsed = $derived(
-		selectedTypeId === 'designer'            ? DESIGNER_DOE_PARSED  :
-		selectedTypeId === 'marketing'           ? MARKETER_DOE_PARSED  :
-		selectedTypeId === 'civil_engineer'      ? CIVIL_DOE_PARSED     :
-		selectedTypeId === 'mechanical_engineer' ? MECH_DOE_PARSED      :
-		selectedTypeId === 'finance'             ? FINANCE_DOE_PARSED   : JOHN_DOE_PARSED
+		selectedTypeId === 'designer'            ? DESIGNER_DOE_PARSED   :
+		selectedTypeId === 'marketing'           ? MARKETER_DOE_PARSED   :
+		selectedTypeId === 'civil_engineer'      ? CIVIL_DOE_PARSED      :
+		selectedTypeId === 'mechanical_engineer' ? MECH_DOE_PARSED       :
+		selectedTypeId === 'accountant'          ? ACCOUNTANT_DOE_PARSED :
+		selectedTypeId === 'hr'                  ? HR_DOE_PARSED         :
+		selectedTypeId === 'finance'             ? FINANCE_DOE_PARSED    : JOHN_DOE_PARSED
 	);
 	const mockContent = $derived(
-		selectedTypeId === 'designer'            ? DESIGNER_DOE_CONTENT  :
-		selectedTypeId === 'marketing'           ? MARKETER_DOE_CONTENT  :
-		selectedTypeId === 'civil_engineer'      ? CIVIL_DOE_CONTENT     :
-		selectedTypeId === 'mechanical_engineer' ? MECH_DOE_CONTENT      :
-		selectedTypeId === 'finance'             ? FINANCE_DOE_CONTENT   : JOHN_DOE_CONTENT
+		selectedTypeId === 'designer'            ? DESIGNER_DOE_CONTENT   :
+		selectedTypeId === 'marketing'           ? MARKETER_DOE_CONTENT   :
+		selectedTypeId === 'civil_engineer'      ? CIVIL_DOE_CONTENT      :
+		selectedTypeId === 'mechanical_engineer' ? MECH_DOE_CONTENT       :
+		selectedTypeId === 'accountant'          ? ACCOUNTANT_DOE_CONTENT :
+		selectedTypeId === 'hr'                  ? HR_DOE_CONTENT         :
+		selectedTypeId === 'finance'             ? FINANCE_DOE_CONTENT    : JOHN_DOE_CONTENT
 	);
 
 	// Reactive preview — re-renders whenever profession or carousel index changes
@@ -731,6 +1030,16 @@
 	);
 
 	const stepLabels = ['File', 'Role', 'Theme'];
+
+	// A resume picked on the landing page (upload dock) before the guest session
+	// existed. Consume it here so the wizard opens with the file already staged
+	// and goes straight into analysis instead of asking for it a second time.
+	onMount(() => {
+		const handedOff = takePendingUpload();
+		if (!handedOff) return;
+		setFile(handedOff);
+		if (selectedFile) void beginAnalysis();
+	});
 
 	function handleFileSelect(e: Event) {
 		const input = e.target as HTMLInputElement;
@@ -834,6 +1143,17 @@
 		errorMessage = '';
 
 		const result = await startUpload(selectedFile);
+		if (result.limitError) {
+			// The portfolio cap is enforced at presign, so this is where a free
+			// user who already has a portfolio actually gets stopped — before any
+			// file leaves the browser. Go back to the file step and offer the
+			// upgrade rather than stranding them on the "analyzing" screen with a
+			// raw error.
+			phase = 'file';
+			entitlements.syncFromLimitError(result.limitError);
+			limitError = result.limitError;
+			return;
+		}
 		if (!result.success || !result.uploadId) {
 			analyzeError = result.error ?? 'Upload failed. Please try again.';
 			return;
@@ -933,6 +1253,12 @@
 		const result = await startGeneration(uploadId, selectedTypeId as ResumeCategory, templateId);
 		if (result.success) {
 			goto(`/app/resumes/${uploadId}/processing`);
+		} else if (result.limitError) {
+			// Plan limit, not a failure — show the upgrade path instead of an error
+			// banner, and correct the local usage from the server's own numbers.
+			uploadStatus = 'idle';
+			entitlements.syncFromLimitError(result.limitError);
+			limitError = result.limitError;
 		} else {
 			uploadStatus = 'error';
 			errorMessage = result.error ?? 'Could not start generation. Please try again.';
@@ -941,6 +1267,24 @@
 
 	function handleUpload() {
 		const templateId = currentTemplates[carouselIndex]?.id ?? 'neon';
+		// Client-side shortcut so a locked theme never costs a round trip. The
+		// backend enforces this independently — this is purely for responsiveness.
+		if (currentIsLocked) {
+			limitError = {
+				error: 'That template is available on the paid plan.',
+				code: 'LIMIT_EXCEEDED',
+				limit: {
+					name: 'templates',
+					label: 'premium templates',
+					plan: $entitlements.data.plan,
+					limit: 'free_only',
+					templateId,
+					resetsAt: null
+				},
+				upgradeTo: 'pro'
+			};
+			return;
+		}
 		void generate(templateId);
 	}
 
@@ -1143,18 +1487,31 @@
 					</div>
 
 					<!-- Template name + tag -->
-					<div class="mt-4 text-center">
+					<div class="mt-4 flex flex-wrap items-center justify-center gap-2 text-center">
 						<span class="font-bold text-ink">{currentTemplates[carouselIndex]?.name}</span>
-						<span class="ml-2 rounded-full bg-surface-subtle px-2 py-0.5 text-xs font-medium text-ink-muted">{currentTemplates[carouselIndex]?.tag}</span>
+						<span class="rounded-full bg-surface-subtle px-2 py-0.5 text-xs font-medium text-ink-muted">{currentTemplates[carouselIndex]?.tag}</span>
+						{#if currentIsLocked}
+							<span class="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-bold text-amber-700">
+								<svg viewBox="0 0 20 20" fill="currentColor" class="h-3 w-3" aria-hidden="true"><path d="M9.5 1.5a.75.75 0 0 1 1 0l2.2 4.46 4.92.72a.75.75 0 0 1 .42 1.28l-3.56 3.47.84 4.9a.75.75 0 0 1-1.09.79L10 14.8l-4.4 2.32a.75.75 0 0 1-1.09-.79l.84-4.9L1.8 7.96a.75.75 0 0 1 .42-1.28l4.92-.72L9.5 1.5Z"/></svg>
+								Pro
+							</span>
+						{/if}
 					</div>
 
-					<!-- Dot indicators -->
+					<!-- Dot indicators — a star marks themes that need an upgrade -->
 					<div class="mt-3 flex items-center justify-center gap-1.5">
-						{#each currentTemplates as _, i}
+						{#each currentTemplates as t, i}
+							{@const locked = $templatesRestricted && !isFreeTemplate(t.id, $freeTemplateIds)}
 							<button
 								onclick={() => (carouselIndex = i)}
-								aria-label="Select template {currentTemplates[i].name}"
-								class="rounded-full transition-all duration-200 {i === carouselIndex ? 'w-5 h-2 bg-brand' : 'w-2 h-2 bg-surface-muted hover:bg-ink-muted'}"
+								aria-label="Select template {t.name}{locked ? ' (paid plan)' : ''}"
+								class="rounded-full transition-all duration-200 {i === carouselIndex
+									? locked
+										? 'h-2 w-5 bg-amber-500'
+										: 'h-2 w-5 bg-brand'
+									: locked
+										? 'h-2 w-2 bg-amber-200 hover:bg-amber-400'
+										: 'h-2 w-2 bg-surface-muted hover:bg-ink-muted'}"
 							></button>
 						{/each}
 					</div>
@@ -1176,9 +1533,18 @@
 					{#if uploadStatus !== 'uploading'}
 						<div class="mt-6 flex gap-4">
 							<button onclick={goBack} class="flex items-center justify-center rounded-xl bg-surface-subtle px-6 py-4 text-sm font-bold text-ink-soft transition-colors hover:bg-surface-muted hover:text-ink">Back</button>
-							<button onclick={handleUpload} class="flex flex-1 items-center justify-center gap-2 rounded-xl bg-brand py-4 text-base font-bold text-white shadow-xl transition-all hover:bg-brand-dark active:scale-95">
-								Select "{currentTemplates[carouselIndex]?.name}" & Generate
-							</button>
+							{#if currentIsLocked}
+								<!-- Still clickable: it opens the upgrade modal. A disabled button
+								     would leave the user with no explanation of why. -->
+								<button onclick={handleUpload} class="flex flex-1 items-center justify-center gap-2 rounded-xl bg-amber-500 py-4 text-base font-bold text-white shadow-xl transition-all hover:bg-amber-600 active:scale-95">
+									<svg viewBox="0 0 20 20" fill="currentColor" class="h-4 w-4" aria-hidden="true"><path d="M5 9V6a5 5 0 0 1 10 0v3h.5a1.5 1.5 0 0 1 1.5 1.5v6A1.5 1.5 0 0 1 15.5 18h-11A1.5 1.5 0 0 1 3 16.5v-6A1.5 1.5 0 0 1 4.5 9H5Zm2-3a3 3 0 0 1 6 0v3H7V6Z"/></svg>
+									Unlock "{currentTemplates[carouselIndex]?.name}"
+								</button>
+							{:else}
+								<button onclick={handleUpload} class="flex flex-1 items-center justify-center gap-2 rounded-xl bg-brand py-4 text-base font-bold text-white shadow-xl transition-all hover:bg-brand-dark active:scale-95">
+									Select "{currentTemplates[carouselIndex]?.name}" & Generate
+								</button>
+							{/if}
 						</div>
 					{/if}
 				</div>
@@ -1186,3 +1552,7 @@
 		</div>
 	</main>
 </div>
+
+<!-- Single modal for every plan limit this page can hit: the portfolio cap at
+     presign/start-generation, and locked themes in the carousel. -->
+<UpgradeModal bind:limitError />

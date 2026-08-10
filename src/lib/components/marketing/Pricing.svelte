@@ -13,18 +13,21 @@
 	const proAnnual: ProPricing = { price: '$69', per: '/year', original: '$84', cta: 'Get Hired at $69/yr' };
 	const pro = $derived(annual ? proAnnual : proMonthly);
 
+	// These bullets mirror what the backend actually enforces — see
+	// src/lambdas/auth/entitlements.py PLANS. If a limit changes there, change it
+	// here too, or the page promises something the product refuses to do.
 	const freePlan = {
 		plan: 'Try It',
 		price: '$0',
 		per: '/forever',
 		sub: 'See what AI builds from your CV. No card needed.',
 		features: [
-			{ on: true, text: '2 AI-generated portfolios' },
-			{ on: true, text: 'All profession templates' },
+			{ on: true, text: '1 AI-generated portfolio' },
+			{ on: true, text: 'Free theme for your profession' },
 			{ on: true, text: 'Shareable live link' },
-			{ on: true, text: 'Basic AI suggestions' },
-			{ on: false, text: 'Recruiter analytics' },
-			{ on: false, text: 'Media upload' }
+			{ on: true, text: '2 AI reviews + 3 rewrites a day' },
+			{ on: false, text: 'Every premium theme' },
+			{ on: false, text: 'Recruiter analytics' }
 		],
 		cta: 'Start for Free',
 		outline: true
@@ -48,11 +51,11 @@
 
 	const proFeatures = [
 		{ on: true, text: 'Unlimited portfolios' },
-		{ on: true, text: 'AI work story writer' },
-		{ on: true, text: 'Media upload: images, video, decks' },
-		{ on: true, text: 'Job description matching' },
+		{ on: true, text: 'Every premium theme' },
+		{ on: true, text: '50 AI reviews + 200 rewrites a day' },
+		{ on: true, text: '20 AI-generated images a day' },
 		{ on: true, text: 'Recruiter analytics' },
-		{ on: true, text: 'Custom domain' },
+		{ on: true, text: 'Publish as often as you like' },
 		{ on: true, text: 'No watermark' }
 	];
 </script>

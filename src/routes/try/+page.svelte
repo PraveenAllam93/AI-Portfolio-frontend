@@ -3,6 +3,7 @@
 	import { goto } from '$app/navigation';
 	import { env } from '$env/dynamic/public';
 	import { authStore } from '$lib/stores/auth';
+	import { getAuthUser, type AuthUser } from '$lib/services/auth';
 	import { startGuestSession } from '$lib/services/guest';
 	import Spinner from '$lib/components/common/Spinner.svelte';
 
@@ -50,6 +51,26 @@
 	}
 
 	onMount(async () => {
+		// Anyone already signed in — real account or an earlier guest — goes straight
+		// to the wizard. Minting a guest here would overwrite their auth cookies
+		// (POST /api/guest/start always calls setAuthCookies), silently swapping a
+		// real user into a throwaway session and stranding a guest's existing work.
+		// Asked directly rather than read off authStore: the root layout populates
+		// that asynchronously and may not have resolved by the time this runs.
+		// A failed lookup must not strand the page — fall through to the normal
+		// guest flow, which surfaces its own errors.
+		let existing: AuthUser | null = null;
+		try {
+			existing = await getAuthUser();
+		} catch {
+			/* treat as signed out */
+		}
+		if (existing) {
+			authStore.setUser(existing);
+			await goto('/app/resumes/upload');
+			return;
+		}
+
 		// No site key configured (e.g. local dev) — skip the challenge entirely.
 		if (!SITE_KEY) {
 			void begin('');

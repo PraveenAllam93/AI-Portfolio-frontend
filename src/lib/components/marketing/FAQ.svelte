@@ -4,7 +4,11 @@
 	const faqs = [
 		{
 			q: 'Is building a portfolio free on Portfolio.ai?',
-			a: 'Yes — you can build, preview, and publish your first portfolio for free. Upgrade only when you want analytics, custom domains, or unlimited portfolios.'
+			a: 'Yes — the free plan lets you build, preview, and publish one portfolio, using the free theme for your profession, with a few AI reviews and rewrites each day. Upgrade when you want more portfolios, every premium theme, recruiter analytics, or more AI.'
+		},
+		{
+			q: 'What are the limits on the free plan?',
+			a: 'One portfolio, the free theme for your profession, 2 AI reviews and 3 AI rewrites a day, 2 publishes a day, and 1 AI-generated image a day. Daily limits reset every night. You can always delete your portfolio and start a new one.'
 		},
 		{
 			q: 'Does Portfolio.ai host my portfolio for me?',
@@ -24,7 +28,7 @@
 		},
 		{
 			q: 'How much storage do I get?',
-			a: 'Free plans include generous storage for your first portfolio. Paid plans unlock unlimited media uploads and high-res video hosting.'
+			a: 'The free plan includes generous storage for your portfolio. Paid plans unlock unlimited media uploads and high-res video hosting.'
 		},
 		{
 			q: 'Who is Portfolio.ai for?',

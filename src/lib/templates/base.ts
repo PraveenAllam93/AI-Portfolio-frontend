@@ -10,6 +10,8 @@ import type { ParsedData, PortfolioContent } from '$lib/types/portfolio';
 export const DEFAULT_SECTION_ORDER: string[] = [
 	'experience',
 	'projects',
+	'engagements',
+	'hr_programs',
 	'skills',
 	'education',
 	'certifications',
@@ -20,6 +22,7 @@ export const DEFAULT_SECTION_ORDER: string[] = [
 	'investment_portfolios',
 	'design_philosophy',
 	'software_proficiency',
+	'compliance_expertise',
 	'custom_sections'
 ];
 
@@ -35,10 +38,13 @@ const SECTION_CATEGORIES: Record<string, string[]> = {
 	projects:              ['software_engineer', 'designer', 'civil_engineer', 'mechanical_engineer'],
 	awards:                ['designer'],
 	design_philosophy:     ['designer'],
-	software_proficiency:  ['designer', 'civil_engineer', 'mechanical_engineer'],
+	software_proficiency:  ['designer', 'civil_engineer', 'mechanical_engineer', 'accountant', 'hr'],
 	campaigns:             ['marketing'],
 	financial_modeling:    ['finance'],
 	investment_portfolios: ['finance'],
+	engagements:           ['accountant'],
+	hr_programs:           ['hr'],
+	compliance_expertise:  ['accountant', 'hr'],
 };
 
 /** True when `key` is a universal section or belongs to `category`.
@@ -414,6 +420,10 @@ export interface NormalizedData {
 		key_points: string[];
 		channels_managed: string[];
 		financial_metrics_managed: string[];
+		/** Uploaded via the edit form's image uploader (max 3). Was missing here
+		 *  until 2026-08-08, which made experience images unrenderable by ANY
+		 *  template even though they saved fine — see Z11. */
+		images: string[];
 	}>;
 	education: Array<{
 		degree: string;
@@ -467,6 +477,38 @@ export interface NormalizedData {
 		assets_under_management: string;
 		performance_return: string;
 	}>;
+	// Accountant
+	engagements: Array<{
+		client_name: string;
+		engagement_type: string;
+		industry: string;
+		start_date: string;
+		end_date: string;
+		description: string;
+		responsibilities: string[];
+		deliverables: string[];
+		standards_applied: string[];
+		tools_used: string[];
+		engagement_value: string;
+		measurable_outcomes: string[];
+		images: string[];
+	}>;
+	// HR
+	hr_programs: Array<{
+		program_name: string;
+		program_type: string;
+		organization: string;
+		start_date: string;
+		end_date: string;
+		description: string;
+		scope: string;
+		activities: string[];
+		tools_used: string[];
+		measurable_outcomes: string[];
+		images: string[];
+	}>;
+	// Accountant + HR — standards, tax and employment-law frameworks
+	compliance_expertise: string[];
 	// Custom sections (all categories)
 	custom_sections: Array<{
 		section_id: string;
@@ -577,7 +619,8 @@ export function normalize(
 			description: _e(exp.description),
 			key_points: (Array.isArray(exp.key_points) ? exp.key_points : []).filter(Boolean).map(_e),
 			channels_managed: (Array.isArray(exp.channels_managed) ? exp.channels_managed : []).filter(Boolean).map(_e),
-			financial_metrics_managed: (Array.isArray(exp.financial_metrics_managed) ? exp.financial_metrics_managed : []).filter(Boolean).map(_e)
+			financial_metrics_managed: (Array.isArray(exp.financial_metrics_managed) ? exp.financial_metrics_managed : []).filter(Boolean).map(_e),
+			images: (Array.isArray(exp.images) ? exp.images : []).map(_safeUrl).filter(Boolean)
 		};
 	});
 
@@ -670,6 +713,42 @@ export function normalize(
 			performance_return: _e(ip.performance_return)
 		}));
 
+	const engagements = _visibleItems(parsedData.engagements)
+		.filter((en) => en.client_name || en.engagement_type)
+		.map((en) => ({
+			client_name: _e(en.client_name),
+			engagement_type: _e(en.engagement_type),
+			industry: _e(en.industry),
+			start_date: _e(en.start_date),
+			end_date: _e(en.end_date),
+			description: _e(en.description),
+			responsibilities: (Array.isArray(en.responsibilities) ? en.responsibilities : []).filter(Boolean).map(_e),
+			deliverables: (Array.isArray(en.deliverables) ? en.deliverables : []).filter(Boolean).map(_e),
+			standards_applied: (Array.isArray(en.standards_applied) ? en.standards_applied : []).filter(Boolean).map(_e),
+			tools_used: (Array.isArray(en.tools_used) ? en.tools_used : []).filter(Boolean).map(_e),
+			engagement_value: _e(en.engagement_value),
+			measurable_outcomes: (Array.isArray(en.measurable_outcomes) ? en.measurable_outcomes : []).filter(Boolean).map(_e),
+			images: (Array.isArray(en.images) ? en.images : []).map(_safeUrl).filter(Boolean)
+		}));
+
+	const hr_programs = _visibleItems(parsedData.hr_programs)
+		.filter((p) => p.program_name || p.program_type)
+		.map((p) => ({
+			program_name: _e(p.program_name),
+			program_type: _e(p.program_type),
+			organization: _e(p.organization),
+			start_date: _e(p.start_date),
+			end_date: _e(p.end_date),
+			description: _e(p.description),
+			scope: _e(p.scope),
+			activities: (Array.isArray(p.activities) ? p.activities : []).filter(Boolean).map(_e),
+			tools_used: (Array.isArray(p.tools_used) ? p.tools_used : []).filter(Boolean).map(_e),
+			measurable_outcomes: (Array.isArray(p.measurable_outcomes) ? p.measurable_outcomes : []).filter(Boolean).map(_e),
+			images: (Array.isArray(p.images) ? p.images : []).map(_safeUrl).filter(Boolean)
+		}));
+
+	const compliance_expertise = (Array.isArray(parsedData.compliance_expertise) ? parsedData.compliance_expertise : []).filter(Boolean).map(_e);
+
 	// Both the section and its items honour the eye toggle. Because hidden entries
 	// are dropped here, the indices templates emit into edit paths
 	// (custom_sections.{i}.items.{j}) are VISIBLE indices — the edit page maps
@@ -723,6 +802,9 @@ export function normalize(
 		campaigns,
 		financial_modeling,
 		investment_portfolios,
+		engagements,
+		hr_programs,
+		compliance_expertise,
 		custom_sections,
 		template_overrides: templateOverrides ?? {},
 		field_visibility: fieldVisibility ?? {},

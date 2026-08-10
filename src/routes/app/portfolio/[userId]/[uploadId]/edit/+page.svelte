@@ -36,11 +36,48 @@
 		CustomSectionItem
 	} from '$lib/types/portfolio';
 	import { DEFAULT_SECTION_ORDER } from '$lib/types/portfolio';
-	import { renderPortfolio, TEMPLATE_META, TEMPLATE_FIELDS, SUMMARY_IMAGE_TEMPLATES, CORE_EXPERTISE_TEMPLATES, CONTACT_TAGLINE_TEMPLATES, DEFAULT_CONTACT_TAGLINE, customDisplayTypes } from '$lib/templates';
+	import { renderPortfolio, TEMPLATE_META, TEMPLATE_FIELDS, SUMMARY_IMAGE_TEMPLATES, CORE_EXPERTISE_TEMPLATES, CONTACT_TAGLINE_TEMPLATES, DEFAULT_CONTACT_TAGLINE, customDisplayTypes, sortFreeFirst, isFreeTemplate } from '$lib/templates';
 	import { EDITOR_JS, EDITOR_SCRIPT } from '$lib/templates/base';
+	import { entitlements, freeTemplateIds, templatesRestricted } from '$lib/stores/entitlements';
+	import { remaining, type LimitError } from '$lib/services/entitlements';
+	import UpgradeModal from '$lib/components/common/UpgradeModal.svelte';
 
 	const userId: string = $derived($page.params.userId ?? '');
 	const uploadId: string = $derived($page.params.uploadId ?? '');
+
+	// ── Plan limits ─────────────────────────────────────────────────────────────
+	// Non-null while the upgrade modal is open; carries the backend's 402 payload.
+	let limitError = $state<LimitError | null>(null);
+
+	/**
+	 * Route a service result's plan-limit rejection to the upgrade modal.
+	 * Returns true when it WAS a limit rejection, so callers read:
+	 *
+	 *   if (handleLimit(result)) { ...clear loading state...; return; }
+	 *
+	 * Also re-syncs local usage from the server's numbers, which keeps the
+	 * "N left today" counters honest if they drifted (a second tab, a refunded
+	 * credit, or the UTC-midnight rollover).
+	 */
+	function handleLimit(result: { limitError?: LimitError }): boolean {
+		if (!result.limitError) return false;
+		entitlements.syncFromLimitError(result.limitError);
+		limitError = result.limitError;
+		return true;
+	}
+
+	// Remaining daily allowance, or null when the plan is unlimited.
+	const aiAnalyzeLeft = $derived(
+		remaining($entitlements.data.limits.aiAnalyzePerDay, $entitlements.data.usage.aiAnalyze)
+	);
+	const aiEnhanceLeft = $derived(
+		remaining($entitlements.data.limits.aiEnhancePerDay, $entitlements.data.usage.aiEnhance)
+	);
+	const outOfEnhances = $derived(aiEnhanceLeft !== null && aiEnhanceLeft <= 0);
+	const outOfAnalyses = $derived(aiAnalyzeLeft !== null && aiAnalyzeLeft <= 0);
+	const publishesLeft = $derived(
+		remaining($entitlements.data.limits.publishesPerDay, $entitlements.data.usage.publishes)
+	);
 
 	// Ownership guard. Skipped while a guest is converting to a real account —
 	// during that window the session is already the real user but the URL still
@@ -220,9 +257,62 @@
 			fields: [{ key: 'value', label: 'Design Philosophy', inputType: 'textarea', limit: 2000 }],
 			emptyItem: () => ({})
 		},
+		engagements: {
+			label: 'Engagements',
+			categories: ['accountant'],
+			type: 'array',
+			itemTitle: (item, i) =>
+				item.client_name
+					? `${item.client_name}${item.engagement_type ? ` — ${item.engagement_type}` : ''}`
+					: (item.engagement_type as string) || `Engagement ${i + 1}`,
+			fields: [
+				{ key: 'client_name', label: 'Client / Entity', inputType: 'text', limit: 200 },
+				{ key: 'engagement_type', label: 'Engagement Type', inputType: 'text', placeholder: 'e.g. Statutory Audit, Tax Filing', limit: 200 },
+				{ key: 'industry', label: 'Industry', inputType: 'text', limit: 150 },
+				{ key: 'start_date', label: 'Start Date', inputType: 'text', placeholder: 'e.g. Apr 2022', limit: 50 },
+				{ key: 'end_date', label: 'End Date', inputType: 'text', placeholder: 'e.g. Mar 2023 or Present', limit: 50 },
+				{ key: 'description', label: 'Scope / Description', inputType: 'textarea', aiEnhanceable: true, limit: 1500 },
+				{ key: 'responsibilities', label: 'Responsibilities (one per line)', inputType: 'list', aiEnhanceable: true },
+				{ key: 'deliverables', label: 'Deliverables (one per line)', inputType: 'list', aiEnhanceable: true },
+				{ key: 'standards_applied', label: 'Standards Applied (one per line)', inputType: 'list' },
+				{ key: 'tools_used', label: 'Tools Used (one per line)', inputType: 'list' },
+				{ key: 'engagement_value', label: 'Scale / Value Handled', inputType: 'text', placeholder: 'e.g. $40M turnover audited', limit: 200 },
+				{ key: 'measurable_outcomes', label: 'Outcomes (one per line)', inputType: 'list', aiEnhanceable: true },
+				{ key: 'images', label: 'Images (max 3)', inputType: 'images' }
+			],
+			emptyItem: () => ({ client_name: '', engagement_type: '', industry: '', start_date: '', end_date: '', description: '', responsibilities: [], deliverables: [], standards_applied: [], tools_used: [], engagement_value: '', measurable_outcomes: [], images: [] })
+		},
+		hr_programs: {
+			label: 'HR Programs',
+			categories: ['hr'],
+			type: 'array',
+			itemTitle: (item, i) => (item.program_name as string) || (item.program_type as string) || `Program ${i + 1}`,
+			fields: [
+				{ key: 'program_name', label: 'Program Name', inputType: 'text', limit: 200 },
+				{ key: 'program_type', label: 'Program Type', inputType: 'text', placeholder: 'e.g. Talent Acquisition, L&D', limit: 200 },
+				{ key: 'organization', label: 'Organization', inputType: 'text', limit: 200 },
+				{ key: 'start_date', label: 'Start Date', inputType: 'text', placeholder: 'e.g. Jan 2022', limit: 50 },
+				{ key: 'end_date', label: 'End Date', inputType: 'text', placeholder: 'e.g. Dec 2023 or Present', limit: 50 },
+				{ key: 'description', label: 'Description', inputType: 'textarea', aiEnhanceable: true, limit: 1500 },
+				{ key: 'scope', label: 'Scope / Reach', inputType: 'text', placeholder: 'e.g. 1,200 employees across 4 sites', limit: 300 },
+				{ key: 'activities', label: 'Activities (one per line)', inputType: 'list', aiEnhanceable: true },
+				{ key: 'tools_used', label: 'Tools Used (one per line)', inputType: 'list' },
+				{ key: 'measurable_outcomes', label: 'Outcomes (one per line)', inputType: 'list', aiEnhanceable: true },
+				{ key: 'images', label: 'Images (max 3)', inputType: 'images' }
+			],
+			emptyItem: () => ({ program_name: '', program_type: '', organization: '', start_date: '', end_date: '', description: '', scope: '', activities: [], tools_used: [], measurable_outcomes: [], images: [] })
+		},
 		software_proficiency: {
 			label: 'Software Proficiency',
-			categories: ['designer', 'civil_engineer', 'mechanical_engineer'],
+			categories: ['designer', 'civil_engineer', 'mechanical_engineer', 'accountant', 'hr'],
+			type: 'list',
+			itemTitle: () => '',
+			fields: [],
+			emptyItem: () => ({})
+		},
+		compliance_expertise: {
+			label: 'Compliance & Regulatory',
+			categories: ['accountant', 'hr'],
 			type: 'list',
 			itemTitle: () => '',
 			fields: [],
@@ -472,8 +562,13 @@
 		financial_modeling:   sectionMatchesCategory('financial_modeling') ? (sections.financial_modeling ?? []).filter(it => !it.hidden).map(it => it.data as any) : [],
 		// eslint-disable-next-line @typescript-eslint/no-explicit-any
 		investment_portfolios:sectionMatchesCategory('investment_portfolios') ? (sections.investment_portfolios ?? []).filter(it => !it.hidden).map(it => it.data as any) : [],
+		// eslint-disable-next-line @typescript-eslint/no-explicit-any
+		engagements:          sectionMatchesCategory('engagements') ? (sections.engagements ?? []).filter(it => !it.hidden).map(it => it.data as any) : [],
+		// eslint-disable-next-line @typescript-eslint/no-explicit-any
+		hr_programs:          sectionMatchesCategory('hr_programs') ? (sections.hr_programs ?? []).filter(it => !it.hidden).map(it => it.data as any) : [],
 		design_philosophy:    sectionMatchesCategory('design_philosophy') ? (stringSections.design_philosophy ?? '') : '',
 		software_proficiency: sectionMatchesCategory('software_proficiency') ? (stringSections.software_proficiency ?? '').split('\n').map(s => s.trim()).filter(Boolean) : [],
+		compliance_expertise: sectionMatchesCategory('compliance_expertise') ? (stringSections.compliance_expertise ?? '').split('\n').map(s => s.trim()).filter(Boolean) : [],
 		// eslint-disable-next-line @typescript-eslint/no-explicit-any
 		custom_sections:      customSections as any,
 	});
@@ -722,7 +817,35 @@
 		persistHandled();
 	}
 
-	async function fetchLlmSuggestions() {
+	/**
+	 * True when the automatic on-load review may run.
+	 *
+	 * The auto-review is a real, billed OpenAI call, and the free plan's entire
+	 * daily allowance is 2 — so firing it on every page load would spend a user's
+	 * budget without them asking, and two reloads would exhaust it before they
+	 * clicked anything. It is therefore capped at once per portfolio per UTC day
+	 * (matching the server's reset boundary). The Refresh button is unaffected
+	 * and always re-runs on demand.
+	 */
+	function shouldAutoReview(): boolean {
+		if (typeof localStorage === 'undefined' || !uploadId) return true;
+		const key = `aiAutoReview:${uploadId}`;
+		const today = new Date().toISOString().slice(0, 10); // UTC, like the backend
+		try {
+			if (localStorage.getItem(key) === today) return false;
+			localStorage.setItem(key, today);
+		} catch {
+			/* private mode / quota — fall through and allow the fetch */
+		}
+		return true;
+	}
+
+	/**
+	 * `auto` marks the unprompted on-load run. Running out of credits on that path
+	 * must stay silent (fall back to the static checklist) — throwing an upgrade
+	 * modal at someone who merely opened the page would be nagging, not selling.
+	 */
+	async function fetchLlmSuggestions(auto = false) {
 		llmSuggestionsLoading = true;
 		llmSuggestionsError = '';
 		// Pass current in-memory state so the LLM always sees what the user sees,
@@ -752,7 +875,17 @@
 		});
 		llmSuggestionsLoading = false;
 		llmSuggestionsLoaded = true;
+		if (result.limitError) {
+			// Out of AI reviews for today. Fall back to the static checklist and
+			// leave llmSuggestionsError unset — a red error strip would misrepresent
+			// a plan limit as a fault. Only a DELIBERATE refresh opens the modal.
+			llmSuggestionsLoaded = false;
+			entitlements.syncFromLimitError(result.limitError);
+			if (!auto) limitError = result.limitError;
+			return;
+		}
 		if (result.ok && result.data) {
+			entitlements.consume('aiAnalyze');
 			llmSuggestions = result.data.suggestions.map((s) =>
 				s.index != null && s.section !== 'profile' && s.section !== 'skills'
 					? { ...s, index: visibleToActual[s.section]?.[s.index] ?? s.index }
@@ -973,14 +1106,30 @@
 	//  - the currently-active template is ALWAYS listed, even if its profession
 	//    doesn't match (e.g. category was reclassified after the template was
 	//    chosen), so the selected entry is never invisible.
+	//
+	// Free templates are floated to the top (stable within each tier) so a free
+	// user sees what they can use first instead of scrolling past locked entries.
 	const visibleTemplates = $derived.by(() => {
 		const matching = Object.entries(TEMPLATE_META).filter(([, m]) => m.profession === category);
 		const base = matching.length > 0 ? matching : Object.entries(TEMPLATE_META);
-		if (TEMPLATE_META[templateId] && !base.some(([id]) => id === templateId)) {
-			return [[templateId, TEMPLATE_META[templateId]] as (typeof base)[number], ...base];
+		const ordered = sortFreeFirst(base, ([id]) => id, $freeTemplateIds);
+		if (TEMPLATE_META[templateId] && !ordered.some(([id]) => id === templateId)) {
+			return [[templateId, TEMPLATE_META[templateId]] as (typeof ordered)[number], ...ordered];
 		}
-		return base;
+		return ordered;
 	});
+
+	/**
+	 * True when this template is not on the caller's plan.
+	 *
+	 * The currently-applied template is never treated as locked: a user who was
+	 * on a paid plan and lapsed must still see their own portfolio's theme
+	 * selected and named, not an "upgrade" chip on the thing already rendering.
+	 */
+	function templateLocked(id: string): boolean {
+		if (id === templateId) return false;
+		return $templatesRestricted && !isFreeTemplate(id, $freeTemplateIds);
+	}
 
 	// ── Load ────────────────────────────────────────────────────────────────────
 
@@ -1053,12 +1202,14 @@
 		}
 		sections = newSections;
 
-		// String / list sections
+		// String / list sections. List sections are edited as newline-joined text
+		// and split back into an array on save (see saveStringSection).
 		const dp = parsedData.design_philosophy ?? '';
 		const sp = (parsedData.software_proficiency ?? []).join('\n');
-		stringSections = { design_philosophy: dp, software_proficiency: sp };
-		stringSectionOriginals = { design_philosophy: dp, software_proficiency: sp };
-		stringSectionStatus = { design_philosophy: 'idle', software_proficiency: 'idle' };
+		const ce = (parsedData.compliance_expertise ?? []).join('\n');
+		stringSections = { design_philosophy: dp, software_proficiency: sp, compliance_expertise: ce };
+		stringSectionOriginals = { design_philosophy: dp, software_proficiency: sp, compliance_expertise: ce };
+		stringSectionStatus = { design_philosophy: 'idle', software_proficiency: 'idle', compliance_expertise: 'idle' };
 
 		// Custom sections
 		customSections = JSON.parse(JSON.stringify(parsedData.custom_sections ?? []));
@@ -1112,8 +1263,10 @@
 			} catch { /* corrupt entry — ignore */ }
 		}
 
-		// Fetch LLM suggestions non-blockingly after data loads
-		fetchLlmSuggestions();
+		// Fetch LLM suggestions non-blockingly after data loads — but at most once
+		// per portfolio per day, so reopening the editor never quietly spends the
+		// user's daily AI review allowance.
+		if (shouldAutoReview()) fetchLlmSuggestions(true);
 	});
 
 	// ── Profile save/AI ─────────────────────────────────────────────────────────
@@ -1482,11 +1635,14 @@
 
 		aiImageGenerating = { ...aiImageGenerating, [stateKey]: false };
 
+		if (handleLimit(result)) return;
+
 		if (!result.ok || !result.data) {
 			aiImageError = { ...aiImageError, [stateKey]: result.error ?? 'Generation failed. Please try again.' };
 			return;
 		}
 
+		entitlements.consume('projectImages');
 		aiImagePending = { ...aiImagePending, [stateKey]: result.data.imageUrl };
 	}
 
@@ -1517,7 +1673,9 @@
 		profileFields[key].aiError = '';
 		const result = await getAiEnhancement(userId, uploadId, key, f.aiInstruction, f.value);
 		profileFields[key].aiLoading = false;
+		if (handleLimit(result)) return;
 		if (result.ok && result.data) {
+			entitlements.consume('aiEnhance');
 			profileFields[key].aiSuggestion = result.data.suggestion;
 		} else {
 			profileFields[key].aiError = result.error ?? 'Enhancement failed. Please try again.';
@@ -1579,7 +1737,9 @@
 		skillsAiError = '';
 		const result = await getAiSkillsEnhancement(userId, uploadId, skillsAiInstruction);
 		skillsAiLoading = false;
+		if (handleLimit(result)) return;
 		if (result.ok && result.data) {
+			entitlements.consume('aiEnhance');
 			skillsAiSuggestion = result.data.suggestion;
 		} else {
 			skillsAiError = result.error ?? 'Enhancement failed. Please try again.';
@@ -1798,7 +1958,13 @@
 
 		const u = [...sections[sectionKey]];
 		u[itemIdx] = { ...u[itemIdx], aiLoading: false };
+		if (handleLimit(result)) {
+			// Clear the spinner but leave no inline error — the modal explains it.
+			sections = { ...sections, [sectionKey]: u };
+			return;
+		}
 		if (result.ok && result.data) {
+			entitlements.consume('aiEnhance');
 			u[itemIdx] = { ...u[itemIdx], aiSuggestion: result.data.suggestion };
 		} else {
 			u[itemIdx] = { ...u[itemIdx], aiError: result.error ?? 'Enhancement failed.' };
@@ -2219,6 +2385,28 @@
 		templateDropdownOpen = false;
 		// Re-selecting the already-active template is a no-op — don't save or mark dirty.
 		if (newId === templateId) return;
+
+		// Locked on this plan: offer the upgrade without touching local state, so
+		// the preview never shows a theme that cannot be saved. The backend blocks
+		// this independently — the check here just avoids a pointless round trip.
+		if (templateLocked(newId)) {
+			limitError = {
+				error: 'That template is available on the paid plan.',
+				code: 'LIMIT_EXCEEDED',
+				limit: {
+					name: 'templates',
+					label: 'premium templates',
+					plan: $entitlements.data.plan,
+					limit: 'free_only',
+					templateId: newId,
+					resetsAt: null
+				},
+				upgradeTo: 'pro'
+			};
+			return;
+		}
+
+		const previousId = templateId;
 		templateId = newId;
 		// Normalize custom-section display types the new template can't render
 		// (previously this only happened on page load, so switching templates left
@@ -2230,7 +2418,13 @@
 			);
 			autoSaveCustomSections();
 		}
-		await updatePortfolioConfig(userId, uploadId, { templateId: newId });
+		const result = await updatePortfolioConfig(userId, uploadId, { templateId: newId });
+		if (result.limitError) {
+			// The save was rejected on plan grounds — roll the optimistic switch
+			// back so the preview keeps matching what is actually persisted.
+			templateId = previousId;
+			limitError = result.limitError;
+		}
 		queuePreviewRefresh();
 	}
 
@@ -2244,11 +2438,18 @@
 			publishStatus = 'done';
 			publishToast = 'Portfolio published! Changes are live.';
 			hasUnpublishedChanges = false;
+			entitlements.consume('publishes');
 			// Publishing creates a new active version, so the public URL changes
 			// (…/v4 → …/v5). Re-read it or the share menu would hand out the
 			// previous version's link.
 			void refreshPublishedUrl();
 			setTimeout(() => { publishStatus = 'idle'; publishToast = ''; }, 8000);
+		} else if (result.limitError) {
+			// Daily publish cap. The draft is still saved, so this is not an error
+			// state — keep hasUnpublishedChanges true and offer the upgrade.
+			publishStatus = 'idle';
+			entitlements.syncFromLimitError(result.limitError);
+			limitError = result.limitError;
 		} else {
 			publishStatus = 'error';
 			publishToast = result.error ?? 'Publish failed. Please try again.';
@@ -2524,9 +2725,9 @@
 		let items: string[] = [];
 		if (ns === 'skills') {
 			items = [...(skillGroups[parseInt(idxStr)]?.skills ?? [])];
-		} else if (ns === 'software_proficiency') {
-			// Flat string-list section stored newline-joined in stringSections.
-			items = (stringSections.software_proficiency ?? '').split('\n').map((s) => s.trim()).filter(Boolean);
+		} else if (ns === 'software_proficiency' || ns === 'compliance_expertise') {
+			// Flat string-list sections stored newline-joined in stringSections.
+			items = (stringSections[ns] ?? '').split('\n').map((s) => s.trim()).filter(Boolean);
 		} else if (ns === 'core_expertise') {
 			// Template portfolio-field list stored newline-joined in rawProfile.
 			// Seed from skill-group categories when the user hasn't set it yet.
@@ -2559,11 +2760,11 @@
 			grps[idx] = { ...grps[idx], skills: cleanItems };
 			skillGroups = grps;
 			await savePortfolioSection(userId, uploadId, 'skills', skillGroups);
-		} else if (ns === 'software_proficiency') {
+		} else if (ns === 'software_proficiency' || ns === 'compliance_expertise') {
 			const joined = cleanItems.join('\n');
-			stringSections = { ...stringSections, software_proficiency: joined };
-			stringSectionOriginals = { ...stringSectionOriginals, software_proficiency: joined };
-			await savePortfolioSection(userId, uploadId, 'software_proficiency', cleanItems);
+			stringSections = { ...stringSections, [ns]: joined };
+			stringSectionOriginals = { ...stringSectionOriginals, [ns]: joined };
+			await savePortfolioSection(userId, uploadId, ns, cleanItems);
 			queuePreviewRefresh();
 		} else if (ns === 'core_expertise') {
 			const joined = cleanItems.join('\n');
@@ -2794,7 +2995,7 @@
 		const parts = path.split('.');
 		const [ns, idxStr, field] = parts;
 		// eslint-disable-next-line @typescript-eslint/no-explicit-any
-		let result: { ok: boolean; data?: { suggestion: string | string[] }; error?: string } = { ok: false };
+		let result: { ok: boolean; data?: { suggestion: string | string[] }; error?: string; limitError?: LimitError } = { ok: false };
 		if (ns === 'portfolio') {
 			result = await getAiEnhancement(userId, uploadId, idxStr as EditableField, instruction, selectedText);
 		} else {
@@ -2803,10 +3004,15 @@
 			const actualIdx = visibleToActual[ns]?.[parseInt(idxStr)] ?? parseInt(idxStr);
 			result = await getAiItemEnhancement(userId, uploadId, ns, actualIdx, field, instruction);
 		}
+		if (handleLimit(result)) {
+			aiToolbar = null;
+			return;
+		}
 		if (!result.ok || !result.data) {
 			aiToolbar = { ...aiToolbar, loading: false, error: result.error ?? 'AI enhancement failed.' };
 			return;
 		}
+		entitlements.consume('aiEnhance');
 		const suggestion = Array.isArray(result.data.suggestion)
 			? result.data.suggestion.join('\n')
 			: result.data.suggestion;
@@ -3207,7 +3413,14 @@
 					Publish live
 				</button>
 			{:else}
-				<button onclick={handlePublish} disabled={publishStatus === 'publishing' || !hasUnpublishedChanges} title={hasUnpublishedChanges ? 'Publish your changes' : 'No changes to publish'} class="rounded-xl bg-brand px-4 py-2 text-sm font-bold text-white transition-all hover:bg-brand-dark active:scale-95 disabled:cursor-not-allowed disabled:opacity-50">
+				<!-- Warn BEFORE the click when the daily allowance is nearly gone;
+				     hitting the cap mid-edit is otherwise a surprise. -->
+				{#if $entitlements.loaded && publishesLeft !== null && publishesLeft <= 1}
+					<span class="hidden text-[11px] font-bold sm:inline {publishesLeft === 0 ? 'text-amber-700' : 'text-ink-muted'}">
+						{publishesLeft === 0 ? 'No publishes left today' : '1 publish left today'}
+					</span>
+				{/if}
+				<button onclick={handlePublish} disabled={publishStatus === 'publishing' || !hasUnpublishedChanges} title={publishesLeft !== null ? `${publishesLeft} publish${publishesLeft === 1 ? '' : 'es'} left today` : hasUnpublishedChanges ? 'Publish your changes' : 'No changes to publish'} class="rounded-xl bg-brand px-4 py-2 text-sm font-bold text-white transition-all hover:bg-brand-dark active:scale-95 disabled:cursor-not-allowed disabled:opacity-50">
 					{publishStatus === 'publishing' ? 'Publishing…' : 'Publish'}
 				</button>
 			{/if}
@@ -3266,12 +3479,37 @@
 						{#if visibleSuggestions.length > 0}
 							<span class="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-bold text-amber-700">{visibleSuggestions.length}</span>
 						{/if}
-						<button onclick={fetchLlmSuggestions} class="ml-auto flex items-center gap-1 rounded-lg px-2 py-1 text-xs text-ink-muted hover:bg-surface-muted hover:text-ink-soft" title="Refresh suggestions">
+						<!-- Wrapped, NOT `onclick={fetchLlmSuggestions}`: Svelte would pass
+						     the MouseEvent as the `auto` argument, which is truthy and would
+						     silence the upgrade modal on a deliberate refresh. -->
+						<button onclick={() => fetchLlmSuggestions()} class="ml-auto flex items-center gap-1 rounded-lg px-2 py-1 text-xs text-ink-muted hover:bg-surface-muted hover:text-ink-soft" title={outOfAnalyses ? 'No AI reviews left today' : 'Refresh suggestions'}>
 							<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="h-3.5 w-3.5"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" /></svg>
 							Refresh
 						</button>
 					{/if}
 				</div>
+
+				<!-- Daily allowance. Shown only on a metered plan, and only once the
+				     real entitlements have loaded, so an unlimited plan never sees a
+				     counter and a slow request never flashes a false "0 left". -->
+				{#if $entitlements.loaded && (aiAnalyzeLeft !== null || aiEnhanceLeft !== null)}
+					<div class="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-surface-muted bg-surface-subtle/60 px-4 py-2 text-[11px] font-medium text-ink-muted">
+						{#if aiAnalyzeLeft !== null}
+							<span class={outOfAnalyses ? 'text-amber-700' : ''}>
+								<strong class="font-bold">{aiAnalyzeLeft}</strong> review{aiAnalyzeLeft === 1 ? '' : 's'} left
+							</span>
+						{/if}
+						{#if aiEnhanceLeft !== null}
+							<span class={outOfEnhances ? 'text-amber-700' : ''}>
+								<strong class="font-bold">{aiEnhanceLeft}</strong> rewrite{aiEnhanceLeft === 1 ? '' : 's'} left
+							</span>
+						{/if}
+						<span class="opacity-70">· resets daily</span>
+						{#if outOfAnalyses || outOfEnhances}
+							<a href="/#pricing" class="ml-auto font-bold text-brand hover:underline">Upgrade</a>
+						{/if}
+					</div>
+				{/if}
 
 				<!-- Completion bar -->
 				<div class="px-4 pt-3 pb-2">
@@ -3384,18 +3622,27 @@
 								<p class="px-2.5 py-3 text-[11px] text-ink-muted leading-snug">No templates available.</p>
 							{:else}
 								{#each visibleTemplates as [id, meta]}
+									{@const locked = templateLocked(id)}
 									<button
 										type="button"
 										onmouseenter={() => hoverTemplateId = id}
 										onmouseleave={() => hoverTemplateId = null}
 										onclick={() => applyTemplate(id)}
-										class="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-xs transition-colors hover:bg-surface-subtle {id === templateId ? 'bg-brand/5 font-bold text-brand' : 'text-ink-soft'}"
+										title={locked ? `${meta.name} — available on the paid plan` : meta.name}
+										class="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-xs transition-colors hover:bg-surface-subtle {id === templateId ? 'bg-brand/5 font-bold text-brand' : locked ? 'text-ink-muted' : 'text-ink-soft'}"
 									>
-										<span class="h-3.5 w-3.5 flex-shrink-0 rounded-full ring-1 ring-black/10" style="background:{meta.accent}"></span>
+										<span class="h-3.5 w-3.5 flex-shrink-0 rounded-full ring-1 ring-black/10 {locked ? 'opacity-40' : ''}" style="background:{meta.accent}"></span>
 										<span class="flex-1 truncate">{meta.name}</span>
 										{#if id === templateId}
 											<svg class="h-3 w-3 flex-shrink-0 text-brand" viewBox="0 0 12 12" fill="none" aria-hidden="true">
 												<path d="M2 6l3 3 5-5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+											</svg>
+										{:else if locked}
+											<!-- Star rather than a padlock: these entries stay clickable
+											     and open the upgrade path, so the affordance should read
+											     as "premium", not "disabled". -->
+											<svg class="h-3 w-3 flex-shrink-0 text-amber-500" viewBox="0 0 20 20" fill="currentColor" role="img" aria-label="Paid plan">
+												<path d="M9.5 1.5a.75.75 0 0 1 1 0l2.2 4.46 4.92.72a.75.75 0 0 1 .42 1.28l-3.56 3.47.84 4.9a.75.75 0 0 1-1.09.79L10 14.8l-4.4 2.32a.75.75 0 0 1-1.09-.79l.84-4.9L1.8 7.96a.75.75 0 0 1 .42-1.28l4.92-.72L9.5 1.5Z"/>
 											</svg>
 										{/if}
 									</button>
@@ -4199,3 +4446,7 @@
 		</div>
 	</div>
 {/if}
+
+<!-- Single modal for every plan limit reachable from the editor: AI reviews and
+     rewrites, daily publishes, AI image generation, and locked themes. -->
+<UpgradeModal bind:limitError />

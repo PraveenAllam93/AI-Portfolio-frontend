@@ -3,7 +3,22 @@
  * Auth is handled server-side via HttpOnly cookies — no token handling here.
  */
 
-export type ResumeCategory = 'software_engineer' | 'designer' | 'marketing' | 'finance' | 'civil_engineer' | 'mechanical_engineer';
+import { readLimitError, type LimitError } from './entitlements';
+
+export type ResumeCategory = 'software_engineer' | 'designer' | 'marketing' | 'finance' | 'civil_engineer' | 'mechanical_engineer' | 'accountant' | 'hr';
+
+/**
+ * Thrown when the backend answers 402 LIMIT_EXCEEDED. Carries the structured
+ * payload so the caller can open the upgrade modal instead of rendering a
+ * generic error string — hitting a plan limit is an expected outcome for a free
+ * user, not a failure.
+ */
+export class PlanLimitError extends Error {
+	constructor(readonly limitError: LimitError) {
+		super(limitError.error);
+		this.name = 'PlanLimitError';
+	}
+}
 
 export interface PresignedUrlRequest {
 	filename: string;
@@ -18,6 +33,8 @@ export interface UploadResult {
 	success: boolean;
 	uploadId?: string;
 	error?: string;
+	/** Set instead of `error` when the plan, not the request, was the problem. */
+	limitError?: LimitError;
 }
 
 const SUPPORTED_TYPES: Record<string, string> = {
@@ -44,6 +61,12 @@ async function getPresignedUrl(request: PresignedUrlRequest): Promise<PresignedU
 		headers: { 'Content-Type': 'application/json' },
 		body: JSON.stringify(request)
 	});
+
+	// Plan limits (portfolio count, paid template) come back as a structured 402.
+	// Surfaced as a typed error so the wizard opens the upgrade modal rather than
+	// mangling it into one of the generic strings below.
+	const limit = await readLimitError(response.clone());
+	if (limit) throw new PlanLimitError(limit);
 
 	if (!response.ok) {
 		let message = 'Could not prepare your upload. Please try again.';
@@ -117,6 +140,9 @@ export async function startUpload(
 		onProgress?.(100);
 		return { success: true, uploadId };
 	} catch (err) {
+		if (err instanceof PlanLimitError) {
+			return { success: false, limitError: err.limitError, error: err.limitError.error };
+		}
 		const message = err instanceof Error ? err.message : 'Upload failed. Please try again.';
 		return { success: false, error: message };
 	}
@@ -130,7 +156,7 @@ export async function startGeneration(
 	uploadId: string,
 	category: ResumeCategory,
 	templateId: string
-): Promise<{ success: boolean; error?: string }> {
+): Promise<{ success: boolean; error?: string; limitError?: LimitError }> {
 	try {
 		const response = await fetch(
 			`/api/resume/${encodeURIComponent(uploadId)}/start-generation`,
@@ -140,6 +166,11 @@ export async function startGeneration(
 				body: JSON.stringify({ category, templateId })
 			}
 		);
+
+		// This is the authoritative gate for both the portfolio limit and the
+		// paid-template check, so 402 here is expected for a free user.
+		const limit = await readLimitError(response.clone());
+		if (limit) return { success: false, limitError: limit, error: limit.error };
 
 		if (!response.ok) {
 			let message = 'Could not start portfolio generation. Please try again.';

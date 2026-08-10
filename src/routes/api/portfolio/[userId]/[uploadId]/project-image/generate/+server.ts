@@ -2,6 +2,7 @@ import { env } from '$env/dynamic/private';
 import { json, error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { getSessionUser } from '$lib/server/cognito';
+import { passThroughLimit } from '$lib/server/limits';
 
 export const POST: RequestHandler = async ({ params, cookies, request }) => {
 	const user = await getSessionUser(cookies);
@@ -25,6 +26,9 @@ export const POST: RequestHandler = async ({ params, cookies, request }) => {
 			body: JSON.stringify(body)
 		}
 	);
+
+	const limited = await passThroughLimit(upstream);
+	if (limited) return limited;
 
 	if (!upstream.ok) {
 		const err = await upstream.json().catch(() => ({}));

@@ -36,7 +36,7 @@
 	}
 
 	let analytics: ExtendedAnalytics | null = $state(null);
-	let loadingStatus: 'loading' | 'error' | 'done' = $state('loading');
+	let loadingStatus: 'loading' | 'error' | 'done' | 'locked' = $state('loading');
 	let errorMsg = $state('');
 	let isChartExpanded = $state(false);
 	let hoveredIndex: number | null = $state(null);
@@ -181,6 +181,11 @@
 			dayTotal = sumRecord(analytics.byDayOfWeek);
 			
 			loadingStatus = 'done';
+		} else if (result.limitError) {
+			// Paid feature on this plan. A distinct state, not an error: views are
+			// still being recorded in the background, so upgrading reveals the
+			// history that built up while they were on the free plan.
+			loadingStatus = 'locked';
 		} else {
 			errorMsg = result.error ?? 'Failed to load analytics';
 			loadingStatus = 'error';
@@ -367,6 +372,20 @@
 
 		{#if loadingStatus === 'loading'}
 			<LoadingState size="lg" message="Loading metrics…" />
+		{:else if loadingStatus === 'locked'}
+			<div class="rounded-3xl border border-amber-200 bg-white p-10 text-center shadow-xl">
+				<div class="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-50">
+					<svg viewBox="0 0 20 20" fill="currentColor" class="h-7 w-7 text-amber-500" aria-hidden="true">
+						<path d="M5 9V6a5 5 0 0 1 10 0v3h.5a1.5 1.5 0 0 1 1.5 1.5v6A1.5 1.5 0 0 1 15.5 18h-11A1.5 1.5 0 0 1 3 16.5v-6A1.5 1.5 0 0 1 4.5 9H5Zm2-3a3 3 0 0 1 6 0v3H7V6Z" />
+					</svg>
+				</div>
+				<p class="font-display text-xl font-bold text-ink">Analytics is a paid feature</p>
+				<p class="mx-auto mt-2 max-w-md text-ink-soft">
+					We’re already recording every view of your portfolio — who’s looking, where
+					they came from, and when. Upgrade to see it.
+				</p>
+				<a href="/#pricing" class="mt-6 inline-block rounded-full bg-brand px-8 py-3 text-sm font-bold text-white shadow-lg transition-all hover:bg-brand-dark">See plans</a>
+			</div>
 		{:else if loadingStatus === 'error'}
 			<div class="rounded-3xl border border-red-100 bg-white p-10 text-center shadow-xl">
 				<p class="text-xl font-display font-bold text-ink">Failed to load analytics</p>

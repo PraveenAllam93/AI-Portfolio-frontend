@@ -6,11 +6,32 @@ import type {
 	PortfolioConfig,
 	SkillGroup
 } from '$lib/types/portfolio';
+import { readLimitError, type LimitError } from './entitlements';
 
 interface ServiceResult<T = undefined> {
 	ok: boolean;
 	data?: T;
 	error?: string;
+	/**
+	 * Set instead of a plain `error` when the backend answered 402
+	 * LIMIT_EXCEEDED. Callers branch on this to open the upgrade modal rather
+	 * than showing a failure toast — running out of plan allowance is an
+	 * expected outcome, not a bug.
+	 */
+	limitError?: LimitError;
+}
+
+/**
+ * Detect a plan-limit 402 and convert it to a ServiceResult.
+ * Returns null when the response is not a limit error, so call sites read:
+ *
+ *   const limited = await asLimitResult(res);
+ *   if (limited) return limited;
+ */
+async function asLimitResult(res: Response): Promise<ServiceResult<never> | null> {
+	const limit = await readLimitError(res.clone());
+	if (!limit) return null;
+	return { ok: false, error: limit.error, limitError: limit };
 }
 
 // ─── Portfolio list ─────────────────────────────────────────────────────────
@@ -148,6 +169,10 @@ export async function getPortfolioAnalytics(
 ): Promise<ServiceResult<PortfolioAnalytics>> {
 	try {
 		const res = await fetch(`/api/portfolio/${userId}/${uploadId}/analytics`);
+		// Analytics is paid-only — free users get 402, which the page renders as a
+		// locked panel rather than an error.
+		const limited = await asLimitResult(res);
+		if (limited) return limited;
 		if (!res.ok) return { ok: false, error: 'Failed to load analytics' };
 		return { ok: true, data: await res.json() };
 	} catch {
@@ -215,6 +240,9 @@ export async function updatePortfolioConfig(
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({ section: 'config', data: config })
 		});
+		// Switching to a paid template lands here as a 402.
+		const limited = await asLimitResult(res);
+		if (limited) return limited;
 		if (!res.ok) {
 			const err = await res.json().catch(() => ({}));
 			return { ok: false, error: (err as { error?: string }).error ?? 'Failed to save config' };
@@ -261,6 +289,8 @@ export async function getAiEnhancement(
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({ field, instruction, currentValue })
 		});
+		const limited = await asLimitResult(res);
+		if (limited) return limited;
 		if (!res.ok) return { ok: false, error: 'Failed to get suggestion' };
 		const json = await res.json();
 		return { ok: true, data: { suggestion: json.suggestedValue ?? '' } };
@@ -283,6 +313,8 @@ export async function getAiItemEnhancement(
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({ section, itemIndex, enhanceField, instruction })
 		});
+		const limited = await asLimitResult(res);
+		if (limited) return limited;
 		if (!res.ok) return { ok: false, error: 'Failed to get suggestion' };
 		const json = await res.json();
 		return { ok: true, data: { suggestion: json.suggestedValue ?? '' } };
@@ -302,6 +334,8 @@ export async function getAiSkillsEnhancement(
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({ section: 'skills', instruction })
 		});
+		const limited = await asLimitResult(res);
+		if (limited) return limited;
 		if (!res.ok) return { ok: false, error: 'Failed to get suggestion' };
 		const json = await res.json();
 		return { ok: true, data: { suggestion: json.suggestedValue ?? [] } };
@@ -315,13 +349,15 @@ export async function getAiSuggestions(
 	uploadId: string,
 	currentState?: { parsedData: unknown; portfolioContent: unknown; category?: string; suppressed?: string[] }
 ): Promise<ServiceResult<{ suggestions: LlmSuggestion[] }>> {
+	// Previously this fell back to a userId-only route when uploadId was missing.
+	// That route was removed: the backend has no /portfolio/{userId}/ai-enhance
+	// path, so the fallback could only ever fail — and it was unreachable anyway
+	// (the sole caller lives on /app/portfolio/[userId]/[uploadId]/edit, where
+	// uploadId is always present). Fail explicitly instead of posting into a void.
+	if (!uploadId) return { ok: false, error: 'Missing portfolio id' };
+
 	try {
-		// When uploadId is not available, use the userId-only route which relies on
-		// the client-provided parsedData in the request body (no DynamoDB lookup needed).
-		const url = uploadId
-			? `/api/portfolio/${userId}/${uploadId}/ai-enhance`
-			: `/api/portfolio/${userId}/ai-enhance`;
-		const res = await fetch(url, {
+		const res = await fetch(`/api/portfolio/${userId}/${uploadId}/ai-enhance`, {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({
@@ -329,6 +365,8 @@ export async function getAiSuggestions(
 				...(currentState ?? {})
 			})
 		});
+		const limited = await asLimitResult(res);
+		if (limited) return limited;
 		if (!res.ok) {
 			let detail = '';
 			try { const b = await res.json(); detail = b?.message ?? b?.error ?? ''; } catch { /* ignore */ }
@@ -349,6 +387,8 @@ export async function publishPortfolio(userId: string, uploadId: string): Promis
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' }
 		});
+		const limited = await asLimitResult(res);
+		if (limited) return limited;
 		if (!res.ok) {
 			const err = await res.json().catch(() => ({}));
 			return { ok: false, error: (err as { error?: string }).error ?? 'Failed to publish' };
@@ -394,6 +434,8 @@ export async function generateProjectImage(
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({ sectionKey, itemIdx })
 		});
+		const limited = await asLimitResult(res);
+		if (limited) return limited;
 		if (!res.ok) {
 			const err = await res.json().catch(() => ({}));
 			return { ok: false, error: (err as { error?: string }).error ?? 'Image generation failed' };

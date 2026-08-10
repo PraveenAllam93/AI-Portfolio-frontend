@@ -43,3 +43,9 @@ yarn-error.log*
 CLAUDE.md
 
 ideas/
+
+# Local scratch checker, not part of the app or its build
+verify_editor_contract.ts
+
+# Windows Zone.Identifier alternate-data-stream junk (WSL/SMB)
+*Zone.Identifier
