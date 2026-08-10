@@ -7,6 +7,8 @@
 	import Spinner from '$lib/components/common/Spinner.svelte';
 	import { checkUsername } from '$lib/services/auth';
 	import { normalizeUsername, validateUsername } from '$lib/username';
+	import { entitlements } from '$lib/stores/entitlements';
+	import { remaining } from '$lib/services/entitlements';
 
 	interface Profile {
 		username: string | null;
@@ -43,7 +45,61 @@
 		normalizeUsername(username) !== (profile?.username ?? '')
 	);
 
+	// ─── Plan ──────────────────────────────────────────────────────────────────
+	// Everything here comes from GET /entitlements, so the numbers shown are the
+	// ones actually enforced — no limit is restated in this file.
+	const plan = $derived($entitlements.data);
+	// Read the plan name rather than inferring from limits, so a future third
+	// tier is treated as paid without touching this.
+	const isPaid = $derived($entitlements.loaded && plan.plan !== 'free');
+
+	/** One row per limit. `null` limit renders as "Unlimited". */
+	const planRows = $derived([
+		{
+			label: 'Portfolios',
+			used: plan.usage.portfolios,
+			limit: plan.limits.portfolios,
+			daily: false
+		},
+		{
+			label: 'AI reviews',
+			used: plan.usage.aiAnalyze,
+			limit: plan.limits.aiAnalyzePerDay,
+			daily: true
+		},
+		{
+			label: 'AI rewrites',
+			used: plan.usage.aiEnhance,
+			limit: plan.limits.aiEnhancePerDay,
+			daily: true
+		},
+		{
+			label: 'Publishes',
+			used: plan.usage.publishes,
+			limit: plan.limits.publishesPerDay,
+			daily: true
+		},
+		{
+			label: 'AI images',
+			used: plan.usage.projectImages,
+			limit: plan.limits.projectImagesPerDay,
+			daily: true
+		}
+	]);
+
+	function rowValue(row: { used: number; limit: number | null }): string {
+		if (row.limit === null) return 'Unlimited';
+		return `${row.used} of ${row.limit}`;
+	}
+
+	function isSpent(row: { used: number; limit: number | null }): boolean {
+		return row.limit !== null && remaining(row.limit, row.used) === 0;
+	}
+
 	onMount(async () => {
+		// The app layout already loads this; ensure() is a no-op if it landed,
+		// and covers a hard refresh straight onto /app/settings.
+		void entitlements.ensure();
 		try {
 			const res = await fetch('/api/profile');
 			if (!res.ok) {
@@ -201,7 +257,7 @@
 			>
 				Settings
 			</h1>
-			<p class="mt-3 text-lg text-ink-soft">Manage your profile and public link.</p>
+			<p class="mt-3 text-lg text-ink-soft">Manage your plan, profile and public link.</p>
 		</div>
 
 		{#if loading}
@@ -214,6 +270,74 @@
 				<span class="mr-2" aria-hidden="true">⚠️</span>{loadError}
 			</div>
 		{:else}
+			<!-- ─── Plan ────────────────────────────────────────────────────── -->
+			<section
+				class="mt-10 overflow-hidden rounded-[2rem] border border-surface-muted bg-white p-8 shadow-sm sm:p-10"
+				use:reveal={{ y: 20, delay: 40 }}
+			>
+				<div class="flex flex-wrap items-center gap-3">
+					<h2 class="font-display text-2xl font-bold tracking-tight text-ink">Plan</h2>
+					{#if $entitlements.loaded}
+						<span
+							class="rounded-full px-3 py-1 text-xs font-bold uppercase tracking-wider {isPaid
+								? 'bg-brand/10 text-brand'
+								: 'bg-surface-subtle text-ink-soft'}"
+						>
+							{plan.planLabel || plan.plan}
+						</span>
+					{/if}
+				</div>
+				<p class="mt-2 text-sm text-ink-soft">
+					{#if !$entitlements.loaded}
+						Loading your plan…
+					{:else if isPaid}
+						Thanks for subscribing — everything below is unlocked.
+					{:else}
+						What your account includes. Daily allowances reset at midnight UTC.
+					{/if}
+				</p>
+
+				{#if $entitlements.loaded}
+					<dl class="mt-6 divide-y divide-surface-muted border-y border-surface-muted">
+						{#each planRows as row}
+							<div class="flex items-center justify-between gap-4 py-3">
+								<dt class="text-sm font-medium text-ink-soft">
+									{row.label}{#if row.daily}<span class="text-ink-muted"> today</span>{/if}
+								</dt>
+								<dd
+									class="text-sm font-bold tabular-nums {isSpent(row)
+										? 'text-amber-700'
+										: 'text-ink'}"
+								>
+									{rowValue(row)}
+								</dd>
+							</div>
+						{/each}
+						<div class="flex items-center justify-between gap-4 py-3">
+							<dt class="text-sm font-medium text-ink-soft">Recruiter analytics</dt>
+							<dd class="text-sm font-bold {plan.limits.analytics ? 'text-ink' : 'text-ink-muted'}">
+								{plan.limits.analytics ? 'Included' : 'Paid plan'}
+							</dd>
+						</div>
+						<div class="flex items-center justify-between gap-4 py-3">
+							<dt class="text-sm font-medium text-ink-soft">Themes</dt>
+							<dd class="text-sm font-bold {plan.limits.allTemplates ? 'text-ink' : 'text-ink-muted'}">
+								{plan.limits.allTemplates ? 'All themes' : 'Free themes only'}
+							</dd>
+						</div>
+					</dl>
+
+					{#if !isPaid}
+						<a
+							href="/#pricing"
+							class="mt-6 inline-flex items-center gap-2 rounded-xl bg-brand px-6 py-3 text-sm font-bold text-white shadow-lg transition-all hover:bg-brand-dark active:scale-95"
+						>
+							Upgrade
+						</a>
+					{/if}
+				{/if}
+			</section>
+
 			<!-- ─── Public username ─────────────────────────────────────────── -->
 			<section
 				class="mt-10 overflow-hidden rounded-[2rem] border border-surface-muted bg-white p-8 shadow-sm sm:p-10"

@@ -3616,37 +3616,57 @@
 							aria-label="Close template selector"
 							onclick={() => { templateDropdownOpen = false; hoverTemplateId = null; }}
 						></button>
-						<div class="absolute right-0 top-full z-40 mt-1 w-44 overflow-hidden rounded-xl border border-surface-muted bg-white p-1.5 shadow-lg ring-1 ring-black/[0.04]">
-							<p class="px-2.5 pb-1 pt-1 text-[10px] font-bold uppercase tracking-widest text-ink-muted">Templates</p>
+						<!-- Multi-column grid rather than one tall column: software
+						     engineering alone has 23 themes, which as a single 176px-wide
+						     list meant a long scroll to reach most of them. Three columns
+						     put the whole set on screen at once. Width is capped to the
+						     viewport so it still fits on a phone, where it drops to two. -->
+						<!-- calc() needs whitespace around the minus, and Tailwind emits a
+						     space for each underscore — calc(100vw-2rem) would be invalid
+						     CSS and the cap would silently never apply. -->
+						<div class="absolute right-0 top-full z-40 mt-1 w-[30rem] max-w-[calc(100vw_-_2rem)] overflow-hidden rounded-xl border border-surface-muted bg-white p-2 shadow-lg ring-1 ring-black/[0.04]">
+							<div class="flex items-baseline justify-between px-1.5 pb-1.5 pt-1">
+								<p class="text-[10px] font-bold uppercase tracking-widest text-ink-muted">Templates</p>
+								{#if $templatesRestricted}
+									<p class="flex items-center gap-1 text-[10px] font-medium text-ink-muted">
+										<svg class="h-2.5 w-2.5 text-amber-500" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+											<path d="M9.5 1.5a.75.75 0 0 1 1 0l2.2 4.46 4.92.72a.75.75 0 0 1 .42 1.28l-3.56 3.47.84 4.9a.75.75 0 0 1-1.09.79L10 14.8l-4.4 2.32a.75.75 0 0 1-1.09-.79l.84-4.9L1.8 7.96a.75.75 0 0 1 .42-1.28l4.92-.72L9.5 1.5Z"/>
+										</svg>
+										paid plan
+									</p>
+								{/if}
+							</div>
 							{#if visibleTemplates.length === 0}
 								<p class="px-2.5 py-3 text-[11px] text-ink-muted leading-snug">No templates available.</p>
 							{:else}
-								{#each visibleTemplates as [id, meta]}
-									{@const locked = templateLocked(id)}
-									<button
-										type="button"
-										onmouseenter={() => hoverTemplateId = id}
-										onmouseleave={() => hoverTemplateId = null}
-										onclick={() => applyTemplate(id)}
-										title={locked ? `${meta.name} — available on the paid plan` : meta.name}
-										class="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-xs transition-colors hover:bg-surface-subtle {id === templateId ? 'bg-brand/5 font-bold text-brand' : locked ? 'text-ink-muted' : 'text-ink-soft'}"
-									>
-										<span class="h-3.5 w-3.5 flex-shrink-0 rounded-full ring-1 ring-black/10 {locked ? 'opacity-40' : ''}" style="background:{meta.accent}"></span>
-										<span class="flex-1 truncate">{meta.name}</span>
-										{#if id === templateId}
-											<svg class="h-3 w-3 flex-shrink-0 text-brand" viewBox="0 0 12 12" fill="none" aria-hidden="true">
-												<path d="M2 6l3 3 5-5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-											</svg>
-										{:else if locked}
-											<!-- Star rather than a padlock: these entries stay clickable
-											     and open the upgrade path, so the affordance should read
-											     as "premium", not "disabled". -->
-											<svg class="h-3 w-3 flex-shrink-0 text-amber-500" viewBox="0 0 20 20" fill="currentColor" role="img" aria-label="Paid plan">
-												<path d="M9.5 1.5a.75.75 0 0 1 1 0l2.2 4.46 4.92.72a.75.75 0 0 1 .42 1.28l-3.56 3.47.84 4.9a.75.75 0 0 1-1.09.79L10 14.8l-4.4 2.32a.75.75 0 0 1-1.09-.79l.84-4.9L1.8 7.96a.75.75 0 0 1 .42-1.28l4.92-.72L9.5 1.5Z"/>
-											</svg>
-										{/if}
-									</button>
-								{/each}
+								<div class="grid max-h-[20rem] grid-cols-2 gap-0.5 overflow-y-auto sm:grid-cols-3">
+									{#each visibleTemplates as [id, meta]}
+										{@const locked = templateLocked(id)}
+										<button
+											type="button"
+											onmouseenter={() => hoverTemplateId = id}
+											onmouseleave={() => hoverTemplateId = null}
+											onclick={() => applyTemplate(id)}
+											title={locked ? `${meta.name} — available on the paid plan` : meta.name}
+											class="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-xs transition-colors hover:bg-surface-subtle {id === templateId ? 'bg-brand/5 font-bold text-brand' : locked ? 'text-ink-muted' : 'text-ink-soft'}"
+										>
+											<span class="h-3.5 w-3.5 flex-shrink-0 rounded-full ring-1 ring-black/10 {locked ? 'opacity-40' : ''}" style="background:{meta.accent}"></span>
+											<span class="flex-1 truncate">{meta.name}</span>
+											{#if id === templateId}
+												<svg class="h-3 w-3 flex-shrink-0 text-brand" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+													<path d="M2 6l3 3 5-5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+												</svg>
+											{:else if locked}
+												<!-- Star rather than a padlock: these entries stay clickable
+												     and open the upgrade path, so the affordance should read
+												     as "premium", not "disabled". -->
+												<svg class="h-3 w-3 flex-shrink-0 text-amber-500" viewBox="0 0 20 20" fill="currentColor" role="img" aria-label="Paid plan">
+													<path d="M9.5 1.5a.75.75 0 0 1 1 0l2.2 4.46 4.92.72a.75.75 0 0 1 .42 1.28l-3.56 3.47.84 4.9a.75.75 0 0 1-1.09.79L10 14.8l-4.4 2.32a.75.75 0 0 1-1.09-.79l.84-4.9L1.8 7.96a.75.75 0 0 1 .42-1.28l4.92-.72L9.5 1.5Z"/>
+												</svg>
+											{/if}
+										</button>
+									{/each}
+								</div>
 							{/if}
 						</div>
 					{/if}
