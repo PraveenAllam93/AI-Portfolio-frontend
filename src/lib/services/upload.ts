@@ -5,7 +5,7 @@
 
 import { readLimitError, type LimitError } from './entitlements';
 
-export type ResumeCategory = 'software_engineer' | 'designer' | 'marketing' | 'finance' | 'civil_engineer' | 'mechanical_engineer' | 'accountant' | 'hr';
+export type ResumeCategory = 'software_engineer' | 'designer' | 'marketing' | 'finance' | 'civil_engineer' | 'mechanical_engineer' | 'accountant' | 'hr' | 'sales';
 
 /**
  * Thrown when the backend answers 402 LIMIT_EXCEEDED. Carries the structured

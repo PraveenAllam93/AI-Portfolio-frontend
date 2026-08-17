@@ -302,9 +302,34 @@
 			],
 			emptyItem: () => ({ program_name: '', program_type: '', organization: '', start_date: '', end_date: '', description: '', scope: '', activities: [], tools_used: [], measurable_outcomes: [], images: [] })
 		},
+		deals: {
+			label: 'Deals & Accounts',
+			categories: ['sales'],
+			type: 'array',
+			itemTitle: (item, i) =>
+				item.client_name
+					? `${item.client_name}${item.deal_type ? ` — ${item.deal_type}` : ''}`
+					: (item.deal_type as string) || `Deal ${i + 1}`,
+			fields: [
+				{ key: 'client_name', label: 'Client / Account', inputType: 'text', limit: 200 },
+				{ key: 'deal_type', label: 'Deal Type', inputType: 'text', placeholder: 'e.g. New Business, Renewal, Upsell', limit: 200 },
+				{ key: 'industry', label: 'Industry', inputType: 'text', limit: 150 },
+				{ key: 'start_date', label: 'Start Date', inputType: 'text', placeholder: 'e.g. Apr 2022', limit: 50 },
+				{ key: 'end_date', label: 'Close Date', inputType: 'text', placeholder: 'e.g. Mar 2023 or Present', limit: 50 },
+				{ key: 'description', label: 'Description', inputType: 'textarea', aiEnhanceable: true, limit: 1500 },
+				{ key: 'products_sold', label: 'Products Sold (one per line)', inputType: 'list' },
+				{ key: 'deal_value', label: 'Deal Value', inputType: 'text', placeholder: 'e.g. $1.2M ARR', limit: 200 },
+				{ key: 'sales_cycle_length', label: 'Sales Cycle Length', inputType: 'text', placeholder: 'e.g. 6 months', limit: 100 },
+				{ key: 'stakeholders_engaged', label: 'Stakeholders Engaged (one per line)', inputType: 'list' },
+				{ key: 'responsibilities', label: 'Responsibilities (one per line)', inputType: 'list', aiEnhanceable: true },
+				{ key: 'measurable_outcomes', label: 'Outcomes (one per line)', inputType: 'list', aiEnhanceable: true },
+				{ key: 'images', label: 'Images (max 3)', inputType: 'images' }
+			],
+			emptyItem: () => ({ client_name: '', deal_type: '', industry: '', start_date: '', end_date: '', description: '', products_sold: [], deal_value: '', sales_cycle_length: '', stakeholders_engaged: [], responsibilities: [], measurable_outcomes: [], images: [] })
+		},
 		software_proficiency: {
 			label: 'Software Proficiency',
-			categories: ['designer', 'civil_engineer', 'mechanical_engineer', 'accountant', 'hr'],
+			categories: ['designer', 'civil_engineer', 'mechanical_engineer', 'accountant', 'hr', 'sales'],
 			type: 'list',
 			itemTitle: () => '',
 			fields: [],
@@ -313,6 +338,14 @@
 		compliance_expertise: {
 			label: 'Compliance & Regulatory',
 			categories: ['accountant', 'hr'],
+			type: 'list',
+			itemTitle: () => '',
+			fields: [],
+			emptyItem: () => ({})
+		},
+		sales_methodologies: {
+			label: 'Sales Methodologies',
+			categories: ['sales'],
 			type: 'list',
 			itemTitle: () => '',
 			fields: [],
@@ -566,9 +599,12 @@
 		engagements:          sectionMatchesCategory('engagements') ? (sections.engagements ?? []).filter(it => !it.hidden).map(it => it.data as any) : [],
 		// eslint-disable-next-line @typescript-eslint/no-explicit-any
 		hr_programs:          sectionMatchesCategory('hr_programs') ? (sections.hr_programs ?? []).filter(it => !it.hidden).map(it => it.data as any) : [],
+		// eslint-disable-next-line @typescript-eslint/no-explicit-any
+		deals:                sectionMatchesCategory('deals') ? (sections.deals ?? []).filter(it => !it.hidden).map(it => it.data as any) : [],
 		design_philosophy:    sectionMatchesCategory('design_philosophy') ? (stringSections.design_philosophy ?? '') : '',
 		software_proficiency: sectionMatchesCategory('software_proficiency') ? (stringSections.software_proficiency ?? '').split('\n').map(s => s.trim()).filter(Boolean) : [],
 		compliance_expertise: sectionMatchesCategory('compliance_expertise') ? (stringSections.compliance_expertise ?? '').split('\n').map(s => s.trim()).filter(Boolean) : [],
+		sales_methodologies:  sectionMatchesCategory('sales_methodologies') ? (stringSections.sales_methodologies ?? '').split('\n').map(s => s.trim()).filter(Boolean) : [],
 		// eslint-disable-next-line @typescript-eslint/no-explicit-any
 		custom_sections:      customSections as any,
 	});
@@ -1207,9 +1243,10 @@
 		const dp = parsedData.design_philosophy ?? '';
 		const sp = (parsedData.software_proficiency ?? []).join('\n');
 		const ce = (parsedData.compliance_expertise ?? []).join('\n');
-		stringSections = { design_philosophy: dp, software_proficiency: sp, compliance_expertise: ce };
-		stringSectionOriginals = { design_philosophy: dp, software_proficiency: sp, compliance_expertise: ce };
-		stringSectionStatus = { design_philosophy: 'idle', software_proficiency: 'idle', compliance_expertise: 'idle' };
+		const sm = (parsedData.sales_methodologies ?? []).join('\n');
+		stringSections = { design_philosophy: dp, software_proficiency: sp, compliance_expertise: ce, sales_methodologies: sm };
+		stringSectionOriginals = { design_philosophy: dp, software_proficiency: sp, compliance_expertise: ce, sales_methodologies: sm };
+		stringSectionStatus = { design_philosophy: 'idle', software_proficiency: 'idle', compliance_expertise: 'idle', sales_methodologies: 'idle' };
 
 		// Custom sections
 		customSections = JSON.parse(JSON.stringify(parsedData.custom_sections ?? []));
@@ -2725,7 +2762,7 @@
 		let items: string[] = [];
 		if (ns === 'skills') {
 			items = [...(skillGroups[parseInt(idxStr)]?.skills ?? [])];
-		} else if (ns === 'software_proficiency' || ns === 'compliance_expertise') {
+		} else if (ns === 'software_proficiency' || ns === 'compliance_expertise' || ns === 'sales_methodologies') {
 			// Flat string-list sections stored newline-joined in stringSections.
 			items = (stringSections[ns] ?? '').split('\n').map((s) => s.trim()).filter(Boolean);
 		} else if (ns === 'core_expertise') {
@@ -2760,7 +2797,7 @@
 			grps[idx] = { ...grps[idx], skills: cleanItems };
 			skillGroups = grps;
 			await savePortfolioSection(userId, uploadId, 'skills', skillGroups);
-		} else if (ns === 'software_proficiency' || ns === 'compliance_expertise') {
+		} else if (ns === 'software_proficiency' || ns === 'compliance_expertise' || ns === 'sales_methodologies') {
 			const joined = cleanItems.join('\n');
 			stringSections = { ...stringSections, [ns]: joined };
 			stringSectionOriginals = { ...stringSectionOriginals, [ns]: joined };

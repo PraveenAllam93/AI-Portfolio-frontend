@@ -47,6 +47,9 @@ export interface ExperienceItem {
 	key_points?: string[];
 	channels_managed?: string[];
 	financial_metrics_managed?: string[];
+	/** Sales-only — territory/patch owned and quota carried in this role. */
+	territory?: string;
+	quota_attainment?: string;
 	images?: string[];
 }
 
@@ -156,6 +159,25 @@ export interface HRProgramItem {
 	_hidden?: boolean;
 }
 
+/** Sales — one deal, named account or client win. */
+export interface SalesDealItem {
+	client_name?: string;
+	deal_type?: string;
+	industry?: string;
+	start_date?: string;
+	end_date?: string;
+	description?: string;
+	products_sold?: string[];
+	deal_value?: string;
+	sales_cycle_length?: string;
+	stakeholders_engaged?: string[];
+	responsibilities?: string[];
+	measurable_outcomes?: string[];
+	/** Deal gallery images (max 3), same uploader as project/experience images. */
+	images?: string[];
+	_hidden?: boolean;
+}
+
 export interface CustomSectionItem {
 	label?: string;
 	value?: string;
@@ -206,8 +228,12 @@ export interface ParsedData {
 	engagements?: EngagementItem[];
 	/** HR-only. */
 	hr_programs?: HRProgramItem[];
+	/** Sales-only. */
+	deals?: SalesDealItem[];
 	/** Accountant + HR — standards, tax and employment-law frameworks. */
 	compliance_expertise?: string[];
+	/** Sales-only — selling frameworks (MEDDIC, SPIN, Challenger, …). */
+	sales_methodologies?: string[];
 	custom_sections?: CustomSection[];
 }
 
@@ -241,6 +267,7 @@ export const DEFAULT_SECTION_ORDER: string[] = [
 	'projects',
 	'engagements',
 	'hr_programs',
+	'deals',
 	'skills',
 	'education',
 	'certifications',
@@ -252,5 +279,6 @@ export const DEFAULT_SECTION_ORDER: string[] = [
 	'design_philosophy',
 	'software_proficiency',
 	'compliance_expertise',
+	'sales_methodologies',
 	'custom_sections'
 ];

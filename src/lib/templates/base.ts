@@ -12,6 +12,7 @@ export const DEFAULT_SECTION_ORDER: string[] = [
 	'projects',
 	'engagements',
 	'hr_programs',
+	'deals',
 	'skills',
 	'education',
 	'certifications',
@@ -23,6 +24,7 @@ export const DEFAULT_SECTION_ORDER: string[] = [
 	'design_philosophy',
 	'software_proficiency',
 	'compliance_expertise',
+	'sales_methodologies',
 	'custom_sections'
 ];
 
@@ -38,13 +40,15 @@ const SECTION_CATEGORIES: Record<string, string[]> = {
 	projects:              ['software_engineer', 'designer', 'civil_engineer', 'mechanical_engineer'],
 	awards:                ['designer'],
 	design_philosophy:     ['designer'],
-	software_proficiency:  ['designer', 'civil_engineer', 'mechanical_engineer', 'accountant', 'hr'],
+	software_proficiency:  ['designer', 'civil_engineer', 'mechanical_engineer', 'accountant', 'hr', 'sales'],
 	campaigns:             ['marketing'],
 	financial_modeling:    ['finance'],
 	investment_portfolios: ['finance'],
 	engagements:           ['accountant'],
 	hr_programs:           ['hr'],
+	deals:                 ['sales'],
 	compliance_expertise:  ['accountant', 'hr'],
+	sales_methodologies:   ['sales'],
 };
 
 /** True when `key` is a universal section or belongs to `category`.
@@ -420,6 +424,9 @@ export interface NormalizedData {
 		key_points: string[];
 		channels_managed: string[];
 		financial_metrics_managed: string[];
+		/** Sales — territory/patch owned and quota carried in this role. */
+		territory: string;
+		quota_attainment: string;
 		/** Uploaded via the edit form's image uploader (max 3). Was missing here
 		 *  until 2026-08-08, which made experience images unrenderable by ANY
 		 *  template even though they saved fine — see Z11. */
@@ -507,8 +514,26 @@ export interface NormalizedData {
 		measurable_outcomes: string[];
 		images: string[];
 	}>;
+	// Sales
+	deals: Array<{
+		client_name: string;
+		deal_type: string;
+		industry: string;
+		start_date: string;
+		end_date: string;
+		description: string;
+		products_sold: string[];
+		deal_value: string;
+		sales_cycle_length: string;
+		stakeholders_engaged: string[];
+		responsibilities: string[];
+		measurable_outcomes: string[];
+		images: string[];
+	}>;
 	// Accountant + HR — standards, tax and employment-law frameworks
 	compliance_expertise: string[];
+	// Sales — selling frameworks (MEDDIC, SPIN, Challenger, …)
+	sales_methodologies: string[];
 	// Custom sections (all categories)
 	custom_sections: Array<{
 		section_id: string;
@@ -620,6 +645,8 @@ export function normalize(
 			key_points: (Array.isArray(exp.key_points) ? exp.key_points : []).filter(Boolean).map(_e),
 			channels_managed: (Array.isArray(exp.channels_managed) ? exp.channels_managed : []).filter(Boolean).map(_e),
 			financial_metrics_managed: (Array.isArray(exp.financial_metrics_managed) ? exp.financial_metrics_managed : []).filter(Boolean).map(_e),
+			territory: _e(exp.territory),
+			quota_attainment: _e(exp.quota_attainment),
 			images: (Array.isArray(exp.images) ? exp.images : []).map(_safeUrl).filter(Boolean)
 		};
 	});
@@ -747,7 +774,26 @@ export function normalize(
 			images: (Array.isArray(p.images) ? p.images : []).map(_safeUrl).filter(Boolean)
 		}));
 
+	const deals = _visibleItems(parsedData.deals)
+		.filter((d) => d.client_name || d.deal_type)
+		.map((d) => ({
+			client_name: _e(d.client_name),
+			deal_type: _e(d.deal_type),
+			industry: _e(d.industry),
+			start_date: _e(d.start_date),
+			end_date: _e(d.end_date),
+			description: _e(d.description),
+			products_sold: (Array.isArray(d.products_sold) ? d.products_sold : []).filter(Boolean).map(_e),
+			deal_value: _e(d.deal_value),
+			sales_cycle_length: _e(d.sales_cycle_length),
+			stakeholders_engaged: (Array.isArray(d.stakeholders_engaged) ? d.stakeholders_engaged : []).filter(Boolean).map(_e),
+			responsibilities: (Array.isArray(d.responsibilities) ? d.responsibilities : []).filter(Boolean).map(_e),
+			measurable_outcomes: (Array.isArray(d.measurable_outcomes) ? d.measurable_outcomes : []).filter(Boolean).map(_e),
+			images: (Array.isArray(d.images) ? d.images : []).map(_safeUrl).filter(Boolean)
+		}));
+
 	const compliance_expertise = (Array.isArray(parsedData.compliance_expertise) ? parsedData.compliance_expertise : []).filter(Boolean).map(_e);
+	const sales_methodologies = (Array.isArray(parsedData.sales_methodologies) ? parsedData.sales_methodologies : []).filter(Boolean).map(_e);
 
 	// Both the section and its items honour the eye toggle. Because hidden entries
 	// are dropped here, the indices templates emit into edit paths
@@ -804,7 +850,9 @@ export function normalize(
 		investment_portfolios,
 		engagements,
 		hr_programs,
+		deals,
 		compliance_expertise,
+		sales_methodologies,
 		custom_sections,
 		template_overrides: templateOverrides ?? {},
 		field_visibility: fieldVisibility ?? {},

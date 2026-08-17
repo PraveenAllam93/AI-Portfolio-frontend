@@ -64,6 +64,8 @@ import { html as solaceHtml }    from './solace';
 import { html as quillHtml }     from './quill';
 import { html as journalHtml }   from './journal';
 import { html as atriumHtml }    from './atrium';
+import { html as clarionHtml }   from './clarion';
+import { html as cadenceHtml }   from './cadence';
 
 type TemplateRenderer = (v: ReturnType<typeof normalize>) => string;
 
@@ -122,6 +124,8 @@ const TEMPLATES: Record<string, TemplateRenderer> = {
 	quill:         quillHtml,
 	journal:       journalHtml,
 	atrium:        atriumHtml,
+	clarion:       clarionHtml,
+	cadence:       cadenceHtml,
 };
 
 /** Default template used when templateId is missing or unknown. */
@@ -368,6 +372,17 @@ export const TEMPLATE_FIELDS: Record<string, TemplateField[]> = {
 		{ key: 'roles_count',          label: 'Roles Held',            hint: 'Shown in the stat cells (defaults to the number of roles)' },
 		{ key: 'certifications_count', label: 'Credentials',           hint: 'Shown in the stat cells' },
 	],
+	clarion: [
+		{ key: 'years_experience',     label: 'Years Selling',        hint: 'Shown as "Years Selling" in the dark pipeline strip under the hero' },
+		{ key: 'deals_count',          label: 'Deals Closed',         hint: 'Shown in the pipeline strip (defaults to the number of deals)' },
+		{ key: 'clients_count',        label: 'Accounts Owned',       hint: 'Shown in the pipeline strip (defaults to the number of distinct client names across your deals)' },
+		{ key: 'certifications_count', label: 'Certifications',       hint: 'Shown in the pipeline strip' },
+	],
+	cadence: [
+		{ key: 'quota_attainment',     label: 'Quota Attainment (%)', hint: 'Drives the circular gauge below the intro. Defaults to the first percentage found in a role\'s Quota Attainment field; set to 0 to hide the gauge' },
+		{ key: 'years_experience',     label: 'Years of Experience',  hint: 'Shown as "Years carrying a number" in the KPI cards beside the gauge' },
+		{ key: 'deals_count',          label: 'Deals Closed',         hint: 'Shown as "Deals & accounts closed" in the KPI cards (defaults to the number of deals)' },
+	],
 };
 
 /**
@@ -388,7 +403,7 @@ export const CORE_EXPERTISE_TEMPLATES: ReadonlySet<string> = new Set(['blueprint
  * Templates with an editable contact tagline (static call-to-action copy, not
  * from the résumé), stored as profile.contact_tagline and shown in Portfolio Fields.
  */
-export const CONTACT_TAGLINE_TEMPLATES: ReadonlySet<string> = new Set(['blueprint', 'meridian', 'cambria', 'verdant', 'haven', 'solace', 'quill', 'journal', 'atrium']);
+export const CONTACT_TAGLINE_TEMPLATES: ReadonlySet<string> = new Set(['blueprint', 'meridian', 'cambria', 'verdant', 'haven', 'solace', 'quill', 'journal', 'atrium', 'clarion', 'cadence']);
 
 /** Default contact tagline per template (shown until the user overrides it). */
 export const DEFAULT_CONTACT_TAGLINE: Record<string, string> = {
@@ -401,6 +416,8 @@ export const DEFAULT_CONTACT_TAGLINE: Record<string, string> = {
 	meridian: "Ready to gain financial clarity? Whether you need tax strategy, audit support, or fractional CFO services — let's talk.",
 	cambria: "Whether you need a one-time consultation or an ongoing advisory partnership, I'm here to help you make sense of your finances — and make them work harder for you.",
 	verdant: 'Available for accounting engagements, statutory reporting, and reconciliation clean-up projects.',
+	clarion: "Let's talk pipeline — where it is now, and where it should be next quarter.",
+	cadence: "Let's talk pipeline — where it is now, and where it should be next quarter.",
 };
 
 /**
@@ -425,6 +442,8 @@ export const CUSTOM_DISPLAY_TYPES: Record<string, Array<'cards' | 'list' | 'time
 	meridian:     ['cards', 'list', 'timeline'],
 	cambria:      ['cards', 'list', 'timeline'],
 	verdant:      ['cards', 'list', 'timeline'],
+	clarion:      ['cards', 'list', 'timeline'],
+	cadence:      ['cards', 'list', 'timeline'],
 	haven:        ['cards', 'list', 'timeline'],
 	solace:       ['cards', 'list', 'timeline'],
 	quill:        ['cards', 'list', 'timeline'],
@@ -534,6 +553,8 @@ export const TEMPLATE_META: Record<string, { name: string; accent: string; profe
 	quill:         { name: 'Quill',       accent: '#d7b998', profession: 'hr' },
 	journal:       { name: 'Journal',     accent: '#9C4258', profession: 'hr' },
 	atrium:        { name: 'Atrium',      accent: '#C89B5C', profession: 'hr' },
+	clarion:       { name: 'Clarion',     accent: '#AD8636', profession: 'sales' },
+	cadence:       { name: 'Cadence',     accent: '#AD7A2C', profession: 'sales' },
 };
 
 /**
@@ -555,7 +576,8 @@ export const FREE_TEMPLATE_IDS: ReadonlySet<string> = new Set([
 	'blueprint',                  // civil_engineer
 	'torque',                     // mechanical_engineer
 	'meridian',                   // accountant
-	'haven'                       // hr
+	'haven',                      // hr
+	'clarion'                     // sales
 ]);
 
 /** True when `templateId` is included on the free plan. */

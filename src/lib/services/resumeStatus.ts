@@ -36,7 +36,8 @@ export type PredictedProfession =
 	| 'civil_engineer'
 	| 'mechanical_engineer'
 	| 'accountant'
-	| 'hr';
+	| 'hr'
+	| 'sales';
 
 export type FailureStage = 'VALIDATION' | 'AI_PROCESSING' | 'PROCESSING';
 

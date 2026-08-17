@@ -91,7 +91,8 @@
 		{ id: 'civil_engineer', label: 'Civil Engineer', description: 'Structural, infra & construction' },
 		{ id: 'mechanical_engineer', label: 'Mechanical Engineer', description: 'Design, thermal & manufacturing' },
 		{ id: 'accountant', label: 'Accountant', description: 'Accounting, audit & taxation' },
-		{ id: 'hr', label: 'Human Resources', description: 'Talent, people ops & L&D' }
+		{ id: 'hr', label: 'Human Resources', description: 'Talent, people ops & L&D' },
+		{ id: 'sales', label: 'Sales', description: 'B2B, account management & BD' }
 	];
 
 	interface Template {
@@ -170,6 +171,10 @@
 			{ id: 'quill',   name: 'Quill',   tag: 'Editorial'    },
 			{ id: 'journal', name: 'Journal', tag: 'Berry & Gold' },
 			{ id: 'atrium',  name: 'Atrium',  tag: 'Forest File'  },
+		],
+		sales: [
+			{ id: 'clarion', name: 'Clarion', tag: 'Editorial Ledger' },
+			{ id: 'cadence', name: 'Cadence', tag: 'Framed Warm'      },
 		],
 	};
 
@@ -969,6 +974,149 @@
 		uniqueValue: 'Hiring well is only half the job — I build the systems that make people want to stay.',
 	};
 
+	// Sales mock data — used when profession is 'sales'
+	const SALES_DOE_PARSED: ParsedData = {
+		profile: {
+			full_name: 'Rhys Calloway',
+			headline: 'Enterprise Account Executive',
+			summary: 'Enterprise SaaS seller who turns long, multi-stakeholder pipelines into signed, expanding revenue.',
+			email: 'rhys.calloway@example.com',
+			phone: '+971 50 123 4567',
+			location: 'Dubai, UAE',
+			social_links: {
+				linkedin: 'https://linkedin.com/in/rhys-calloway',
+			},
+		},
+		skills: [
+			{ category: 'Sales Methodology', skills: ['Enterprise Sales', 'Solution Selling', 'Consultative Selling', 'Negotiation', 'Closing'] },
+			{ category: 'Pipeline & Accounts', skills: ['Prospecting', 'Lead Generation', 'Account Management', 'Territory Planning', 'Upsell & Cross-sell'] },
+			{ category: 'Revenue Operations', skills: ['Sales Forecasting', 'Pipeline Hygiene', 'Deal Desk Review', 'Win/Loss Analysis'] },
+		],
+		sales_methodologies: ['MEDDIC', 'MEDDPICC', 'SPIN Selling', 'Challenger', 'Sandler', 'Value Selling', 'Account-Based Selling'],
+		software_proficiency: ['Salesforce', 'HubSpot CRM', 'Outreach', 'Gong', 'ZoomInfo', 'LinkedIn Sales Navigator', 'Clari', 'Excel'],
+		experience: [
+			{
+				role: 'Senior Account Executive',
+				company: 'Northwind Cloud',
+				location: 'Dubai, UAE',
+				start_date: '2022-03',
+				is_current: true,
+				territory: 'MENA — Mid-Market Logistics',
+				quota_attainment: '142% of $2.2M ARR quota (FY25)',
+				description: 'Own the full enterprise cycle for MENA logistics accounts, from first outreach through multi-year renewal. Rebuilt the region’s outbound motion after a flat prior year.',
+				key_points: [
+					'Sold a supply-chain visibility platform into 40+ mid-market logistics operators',
+					'Ran quarterly territory planning and built the region’s first structured forecast',
+					'Promoted after exceeding quota four consecutive quarters',
+				],
+			},
+			{
+				role: 'Account Executive',
+				company: 'Fintra Systems',
+				location: 'Dubai, UAE',
+				start_date: '2019-01',
+				end_date: '2022-02',
+				territory: 'GCC — Banking & Fintech',
+				quota_attainment: '118% average attainment across 3 years',
+				description: 'Carried a full-cycle quota selling payments infrastructure to banks and fintech challengers across the Gulf.',
+				key_points: [
+					'Closed the company’s largest single contract to date at $610K ACV',
+					'Built a repeatable demo-to-close playbook adopted company-wide',
+				],
+			},
+			{
+				role: 'Sales Development Representative',
+				company: 'Brightline Software',
+				location: 'Dubai, UAE',
+				start_date: '2017-06',
+				end_date: '2018-12',
+				territory: 'GCC — Outbound',
+				description: 'Generated qualified enterprise pipeline for a three-person AE team.',
+				key_points: ['Booked 220+ qualified meetings and sourced $3.4M in pipeline over 18 months'],
+			},
+		],
+		deals: [
+			{
+				client_name: 'Meridian Freight',
+				deal_type: 'New Business → Expansion',
+				industry: 'Logistics',
+				start_date: '2022-06',
+				end_date: '2023-01',
+				description: 'Landed a flagship freight operator through a phased pilot-to-platform motion, then expanded it across the group.',
+				products_sold: ['Supply Chain Visibility Platform', 'Carrier API', 'Analytics Add-on'],
+				deal_value: '$890K ARR',
+				sales_cycle_length: '7 months',
+				stakeholders_engaged: ['COO', 'Head of Operations', 'IT Director', 'Procurement'],
+				responsibilities: [
+					'Ran discovery across four operating hubs to size the manual-tracking cost',
+					'Built the business case with finance and secured executive sponsorship',
+					'Negotiated a three-year term with a phased rollout schedule',
+				],
+				measurable_outcomes: [
+					'Expanded from a single-site pilot to 14 hubs within the first contract year',
+					'Grew the account 3x in 18 months',
+					'Became the regional reference account for logistics',
+				],
+			},
+			{
+				client_name: 'Vantra Bank',
+				deal_type: 'Channel / Partner',
+				industry: 'Fintech',
+				start_date: '2021-02',
+				end_date: '2021-10',
+				description: 'Built a reseller channel with two regional integrators, opening a pipeline lane outside direct outbound.',
+				products_sold: ['Payments Infrastructure', 'Partner Enablement Package'],
+				deal_value: '$610K ACV',
+				sales_cycle_length: '8 months',
+				stakeholders_engaged: ['CFO', 'Head of Digital', 'Compliance', 'Legal'],
+				responsibilities: [
+					'Navigated a lengthy procurement and compliance review',
+					'Ran partner enablement and a joint co-sell motion',
+				],
+				measurable_outcomes: [
+					'Sourced 14 new opportunities in the first quarter after launch',
+					'Channel now accounts for 18% of regional pipeline',
+				],
+			},
+			{
+				client_name: 'Al Noor Health',
+				deal_type: 'Enterprise — New Business',
+				industry: 'Healthtech',
+				start_date: '2023-04',
+				end_date: '2023-11',
+				description: 'Phased rollout across six hospital sites, moving from a departmental pilot to an enterprise-wide licence.',
+				products_sold: ['Clinical Workflow Suite', 'Integration Services'],
+				deal_value: '$1.2M TCV',
+				sales_cycle_length: '7 months',
+				stakeholders_engaged: ['CMO', 'CIO', 'Head of Nursing', 'Procurement'],
+				responsibilities: [
+					'Champion-led pilot expanded to full committee sign-off',
+					'Coordinated a solutions engineer and clinical reference calls',
+				],
+				measurable_outcomes: ['Expanded from 1 to 6 sites inside the contract year', 'Renewed at 120% net revenue retention'],
+			},
+		],
+		education: [
+			{ degree: 'B.A.', field_of_study: 'Business Administration', institution: 'American University of Dubai', location: 'Dubai, UAE', start_year: '2013', end_year: '2017', grade_or_score: 'GPA 3.6' },
+		],
+		certifications: [
+			{ name: 'Salesforce Sales Cloud Consultant', issuer: 'Salesforce', year: '2024' },
+			{ name: 'Certified Professional Sales Person (CPSP)', issuer: 'NASP', year: '2022' },
+			{ name: 'Challenger Selling Certification', issuer: 'Challenger Inc.', year: '2021' },
+		],
+		achievements: [
+			{ title: "President's Club", description: 'Top 5% of the global sales organisation by quota attainment and revenue growth.', year: '2025' },
+			{ title: 'Deal of the Year', description: 'Largest single contract signed in the region that fiscal year.', year: '2023' },
+			{ title: 'Rookie of the Year', description: 'Fastest ramp to full quota in company history at the time.', year: '2019' },
+		],
+	};
+
+	const SALES_DOE_CONTENT: PortfolioContent = {
+		bio: 'Enterprise seller with 9+ years closing six and seven-figure B2B contracts across fintech, logistics and healthtech. I build trust early, quantify value relentlessly, and run a forecast my VP can take to the board without flinching.',
+		headline: 'Enterprise SaaS sales leader turning long, complex pipelines into signed, expanding revenue',
+		uniqueValue: 'A closed deal is the easy part — I build the accounts that renew, expand, and refer.',
+	};
+
 	// Derived: templates visible for the selected profession.
 	// Free ones are floated to the front so a free user's first impression — and
 	// the carousel's index-0 default — is always something they can actually use.
@@ -996,6 +1144,7 @@
 		selectedTypeId === 'mechanical_engineer' ? MECH_DOE_PARSED       :
 		selectedTypeId === 'accountant'          ? ACCOUNTANT_DOE_PARSED :
 		selectedTypeId === 'hr'                  ? HR_DOE_PARSED         :
+		selectedTypeId === 'sales'               ? SALES_DOE_PARSED      :
 		selectedTypeId === 'finance'             ? FINANCE_DOE_PARSED    : JOHN_DOE_PARSED
 	);
 	const mockContent = $derived(
@@ -1005,6 +1154,7 @@
 		selectedTypeId === 'mechanical_engineer' ? MECH_DOE_CONTENT       :
 		selectedTypeId === 'accountant'          ? ACCOUNTANT_DOE_CONTENT :
 		selectedTypeId === 'hr'                  ? HR_DOE_CONTENT         :
+		selectedTypeId === 'sales'               ? SALES_DOE_CONTENT      :
 		selectedTypeId === 'finance'             ? FINANCE_DOE_CONTENT    : JOHN_DOE_CONTENT
 	);
 
