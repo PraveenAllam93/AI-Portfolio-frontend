@@ -96,8 +96,16 @@ export function _listEditable(path: string): string {
  *
  * `path` is the target the parent editor updates:
  *   - 'profile.profile_image'         → hero/profile photo (replace)
- *   - 'profile.summary_image'         → about/summary image (replace)
+ *   - 'profile.summary_image'         → secondary image (replace)
+ *   - 'profile.secondary_image'       → third image (replace)
  *   - '{section}.{visibleIdx}.images' → section item image, e.g. 'projects.0.images'
+ *
+ * `summary_image`/`secondary_image` are generic auxiliary slots, NOT fixed to a
+ * particular section — each template decides what they mean (terra uses
+ * summary_image as its full-bleed hero background, salon uses both for the About
+ * image composition). The Portfolio Fields tab relabels the upload card per
+ * template via SUMMARY_IMAGE_COPY / SECONDARY_IMAGE_COPY so the wording the user
+ * sees always matches where the image actually lands.
  *
  * Only active in edit mode; returns '' for published output so nothing leaks
  * into the static portfolio.
@@ -404,6 +412,7 @@ export interface NormalizedData {
 	location: string;
 	profile_image: string;
 	summary_image: string;
+	secondary_image: string;
 	contact_tagline: string;
 	core_expertise: string[];
 	linkedin_url: string;
@@ -609,6 +618,7 @@ export function normalize(
 	const location = _e(profile.location);
 	const profile_image = _safeUrl(profile.profile_image);
 	const summary_image = _safeUrl(profile.summary_image);
+	const secondary_image = _safeUrl(profile.secondary_image);
 	const contact_tagline = _e(profile.contact_tagline);
 	const core_expertise = String(profile.core_expertise ?? '')
 		.split('\n')
@@ -830,6 +840,7 @@ export function normalize(
 		location,
 		profile_image,
 		summary_image,
+		secondary_image,
 		contact_tagline,
 		core_expertise,
 		linkedin_url,

@@ -209,6 +209,7 @@ export interface ParsedData {
 		social_links?: Record<string, string>;
 		profile_image?: string;
 		summary_image?: string;
+		secondary_image?: string;
 		contact_tagline?: string;
 		core_expertise?: string;
 	};

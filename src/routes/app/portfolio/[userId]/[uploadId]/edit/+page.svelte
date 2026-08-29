@@ -36,7 +36,7 @@
 		CustomSectionItem
 	} from '$lib/types/portfolio';
 	import { DEFAULT_SECTION_ORDER } from '$lib/types/portfolio';
-	import { renderPortfolio, TEMPLATE_META, TEMPLATE_FIELDS, SUMMARY_IMAGE_TEMPLATES, CORE_EXPERTISE_TEMPLATES, CONTACT_TAGLINE_TEMPLATES, DEFAULT_CONTACT_TAGLINE, customDisplayTypes, sortFreeFirst, isFreeTemplate } from '$lib/templates';
+	import { renderPortfolio, TEMPLATE_META, TEMPLATE_FIELDS, SUMMARY_IMAGE_TEMPLATES, SECONDARY_IMAGE_TEMPLATES, SUMMARY_IMAGE_COPY, DEFAULT_SUMMARY_IMAGE_COPY, SECONDARY_IMAGE_COPY, DEFAULT_SECONDARY_IMAGE_COPY, CORE_EXPERTISE_TEMPLATES, CONTACT_TAGLINE_TEMPLATES, DEFAULT_CONTACT_TAGLINE, customDisplayTypes, sortFreeFirst, isFreeTemplate } from '$lib/templates';
 	import { EDITOR_JS, EDITOR_SCRIPT } from '$lib/templates/base';
 	import { entitlements, freeTemplateIds, templatesRestricted } from '$lib/stores/entitlements';
 	import { remaining, type LimitError } from '$lib/services/entitlements';
@@ -405,12 +405,13 @@
 		social_twitter: string;
 		profile_image: string;
 		summary_image: string;
+		secondary_image: string;
 		contact_tagline: string;
 		core_expertise: string;
 	}
 
 	function emptyRawProfile(): RawProfileState {
-		return { full_name: '', headline: '', email: '', phone: '', location: '', summary: '', social_linkedin: '', social_github: '', social_gitlab: '', social_portfolio: '', social_twitter: '', profile_image: '', summary_image: '', contact_tagline: '', core_expertise: '' };
+		return { full_name: '', headline: '', email: '', phone: '', location: '', summary: '', social_linkedin: '', social_github: '', social_gitlab: '', social_portfolio: '', social_twitter: '', profile_image: '', summary_image: '', secondary_image: '', contact_tagline: '', core_expertise: '' };
 	}
 
 	let rawProfile: RawProfileState = $state(emptyRawProfile());
@@ -425,6 +426,10 @@
 	// Summary/section image upload state (separate from the hero profile photo)
 	let summaryImageUploadStatus = $state<'idle' | 'uploading' | 'done' | 'error'>('idle');
 	let summaryImageUploadError: string = $state('');
+
+	// Third auxiliary image upload state (profile.secondary_image)
+	let secondaryImageUploadStatus = $state<'idle' | 'uploading' | 'done' | 'error'>('idle');
+	let secondaryImageUploadError: string = $state('');
 
 	// Inline (in-preview) image upload — a hidden file input the preview triggers
 	// via an `image-upload-click` message. `inlineImgTarget` records which field
@@ -564,6 +569,7 @@
 			summary:       rawProfile.summary,
 			profile_image: rawProfile.profile_image || undefined,
 			summary_image: rawProfile.summary_image || undefined,
+			secondary_image: rawProfile.secondary_image || undefined,
 			contact_tagline: rawProfile.contact_tagline || undefined,
 			core_expertise: rawProfile.core_expertise || undefined,
 			social_links: {
@@ -1206,6 +1212,7 @@
 			summary:          (prof.summary as string)       ?? '',
 			profile_image:    (prof.profile_image as string) ?? '',
 			summary_image:    (prof.summary_image as string) ?? '',
+			secondary_image:  (prof.secondary_image as string) ?? '',
 			contact_tagline:  (prof.contact_tagline as string) ?? '',
 			core_expertise:   (prof.core_expertise as string) ?? '',
 			social_linkedin:  soc.linkedin   ?? '',
@@ -1368,6 +1375,9 @@
 		if (rawProfile.summary_image) {
 			profileData.summary_image = rawProfile.summary_image;
 		}
+		if (rawProfile.secondary_image) {
+			profileData.secondary_image = rawProfile.secondary_image;
+		}
 		if (rawProfile.contact_tagline) profileData.contact_tagline = rawProfile.contact_tagline;
 		if (rawProfile.core_expertise) profileData.core_expertise = rawProfile.core_expertise;
 		const result = await savePortfolioSection(userId, uploadId, 'profile', profileData);
@@ -1433,6 +1443,7 @@
 			location: rawProfile.location, summary: rawProfile.summary,
 			social_links, profile_image: imageUrl,
 			...(rawProfile.summary_image ? { summary_image: rawProfile.summary_image } : {}),
+			...(rawProfile.secondary_image ? { secondary_image: rawProfile.secondary_image } : {}),
 			...(rawProfile.contact_tagline ? { contact_tagline: rawProfile.contact_tagline } : {}),
 			...(rawProfile.core_expertise ? { core_expertise: rawProfile.core_expertise } : {}),
 		});
@@ -1485,6 +1496,7 @@
 			location: rawProfile.location, summary: rawProfile.summary,
 			social_links, summary_image: imageUrl,
 			...(rawProfile.profile_image ? { profile_image: rawProfile.profile_image } : {}),
+			...(rawProfile.secondary_image ? { secondary_image: rawProfile.secondary_image } : {}),
 			...(rawProfile.contact_tagline ? { contact_tagline: rawProfile.contact_tagline } : {}),
 			...(rawProfile.core_expertise ? { core_expertise: rawProfile.core_expertise } : {}),
 		});
@@ -1509,6 +1521,84 @@
 			location: rawProfile.location, summary: rawProfile.summary,
 			social_links, summary_image: '',
 			...(rawProfile.profile_image ? { profile_image: rawProfile.profile_image } : {}),
+			...(rawProfile.secondary_image ? { secondary_image: rawProfile.secondary_image } : {}),
+			...(rawProfile.contact_tagline ? { contact_tagline: rawProfile.contact_tagline } : {}),
+			...(rawProfile.core_expertise ? { core_expertise: rawProfile.core_expertise } : {}),
+		});
+	}
+
+	/** Uploads the THIRD auxiliary image (profile.secondary_image), distinct from
+	 *  both the hero profile photo and the summary image. Used by templates that
+	 *  compose two images side by side (salon's About pair). */
+	async function uploadSecondaryImage(file: File) {
+		if (secondaryImageUploadStatus === 'uploading') return;
+		secondaryImageUploadStatus = 'uploading';
+		secondaryImageUploadError = '';
+
+		const urlResult = await getImageUploadUrl(userId, uploadId, file.type);
+		if (!urlResult.ok || !urlResult.data) {
+			secondaryImageUploadStatus = 'error';
+			secondaryImageUploadError = urlResult.error ?? 'Failed to get upload URL';
+			return;
+		}
+		const { uploadUrl, imageUrl } = urlResult.data;
+
+		try {
+			const putRes = await fetch(uploadUrl, { method: 'PUT', headers: { 'Content-Type': file.type }, body: file });
+			if (!putRes.ok) {
+				secondaryImageUploadStatus = 'error';
+				secondaryImageUploadError = 'Upload to storage failed';
+				return;
+			}
+		} catch {
+			secondaryImageUploadStatus = 'error';
+			secondaryImageUploadError = 'Network error during upload';
+			return;
+		}
+
+		rawProfile = { ...rawProfile, secondary_image: imageUrl };
+		rawProfileOriginal = { ...rawProfileOriginal, secondary_image: imageUrl };
+		secondaryImageUploadStatus = 'done';
+		queuePreviewRefresh();
+
+		const social_links: Record<string, string> = {};
+		if (rawProfile.social_linkedin)  social_links.linkedin  = rawProfile.social_linkedin;
+		if (rawProfile.social_github)    social_links.github    = rawProfile.social_github;
+		if (rawProfile.social_gitlab)    social_links.gitlab    = rawProfile.social_gitlab;
+		if (rawProfile.social_portfolio) social_links.portfolio = rawProfile.social_portfolio;
+		if (rawProfile.social_twitter)   social_links.twitter   = rawProfile.social_twitter;
+		await savePortfolioSection(userId, uploadId, 'profile', {
+			full_name: rawProfile.full_name, headline: rawProfile.headline,
+			email: rawProfile.email, phone: rawProfile.phone,
+			location: rawProfile.location, summary: rawProfile.summary,
+			social_links, secondary_image: imageUrl,
+			...(rawProfile.profile_image ? { profile_image: rawProfile.profile_image } : {}),
+			...(rawProfile.summary_image ? { summary_image: rawProfile.summary_image } : {}),
+			...(rawProfile.contact_tagline ? { contact_tagline: rawProfile.contact_tagline } : {}),
+			...(rawProfile.core_expertise ? { core_expertise: rawProfile.core_expertise } : {}),
+		});
+
+		setTimeout(() => { secondaryImageUploadStatus = 'idle'; }, 3000);
+	}
+
+	/** Clears the third auxiliary image. */
+	async function removeSecondaryImage() {
+		rawProfile = { ...rawProfile, secondary_image: '' };
+		rawProfileOriginal = { ...rawProfileOriginal, secondary_image: '' };
+		queuePreviewRefresh();
+		const social_links: Record<string, string> = {};
+		if (rawProfile.social_linkedin)  social_links.linkedin  = rawProfile.social_linkedin;
+		if (rawProfile.social_github)    social_links.github    = rawProfile.social_github;
+		if (rawProfile.social_gitlab)    social_links.gitlab    = rawProfile.social_gitlab;
+		if (rawProfile.social_portfolio) social_links.portfolio = rawProfile.social_portfolio;
+		if (rawProfile.social_twitter)   social_links.twitter   = rawProfile.social_twitter;
+		await savePortfolioSection(userId, uploadId, 'profile', {
+			full_name: rawProfile.full_name, headline: rawProfile.headline,
+			email: rawProfile.email, phone: rawProfile.phone,
+			location: rawProfile.location, summary: rawProfile.summary,
+			social_links, secondary_image: '',
+			...(rawProfile.profile_image ? { profile_image: rawProfile.profile_image } : {}),
+			...(rawProfile.summary_image ? { summary_image: rawProfile.summary_image } : {}),
 			...(rawProfile.contact_tagline ? { contact_tagline: rawProfile.contact_tagline } : {}),
 			...(rawProfile.core_expertise ? { core_expertise: rawProfile.core_expertise } : {}),
 		});
@@ -1628,6 +1718,8 @@
 			uploadProfileImage(file);
 		} else if (target === 'profile.summary_image') {
 			uploadSummaryImage(file);
+		} else if (target === 'profile.secondary_image') {
+			uploadSecondaryImage(file);
 		} else {
 			const m = target.match(/^([a-z_]+)\.(\d+)\.images$/i);
 			if (m) {
@@ -2689,6 +2781,7 @@
 			};
 			if (rawProfile.profile_image) profilePayload.profile_image = rawProfile.profile_image;
 			if (rawProfile.summary_image) profilePayload.summary_image = rawProfile.summary_image;
+			if (rawProfile.secondary_image) profilePayload.secondary_image = rawProfile.secondary_image;
 			if (rawProfile.contact_tagline) profilePayload.contact_tagline = rawProfile.contact_tagline;
 			if (rawProfile.core_expertise) profilePayload.core_expertise = rawProfile.core_expertise;
 			await savePortfolioSection(userId, uploadId, 'profile', profilePayload);
@@ -2732,6 +2825,7 @@
 		};
 		if (rawProfile.profile_image)   payload.profile_image   = rawProfile.profile_image;
 		if (rawProfile.summary_image)   payload.summary_image   = rawProfile.summary_image;
+		if (rawProfile.secondary_image) payload.secondary_image = rawProfile.secondary_image;
 		if (rawProfile.contact_tagline) payload.contact_tagline = rawProfile.contact_tagline;
 		if (rawProfile.core_expertise)  payload.core_expertise  = rawProfile.core_expertise;
 		return savePortfolioSection(userId, uploadId, 'profile', payload);
@@ -3495,7 +3589,7 @@
 							</div>
 						{/each}
 					</div>
-					{#if (TEMPLATE_FIELDS[templateId]?.length ?? 0) > 0 || SUMMARY_IMAGE_TEMPLATES.has(templateId) || CORE_EXPERTISE_TEMPLATES.has(templateId) || CONTACT_TAGLINE_TEMPLATES.has(templateId)}
+					{#if (TEMPLATE_FIELDS[templateId]?.length ?? 0) > 0 || SUMMARY_IMAGE_TEMPLATES.has(templateId) || SECONDARY_IMAGE_TEMPLATES.has(templateId) || CORE_EXPERTISE_TEMPLATES.has(templateId) || CONTACT_TAGLINE_TEMPLATES.has(templateId)}
 						<button onclick={() => { activeTab = 'template_overrides'; mobileTab = 'edit'; }} class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm font-medium transition-colors {activeTab === 'template_overrides' ? 'bg-brand text-white' : 'text-ink-soft hover:bg-surface-muted'}">
 							<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="h-3.5 w-3.5 flex-shrink-0 opacity-60"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 3v11.25A2.25 2.25 0 0 0 6 16.5h2.25M3.75 3h-1.5m1.5 0h16.5m0 0h1.5m-1.5 0v11.25A2.25 2.25 0 0 1 18 16.5h-2.25m-7.5 0h7.5m-7.5 0-1 3m8.5-3 1 3m0 0 .5 1.5m-.5-1.5h-9.5m0 0-.5 1.5" /></svg>
 							Portfolio Fields
@@ -4115,11 +4209,12 @@
 						</div>
 					{/if}
 					{#if SUMMARY_IMAGE_TEMPLATES.has(templateId)}
+						{@const summaryCopy = SUMMARY_IMAGE_COPY[templateId] ?? DEFAULT_SUMMARY_IMAGE_COPY}
 						<div class="mb-4 rounded-[1.5rem] border border-surface-muted bg-white p-6 shadow-sm">
 							<div class="mb-4 flex items-start justify-between">
 								<div>
-									<p class="text-xs font-bold uppercase tracking-widest text-ink-muted">Summary Image</p>
-									<p class="mt-0.5 text-xs text-ink-muted">A separate image shown in your About / Summary section (not your hero profile photo).</p>
+									<p class="text-xs font-bold uppercase tracking-widest text-ink-muted">{summaryCopy.label}</p>
+									<p class="mt-0.5 text-xs text-ink-muted">{summaryCopy.hint}</p>
 								</div>
 								{#if summaryImageUploadStatus === 'done'}<span class="flex-shrink-0 rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-600 ring-1 ring-emerald-100">Saved ✓</span>
 								{:else if summaryImageUploadStatus === 'uploading'}<span class="flex-shrink-0 rounded-full bg-surface-muted px-3 py-1 text-xs font-bold text-ink-muted">Uploading…</span>
@@ -4127,7 +4222,7 @@
 							</div>
 							<div class="flex items-center gap-4">
 								{#if rawProfile.summary_image}
-									<img src={rawProfile.summary_image} alt="Summary" class="h-20 w-28 flex-shrink-0 rounded-lg object-cover ring-1 ring-surface-muted" />
+									<img src={rawProfile.summary_image} alt={summaryCopy.label} class="h-20 w-28 flex-shrink-0 rounded-lg object-cover ring-1 ring-surface-muted" />
 								{:else}
 									<div class="flex h-20 w-28 flex-shrink-0 items-center justify-center rounded-lg bg-surface-subtle text-ink-muted ring-1 ring-surface-muted">
 										<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="h-7 w-7"><path stroke-linecap="round" stroke-linejoin="round" d="m2.25 15.75 5.159-5.159a2.25 2.25 0 0 1 3.182 0l5.159 5.159m-1.5-1.5 1.409-1.409a2.25 2.25 0 0 1 3.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 0 0 1.5-1.5V6a1.5 1.5 0 0 0-1.5-1.5H3.75A1.5 1.5 0 0 0 2.25 6v12a1.5 1.5 0 0 0 1.5 1.5Z" /></svg>
@@ -4144,6 +4239,39 @@
 								</div>
 							</div>
 							{#if summaryImageUploadError}<p class="mt-3 rounded-lg bg-red-50 px-3 py-2 text-xs font-bold text-red-600">{summaryImageUploadError}</p>{/if}
+						</div>
+					{/if}
+					{#if SECONDARY_IMAGE_TEMPLATES.has(templateId)}
+						{@const secondaryCopy = SECONDARY_IMAGE_COPY[templateId] ?? DEFAULT_SECONDARY_IMAGE_COPY}
+						<div class="mb-4 rounded-[1.5rem] border border-surface-muted bg-white p-6 shadow-sm">
+							<div class="mb-4 flex items-start justify-between">
+								<div>
+									<p class="text-xs font-bold uppercase tracking-widest text-ink-muted">{secondaryCopy.label}</p>
+									<p class="mt-0.5 text-xs text-ink-muted">{secondaryCopy.hint}</p>
+								</div>
+								{#if secondaryImageUploadStatus === 'done'}<span class="flex-shrink-0 rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-600 ring-1 ring-emerald-100">Saved ✓</span>
+								{:else if secondaryImageUploadStatus === 'uploading'}<span class="flex-shrink-0 rounded-full bg-surface-muted px-3 py-1 text-xs font-bold text-ink-muted">Uploading…</span>
+								{:else if secondaryImageUploadStatus === 'error'}<span class="flex-shrink-0 rounded-full bg-red-50 px-3 py-1 text-xs font-bold text-red-600 ring-1 ring-red-100">Error</span>{/if}
+							</div>
+							<div class="flex items-center gap-4">
+								{#if rawProfile.secondary_image}
+									<img src={rawProfile.secondary_image} alt={secondaryCopy.label} class="h-20 w-28 flex-shrink-0 rounded-lg object-cover ring-1 ring-surface-muted" />
+								{:else}
+									<div class="flex h-20 w-28 flex-shrink-0 items-center justify-center rounded-lg bg-surface-subtle text-ink-muted ring-1 ring-surface-muted">
+										<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="h-7 w-7"><path stroke-linecap="round" stroke-linejoin="round" d="m2.25 15.75 5.159-5.159a2.25 2.25 0 0 1 3.182 0l5.159 5.159m-1.5-1.5 1.409-1.409a2.25 2.25 0 0 1 3.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 0 0 1.5-1.5V6a1.5 1.5 0 0 0-1.5-1.5H3.75A1.5 1.5 0 0 0 2.25 6v12a1.5 1.5 0 0 0 1.5 1.5Z" /></svg>
+									</div>
+								{/if}
+								<div class="flex flex-col items-start gap-2">
+									<label class="inline-flex cursor-pointer items-center gap-2 rounded-xl bg-brand px-4 py-2 text-xs font-bold text-white shadow-sm transition-all hover:bg-brand-dark active:scale-95 {secondaryImageUploadStatus === 'uploading' ? 'pointer-events-none opacity-50' : ''}">
+										<input type="file" accept="image/*" class="hidden" disabled={secondaryImageUploadStatus === 'uploading'} onchange={(e) => { const f = (e.target as HTMLInputElement).files?.[0]; if (f) uploadSecondaryImage(f); (e.target as HTMLInputElement).value = ''; }} />
+										{secondaryImageUploadStatus === 'uploading' ? 'Uploading…' : rawProfile.secondary_image ? 'Replace image' : 'Upload image'}
+									</label>
+									{#if rawProfile.secondary_image}
+										<button onclick={() => removeSecondaryImage()} class="text-xs font-medium text-ink-muted transition-colors hover:text-red-500">Remove image</button>
+									{/if}
+								</div>
+							</div>
+							{#if secondaryImageUploadError}<p class="mt-3 rounded-lg bg-red-50 px-3 py-2 text-xs font-bold text-red-600">{secondaryImageUploadError}</p>{/if}
 						</div>
 					{/if}
 					<div class="rounded-[1.5rem] border border-surface-muted bg-white p-6 shadow-sm">

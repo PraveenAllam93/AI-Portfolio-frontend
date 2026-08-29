@@ -2,9 +2,14 @@
  * Template: Terra (Designer)
  * Warm architectural / interior aesthetic — off-white canvas, gold (#c9a96e) +
  * sage accents, Cormorant Garamond serif, Outfit body, DM Mono labels.
- * Full-bleed hero (profile photo or warm gradient) with fade-up intro, framed
- * about photo with gold corner + stat badge, gilded section labels, featured
- * project grid with hover-zoom overlays, cert grid, scroll reveals.
+ * Full-bleed hero (its OWN background image or a warm gradient) with fade-up
+ * intro, framed about photo with gold corner + stat badge, gilded section labels,
+ * featured project grid with hover-zoom overlays, cert grid, scroll reveals.
+ *
+ * The hero background is profile.summary_image, NOT the profile photo: a portrait
+ * headshot stretched full-bleed reads badly, and the About section already shows
+ * the portrait framed. The two are deliberately independent — the hero wants a
+ * room/building/workspace shot. With no hero image the warm gradient stands in.
  * Ported from "interiar-desginer-1.html", mapped to our designer data model
  * (external stock images dropped; renders every designer section).
  */
@@ -75,6 +80,26 @@ nav.scrolled .nav-cta{color:var(--ink);border-color:var(--ink)}
 .hero-scroll::before{content:'';width:40px;height:1px;background:rgba(255,255,255,.35)}
 @keyframes fadeUp{to{opacity:1;transform:translateY(0)}}
 
+/* HERO BACKGROUND UPLOAD (edit mode only)
+   The editor injects a click overlay into every [data-img-upload] element, and
+   for an EMPTY one it pins that overlay open (opacity:1) with a 120px minimum.
+   On .hero-bg — which is inset:0 over the whole viewport — that would paint a
+   full-screen indigo sheet with a giant camera in the middle. So:
+     1. the hero-bg overlay is muted at rest and only fades in on hover, giving a
+        clean canvas plus a large, forgiving click target; and
+     2. a small always-visible pill in the corner carries the discoverability,
+        with the 120px floor cancelled by specificity (0,3,0 beats the editor's
+        0,2,0 [data-img-upload].ce-img-empty rule). */
+.hero-bg-upload{position:absolute;right:60px;bottom:80px;z-index:3;display:inline-flex;align-items:center;gap:8px;padding:9px 16px;font-family:var(--mono);font-size:.62rem;letter-spacing:.18em;text-transform:uppercase;color:rgba(255,255,255,.82);background:rgba(20,19,17,.5);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.28);transition:background .3s var(--ease),border-color .3s var(--ease),color .3s var(--ease)}
+.hero-bg-upload:hover{background:rgba(20,19,17,.75);border-color:var(--accent);color:var(--white)}
+.hero-bg-upload svg{width:13px;height:13px;flex:none}
+.hero .hero-bg-upload.ce-img-empty{min-width:0;min-height:0}
+.hero .hero-bg-upload .ce-img-ov{opacity:0;background:rgba(17,24,39,0)}
+.hero .hero-bg-upload:hover .ce-img-ov{opacity:0}
+.hero .hero-bg.ce-img-empty .ce-img-ov{opacity:0;background:rgba(17,24,39,0)}
+.hero .hero-bg:hover .ce-img-ov{opacity:1;background:rgba(17,24,39,.45)}
+@media(max-width:768px){.hero-bg-upload{right:24px;bottom:56px}}
+
 /* SECTION */
 section{padding:120px 60px;border-bottom:1px solid var(--linen)}
 .sec-inner{max-width:1280px;margin:0 auto}
@@ -90,6 +115,11 @@ section{padding:120px 60px;border-bottom:1px solid var(--linen)}
 .about-inner{display:grid;grid-template-columns:1fr 1fr;gap:80px;align-items:center;max-width:1200px;margin:0 auto}
 .about-image-wrap{position:relative}
 .about-image-wrap::before{content:'';position:absolute;top:-20px;left:-20px;width:50%;height:50%;border:1px solid var(--accent);z-index:0}
+/* Upload zone for the About PORTRAIT (profile.profile_image). Wraps only the
+   photo, not the wrapper, so the overflowing gold corner and year badge stay
+   clear of the editor's hover overlay. The hero background is a separate image
+   — see the hero-bg-upload block above. */
+.about-img-zone{position:relative;z-index:1;display:block}
 .about-img{width:100%;aspect-ratio:3/4;object-fit:cover;object-position:top;position:relative;z-index:1;background:linear-gradient(160deg,var(--linen),var(--sand))}
 .about-img-ph{display:flex;align-items:center;justify-content:center;font-family:var(--serif);font-size:4rem;color:var(--white);opacity:.6}
 .about-badge{position:absolute;bottom:-20px;right:-20px;z-index:2;background:var(--ink);color:var(--white);padding:24px;font-family:var(--serif);text-align:center}
@@ -435,8 +465,9 @@ ${v.email ? `<a href="mailto:${v.email}" class="nav-cta">Inquire</a>` : ''}
 </nav>
 
 <section class="hero" id="home">
-<div class="hero-bg" ${_imgUpload('profile.profile_image', em)}>${v.profile_image ? `<img src="${v.profile_image}" alt="${v.name}">` : ''}</div>
+<div class="hero-bg" ${_imgUpload('profile.summary_image', em, 'Change hero background')}>${v.summary_image ? `<img src="${v.summary_image}" alt="">` : ''}</div>
 <div class="hero-overlay"></div>
+${em ? `<button type="button" class="hero-bg-upload" ${_imgUpload('profile.summary_image', em, '')}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg><span>${v.summary_image ? 'Change background' : 'Add hero background'}</span></button>` : ''}
 <div class="hero-content">
 <p class="hero-eyebrow">${v.profile_headline ? `<span ${ed('profile.headline')}>${v.profile_headline}</span>` : ''}</p>
 <h1 class="hero-name" ${ed('profile.full_name')}>${heroName}</h1>
@@ -452,7 +483,7 @@ ${(v.uniqueValue || v.bio) ? `<p class="hero-tagline" ${ed(v.uniqueValue ? 'port
 <section id="about">
 <div class="about-inner">
 <div class="about-image-wrap reveal">
-${v.profile_image ? `<img class="about-img" src="${v.profile_image}" alt="${v.name}">` : `<div class="about-img about-img-ph">${initials}</div>`}
+<div class="about-img-zone" ${_imgUpload('profile.profile_image', em)}>${v.profile_image ? `<img class="about-img" src="${v.profile_image}" alt="${v.name}">` : `<div class="about-img about-img-ph">${initials}</div>`}</div>
 ${statShown(v, 'years_experience', yearsExp) ? `<div class="about-badge"><strong ${ed('template_overrides.years_experience')}>${yearsExp}+</strong><span>Years<br>Practice</span></div>` : ''}
 </div>
 <div class="about-text reveal reveal-delay-1">

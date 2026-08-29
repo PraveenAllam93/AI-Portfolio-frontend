@@ -4,8 +4,13 @@
  * ink, gold (#d4af37) + taupe accents, Playfair Display headings with a centered
  * gold-underline motif, Inter body. Framed hero portrait with gold corner accent,
  * sliding gold-fill buttons, refined cards, scroll reveals, header-scroll shadow.
+ * Two-column About: copy + a three-stat row on the left, an overlapping pair of
+ * images on the right (main top-right, smaller one lapping its bottom-left).
  * Ported from "interiar-desginer-2.html", mapped to our designer data model
  * (FontAwesome + hero video dropped; renders every designer section).
+ *
+ * Three independent image slots: profile.profile_image is the hero portrait,
+ * profile.summary_image the About main, profile.secondary_image the overlap.
  */
 
 import type { NormalizedData } from './base';
@@ -80,6 +85,39 @@ header.scrolled{padding:14px 0;box-shadow:var(--shadow)}
 .hero-photo{position:relative;z-index:1;width:100%;height:100%;object-fit:cover;background:linear-gradient(160deg,#2a2a2a,#0d0d0d)}
 .hero-photo-ph{display:flex;align-items:center;justify-content:center;font-family:var(--pf);font-size:5rem;color:var(--gold);opacity:.4}
 @media(max-width:900px){.hero .container{flex-direction:column;text-align:center}.hero-photo-frame{width:280px;height:350px;order:-1}.hero-actions{justify-content:center}}
+
+/* ABOUT — two columns: copy + stats on the left, an overlapping pair of images
+   on the right (main sits top-right, the smaller one laps its bottom-left).
+   Both images are their own upload slots: profile.summary_image for the main and
+   profile.secondary_image for the overlap, kept separate from the hero portrait
+   (profile.profile_image) so all three can differ. */
+#about{background:#fff}
+.about-content{display:grid;grid-template-columns:1fr 1fr;gap:80px;align-items:center}
+/* No images uploaded on a PUBLISHED page: fall back to the centered single
+   column rather than leaving an empty half. */
+.about-content.solo{grid-template-columns:1fr;max-width:820px;margin:0 auto;text-align:center}
+.about-content.solo .stat-item:last-child{border-right:none}
+.about-text h2{margin-bottom:26px;font-size:clamp(2rem,3.6vw,2.9rem)}
+.about-text h2 em{font-style:italic;color:var(--gold)}
+.about-lead{font-size:1.2rem;color:var(--text-dark);font-style:italic;margin-bottom:1.4rem}
+.about-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:30px;margin-top:50px}
+.about-stats.cols-2{grid-template-columns:repeat(2,1fr)}
+.about-stats.cols-1{grid-template-columns:1fr}
+.stat-item{text-align:center;padding:20px;border-right:1px solid var(--gray)}
+.stat-item:last-child{border-right:none}
+.stat-number{font-family:var(--pf);font-size:2.5rem;color:var(--accent);font-weight:700;margin-bottom:10px;line-height:1}
+.stat-text{font-size:.9rem;color:var(--text-light);text-transform:uppercase;letter-spacing:1.5px}
+.about-images{position:relative;height:600px}
+.about-img-main,.about-img-secondary{position:absolute;box-shadow:var(--shadow);transition:var(--trans);overflow:hidden;background:linear-gradient(160deg,var(--gray),#dcd7cf)}
+.about-img-main{width:80%;height:70%;top:0;right:0}
+.about-img-secondary{width:60%;height:50%;bottom:0;left:0;z-index:2}
+.about-img-main img,.about-img-secondary img{width:100%;height:100%;object-fit:cover}
+.about-img-main:hover,.about-img-secondary:hover{transform:translateY(-10px);box-shadow:var(--shadow-hover)}
+.about-img-ph{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;width:100%;height:100%;text-align:center;padding:18px;border:1px solid var(--gray)}
+.about-img-ph span{font-family:var(--pf);font-size:2.4rem;color:var(--gold);opacity:.45;line-height:1}
+.about-img-ph small{font-family:var(--in);font-size:.72rem;letter-spacing:.14em;text-transform:uppercase;color:var(--text-light)}
+@media(max-width:900px){.about-content{grid-template-columns:1fr;gap:56px}.about-images{height:460px;order:-1}.about-stats{margin-top:36px;gap:14px}.stat-item{padding:14px 8px}.stat-number{font-size:1.9rem}.stat-text{font-size:.76rem;letter-spacing:1px}}
+@media(max-width:560px){.about-images{height:380px}}
 
 /* GRID CARDS */
 .card-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:30px}
@@ -172,6 +210,7 @@ export function html(v: NormalizedData): string {
 
 	const yearsExp = v.template_overrides?.years_experience ?? yearsFromExperience(v.experience);
 	const projCount = v.template_overrides?.projects_count ?? (v.projects?.length ?? 0);
+	const certCount = v.template_overrides?.certifications_count ?? (v.certifications?.length ?? 0);
 	const initials = v.name.split(' ').map(p => p[0] ?? '').join('').slice(0, 2).toUpperCase() || 'D';
 	const nameParts = v.name.split(/\s+/);
 	const heroName = nameParts.length > 1
@@ -353,6 +392,50 @@ ${addBtn(`custom_sections.${ci}.items`, 'Item')}
 	};
 	const orderedSections = order.filter(k => !hidden.has(k) && k in sectionMap).map(k => sectionMap[k]).filter(Boolean).join('\n');
 
+	// ABOUT — copy + stats on the left, the overlapping image pair on the right.
+	// In edit mode both image slots always render (as placeholders) so they can be
+	// clicked; on a published page only the ones actually filled are emitted, and
+	// with neither the column collapses to the centered single-column layout.
+	const aboutStats = [
+		statShown(v, 'projects_count', projCount)
+			? `<div class="stat-item"><div class="stat-number"><span ${ed('template_overrides.projects_count')}>${projCount}</span>+</div><div class="stat-text">Projects Completed</div></div>`
+			: '',
+		statShown(v, 'years_experience', yearsExp)
+			? `<div class="stat-item"><div class="stat-number"><span ${ed('template_overrides.years_experience')}>${yearsExp}</span></div><div class="stat-text">Years Experience</div></div>`
+			: '',
+		statShown(v, 'certifications_count', certCount)
+			? `<div class="stat-item"><div class="stat-number"><span ${ed('template_overrides.certifications_count')}>${certCount}</span></div><div class="stat-text">Credentials</div></div>`
+			: '',
+	].filter(Boolean);
+	const aboutStatsHtml = aboutStats.length
+		? `<div class="about-stats reveal${aboutStats.length < 3 ? ` cols-${aboutStats.length}` : ''}">${aboutStats.join('')}</div>`
+		: '';
+
+	const aboutPh = (label: string) => `<div class="about-img-ph"><span>${initials}</span><small>${label}</small></div>`;
+	const showAboutMain = !!v.summary_image || em;
+	const showAboutSecondary = !!v.secondary_image || em;
+	const aboutImagesHtml = (showAboutMain || showAboutSecondary)
+		? `<div class="about-images reveal">
+${showAboutMain ? `<div class="about-img-main" ${_imgUpload('profile.summary_image', em, 'Main image')}>${v.summary_image ? `<img src="${v.summary_image}" alt="${v.name} — studio">` : aboutPh('Add main image')}</div>` : ''}
+${showAboutSecondary ? `<div class="about-img-secondary" ${_imgUpload('profile.secondary_image', em, 'Overlap image')}>${v.secondary_image ? `<img src="${v.secondary_image}" alt="${v.name} — detail">` : aboutPh('Add overlap')}</div>` : ''}
+</div>`
+		: '';
+
+	const aboutHtml = (v.bio || v.uniqueValue || aboutStatsHtml || aboutImagesHtml)
+		? `<section id="about"><div class="container">
+<div class="about-content${aboutImagesHtml ? '' : ' solo'}">
+<div class="about-text reveal">
+<span class="eyebrow">About</span>
+<h2>Crafting <em>timeless</em> spaces</h2>
+${v.uniqueValue ? `<p class="about-lead" ${ed('portfolio.uniqueValue', true)}>${v.uniqueValue}</p>` : ''}
+${v.bio ? `<p ${ed('portfolio.bio', true)}>${v.bio}</p>` : ''}
+${aboutStatsHtml}
+</div>
+${aboutImagesHtml}
+</div>
+</div></section>`
+		: '';
+
 	// CONTACT
 	const cItems = [
 		v.email ? `<a class="contact-item" href="mailto:${v.email}" ${ed('profile.email')}>${v.email}</a>` : '',
@@ -403,13 +486,7 @@ ${v.email ? `<a href="mailto:${v.email}" class="btn btn-outline" style="color:#f
 </div>
 </section>
 
-${(v.bio || v.uniqueValue || em) ? `<section id="about"><div class="container">
-${shead('About', 'The Practice')}
-<div style="max-width:780px;margin:0 auto;text-align:center">
-${v.uniqueValue ? `<p class="philo reveal" style="font-size:clamp(1.4rem,2.4vw,2rem);margin-bottom:2rem" ${ed('portfolio.uniqueValue', true)}>${v.uniqueValue}</p>` : ''}
-${v.bio ? `<p class="reveal" ${ed('portfolio.bio', true)}>${v.bio}</p>` : ''}
-</div>
-</div></section>` : ''}
+${aboutHtml}
 
 ${orderedSections}
 

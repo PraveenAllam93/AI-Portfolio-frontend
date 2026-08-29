@@ -331,8 +331,9 @@ export const TEMPLATE_FIELDS: Record<string, TemplateField[]> = {
 		{ key: 'projects_count',   label: 'Projects Count',      hint: 'Shown as "Projects" in the About stat cards' },
 	],
 	salon: [
-		{ key: 'years_experience', label: 'Years of Experience', hint: 'Computed years of experience' },
-		{ key: 'projects_count',   label: 'Projects Count',      hint: 'Computed count of projects' },
+		{ key: 'projects_count',       label: 'Projects Count',       hint: 'Shown as "Projects Completed" in the About stats row' },
+		{ key: 'years_experience',     label: 'Years of Experience',  hint: 'Shown as "Years Experience" in the About stats row' },
+		{ key: 'certifications_count', label: 'Credentials Count',    hint: 'Shown as "Credentials" in the About stats row (defaults to the number of certifications)' },
 	],
 	meridian: [
 		{ key: 'years_experience',     label: 'Years of Experience',  hint: 'Shown as "X+ Years Experience" in the hero stats row' },
@@ -390,7 +391,56 @@ export const TEMPLATE_FIELDS: Record<string, TemplateField[]> = {
  * profile photo), uploaded from the edit page's "Portfolio Fields" tab and stored
  * as profile.summary_image.
  */
-export const SUMMARY_IMAGE_TEMPLATES: ReadonlySet<string> = new Set(['structura', 'citrus', 'bloom', 'vantage', 'canopy', 'meridian', 'cambria', 'verdant', 'haven', 'solace', 'quill']);
+export const SUMMARY_IMAGE_TEMPLATES: ReadonlySet<string> = new Set(['structura', 'citrus', 'bloom', 'vantage', 'canopy', 'meridian', 'cambria', 'verdant', 'haven', 'solace', 'quill', 'terra', 'salon']);
+
+/**
+ * Templates that render a THIRD image (profile.secondary_image), on top of the
+ * hero photo and the summary image. Currently only salon, whose About section is
+ * an overlapping two-image composition.
+ */
+export const SECONDARY_IMAGE_TEMPLATES: ReadonlySet<string> = new Set(['salon']);
+
+/**
+ * Per-template wording for the two auxiliary image upload cards.
+ *
+ * summary_image/secondary_image are generic slots — each template decides where
+ * the image actually lands, so the default "About / Summary section" copy is
+ * wrong for templates that use the slot for something else (terra puts it behind
+ * the hero). Override here so the card never describes the wrong place; anything
+ * absent falls back to the default below.
+ */
+export interface ImageFieldCopy {
+	label: string;
+	hint: string;
+}
+
+export const DEFAULT_SUMMARY_IMAGE_COPY: ImageFieldCopy = {
+	label: 'Summary Image',
+	hint: 'A separate image shown in your About / Summary section (not your hero profile photo).'
+};
+
+export const SUMMARY_IMAGE_COPY: Record<string, ImageFieldCopy> = {
+	terra: {
+		label: 'Hero Background',
+		hint: 'The full-screen photo behind your name at the top of the page. Separate from your profile photo — a room, building or workspace shot works best. Without one the hero shows a warm gradient.'
+	},
+	salon: {
+		label: 'About Image — Main',
+		hint: 'The larger image in your About section, sitting at the top right of the pair.'
+	}
+};
+
+export const DEFAULT_SECONDARY_IMAGE_COPY: ImageFieldCopy = {
+	label: 'Secondary Image',
+	hint: 'An additional image used by this template.'
+};
+
+export const SECONDARY_IMAGE_COPY: Record<string, ImageFieldCopy> = {
+	salon: {
+		label: 'About Image — Overlap',
+		hint: 'The smaller image overlapping the bottom left of the main one. Leave empty to show the main image on its own.'
+	}
+};
 
 /**
  * Templates with an editable "Core Expertise" list, managed from the Portfolio
