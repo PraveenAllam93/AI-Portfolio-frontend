@@ -1158,6 +1158,31 @@
 		selectedTypeId === 'finance'             ? FINANCE_DOE_CONTENT    : JOHN_DOE_CONTENT
 	);
 
+	// The preview iframe is fed through `srcdoc`, and a srcdoc document inherits its
+	// base URL from THIS page. So a template's `<a href="#contact">` resolves to
+	// /app/resumes/upload#contact — a cross-document navigation, not a fragment
+	// scroll — and the browser dutifully loads the upload wizard itself inside the
+	// preview frame. (The edit page escapes this because document.open() re-points
+	// the iframe's URL at the parent's, making the same links true fragment links;
+	// published portfolios are real documents at real URLs, so they're fine too.)
+	//
+	// Take over every link click in the preview: hash links scroll manually, and
+	// everything else — the John Doe mock LinkedIn/GitHub URLs, mailto:, tel: — is
+	// inert, since a preview should never navigate anywhere. Capture phase, so a
+	// template that stopPropagation()s its own nav can't slip a navigation past us.
+	const PREVIEW_LINK_SHIM =
+		'<script>(function(){document.addEventListener("click",function(e){' +
+		'var a=e.target&&e.target.closest?e.target.closest("a"):null;if(!a)return;' +
+		'e.preventDefault();' +
+		'var href=a.getAttribute("href")||"";if(href.charAt(0)!=="#")return;' +
+		'var id=href.slice(1);var t=null;' +
+		'if(id){try{t=document.getElementById(id)||document.querySelector("[id=\\""+id+"\\"]");}catch(_){}}' +
+		'if(!t){window.scrollTo({top:0,behavior:"smooth"});return;}' +
+		'var nav=document.querySelector("nav");' +
+		'var navH=nav?nav.getBoundingClientRect().height:0;' +
+		'window.scrollBy({top:t.getBoundingClientRect().top-navH-16,behavior:"smooth"});' +
+		'},true);})();<\/script>';
+
 	// Reactive preview — re-renders whenever profession or carousel index changes
 	const previewScale  = $derived(containerWidth / 1280);
 	const previewHeight = $derived(Math.round(900 * previewScale));
@@ -1175,7 +1200,8 @@
 			true   // publishMode — strips editor chrome
 		).replace(
 			'</head>',
-			'<style>::-webkit-scrollbar{display:none!important}html,body{scrollbar-width:none!important;-ms-overflow-style:none!important}</style></head>'
+			'<style>::-webkit-scrollbar{display:none!important}html,body{scrollbar-width:none!important;-ms-overflow-style:none!important}</style>' +
+			PREVIEW_LINK_SHIM + '</head>'
 		)
 	);
 
